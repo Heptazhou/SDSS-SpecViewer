@@ -3,7 +3,7 @@ authors: Dr. Jennifer Li (UIUC) and Meg Davis (UConn, megan.c.davis@uconn.edu), 
 
 This is a demo for a multi-epoch spectral viewer for SDSSV-BHM using plotly/dash (https://dash.plotly.com/). The ultimate goal is to build a web application that allows quick spectral visualization for SDSSV BHM data.
 
-**Usage**: Please see the Getting Started section, below, before launching the tool. To launch the web app, you run the script as a regular python file. The web app will be at http://127.0.0.1:8050/, which you can open with any web browser.
+**Usage**: Please see the Getting Started section, below, before launching the tool. To launch the web app, you run the script `sdssv_spec_appREMOTE.py` as a regular python file. The web app will be at http://127.0.0.1:8050/, which you can open with any web browser.
 
 ---
 # Getting Started
