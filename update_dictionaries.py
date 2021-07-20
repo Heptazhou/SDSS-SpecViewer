@@ -38,6 +38,19 @@ except: #fails if the authentication is bad or url is bad!
 programs = {'SDSS-RM':[15171, 15172, 15173, "all"],'XMM-LSS':[15000, 15002, "all"],
             'COSMOS':[15038, 15070, 15071, 15252, 15253, "all"]}
 
+#Sorting out AQMES plates and adding the "all" option
+AQWIDE = (spAll[1].data["PROGRAMNAME"] == 'AQMES-Wide') & (spAll[1].data["OBJTYPE"] == 'QSO')
+AQMED = (spAll[1].data["PROGRAMNAME"] == 'AQMES-Medium') & (spAll[1].data["OBJTYPE"] == 'QSO')
+
+wide_plates = np.unique(spAll[1].data["PLATE"][AQWIDE]).tolist()
+wide_plates.append("all")
+
+med_plates = np.unique(spAll[1].data["PLATE"][AQMED]).tolist()
+med_plates.append("all")
+
+programs['AQMES-Wide'] = wide_plates
+programs['AQMES-Medium'] = med_plates
+
 #plateIDs = {'plateID':[catalogID, ...], ...}
 plateIDs = {}
 
@@ -47,7 +60,7 @@ mask1 = (spAll[1].data["PROGRAMNAME"] == 'RM') & (spAll[1].data["OBJTYPE"] == 'Q
 #Include v2 for COSMOS IDs...
 mask2 = (spAll[1].data["PROGRAMNAME"] == 'RMv2') & (spAll[1].data["OBJTYPE"] == 'QSO')
 #Either 'RM' or 'RMv2', all QSOs
-mask = mask1 | mask2
+mask = mask1 | mask2 | AQWIDE | AQMED
 
 #fill plateIDs and catalogIDs
 #Only QSOs and completed epochs
@@ -73,7 +86,7 @@ for i in programs.keys():
             programs[i].append('all')
 
 
-print("building dictionaries from spAll_v6_0_2.fits (approx 2 minutes) ...")
+print("building dictionaries from spAll_v6_0_2.fits (approx 12 minutes with AQMES) ...")
 
 #catalogIDs = {'catalogID': [[Plate, MJD, SN2, decMJD],  ...], ...}
 catalogIDs = {}
