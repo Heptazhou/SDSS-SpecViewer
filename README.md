@@ -22,7 +22,7 @@ Please install the following Python packages to use this tool. The provided "dep
 
 ### Keeping up-to-date
 
-The `dictionaries.txt` file is the backbone to this tool. By running the `update_dictionaires.py` file, it will access the most recent `spAll_v6_0_2.fits` file and update said dictionary file. This doesn't need to be done often, especially once the plate programs are done observing. As of 6/30/2021, the file provided here is up-to-date! Runtime: ~5 minutes.
+The `dictionaries.txt` file is the backbone to this tool. By running the `update_dictionaires.py` file, it will access the most recent `spAll_v6_0_2.fits` file and update said dictionary file. This doesn't need to be done often, especially once the plate programs are done observing. As of 7/20/2021, the file provided here is up-to-date! Runtime: ~10 minutes.
 
 
 # Features to be added
