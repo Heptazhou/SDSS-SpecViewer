@@ -30,7 +30,7 @@ authen = './authentication.txt'
 ### css files
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css', \
 'https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css', \
-'http://aladin.u-strasbg.fr/AladinLite/api/v2/latest/aladin.min.css', \
+'https://aladin.u-strasbg.fr/AladinLite/api/v2/latest/aladin.min.css', \
 'https://use.fontawesome.com/releases/v5.13.0/css/all.css', \
 'https://use.fontawesome.com/releases/v5.13.0/css/v4-shims.css', \
 ]
@@ -73,7 +73,7 @@ def fetch_catID(catID, field, redshift):
 	# if (redshift > 0):
 	# 	print("fetch_catID", catID, field) # for testing
 	# 	print(waves)
-	# else:
+	# 	return waves, fluxes, names
 		# print("fetch_catID", catID, field) # for testing
 		fluxes = []
 		waves = []
@@ -99,7 +99,7 @@ def fetch_catID(catID, field, redshift):
 					continue
 		# print(fluxes) # for testing
 		return waves, fluxes, names
-	# return waves, fluxes, names
+
 
 ###
 ### Authentication
@@ -121,8 +121,8 @@ try:
 	fetch_test = SDSSV_fetch(username, password, 112359, 60086, 27021600949438682)
 	print("Verification successful.")
 except:
-	print("Authentication error, please cntrl-c and fix authentication.txt.")
-	# print("Contact Meg (megan.c.davis@uconn.edu) is the issue persists.")
+	print("Authentication error, please ctrl-c and fix authentication.txt.")
+	# print("Contact Meg (megan.c.davis@uconn.edu) if the issue persists.")
 
 
 
@@ -130,7 +130,7 @@ except:
 spectral_lines = { 'Ha': [6564],
 				   'Hb': [4862],
 				   'MgII': [2798],
-				   'CIII]': [1908],
+				   'CIII': [1908],
 				   'CIV': [1549],
 				   'Lya': [1215],}
 
@@ -245,19 +245,19 @@ app.layout = html.Div(className='container',children=[
 				value=list(spectral_lines.keys())),
 		],style={"width": "20%", 'display': 'inline-block'}),
 
-# 		## user-adjustable redshift
-# 		html.Div(children=[
-# 			html.H4(children=['Redshift:'])
-# 		],style={"width": "10%",'display': 'inline-block'}),
-#
-# 		html.Div(children=[
-# 		dcc.Textarea(
-# 		id='user_redshift',
-# 		value='0'
-# 		),
-# 		html.Button('Submit', id='user_redshift_button', n_clicks=0),
-# 		html.Div(id='user_redshift_output', style={'whiteSpace': 'pre-line'})
-# 		],style={"width": "30%",'display': 'inline-block'}),
+		# ## user-adjustable redshift
+		# html.Div(children=[
+		# 	html.H4(children=['Redshift:'])
+		# ],style={"width": "10%",'display': 'inline-block'}),
+		#
+		# html.Div(children=[
+		# dcc.Textarea(
+		# id='user_redshift',
+		# value='0'
+		# ),
+		# html.Button('Submit', id='user_redshift_button', n_clicks=0),
+		# html.Div(id='user_redshift_output', style={'whiteSpace': 'pre-line'})
+		# ],style={"width": "30%",'display': 'inline-block'}),
 
 	]),
 
