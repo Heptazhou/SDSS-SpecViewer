@@ -144,7 +144,7 @@ app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 ### get object info
 ### organize by program, fieldid, catalogid
 # programname = ['COSMOS']
-programname = ['AQMES-Medium', 'AQMES-Wide', 'AQMES-Bonus', 'bhm_aqmes']
+# programname = ['AQMES-Medium', 'AQMES-Wide', 'AQMES-Bonus', 'bhm_aqmes']
 # programname = ['SDSS-RM', 'XMM-LSS', 'COSMOS', 'AQMES-Medium', 'AQMES-Wide'] # , 'eFEDS1', 'eFEDS2']
 
 
@@ -188,7 +188,7 @@ app.layout = html.Div(className='container', children=[
                         options=[
                             {'label': i, 'value': i} for i in programs.keys()],
                         placeholder="Program",
-                        value='SDSS-RM',
+                        # value='SDSS-RM',
                     )], style={"width": "30%", 'display': 'inline-block'}),
 
 		## Field ID dropdown
@@ -290,6 +290,7 @@ app.layout = html.Div(className='container', children=[
 	Output('fieldid_dropdown', 'options'),
 	Input('program_dropdown', 'value'))
 def set_fieldid_options(selected_program):
+	if not selected_program: return []
 	return [{'label': i, 'value': i} for i in programs[selected_program]]
 
 @app.callback(
@@ -297,6 +298,8 @@ def set_fieldid_options(selected_program):
 	Input('fieldid_dropdown', 'value'),
 	Input('program_dropdown', 'value'))
 def set_catalogid_options(selected_designid, selected_program):
+	if not selected_designid: return []
+	if not selected_program: return []
 	if selected_designid != 'all':
 		return [{'label': i, 'value': i} for i in fieldIDs[str(selected_designid)]]
 	else:
@@ -306,15 +309,21 @@ def set_catalogid_options(selected_designid, selected_program):
 	Output('fieldid_dropdown', 'value'),
 	Input('fieldid_dropdown', 'options'))
 def set_fieldid_value(available_fieldid_options):
-	# print("set_fieldid_value", available_fieldid_options[0]['value']) # for testing
-	return available_fieldid_options[0]['value']
+	try:
+		# print("set_fieldid_value", available_fieldid_options[0]['value']) # for testing
+		return available_fieldid_options[0]['value']
+	except:
+		return
 
 @app.callback(
 	Output('catalogid_dropdown', 'value'),
 	Input('catalogid_dropdown', 'options'))
 def set_catalogid_value(available_catalogid_options):
-	# print("set_catalogid_value", available_catalogid_options[0]['value']) # for testing
-	return available_catalogid_options[0]['value']
+	try:
+		# print("set_catalogid_value", available_catalogid_options[0]['value']) # for testing
+		return available_catalogid_options[0]['value']
+	except:
+		return
 
 # @app.callback(
 # 	Output('redshift_dropdown', 'value'),
@@ -330,7 +339,8 @@ def set_catalogid_value(available_catalogid_options):
 	Input('catalogid_dropdown', 'value'),
 	Input('redshift_input', 'value')) # redshift_dropdown
 def make_multiepoch_spectra(selected_designid, selected_catalogid, redshift):
-	waves, fluxes, names = fetch_catID(selected_catalogid, selected_designid, redshift)
+	try: waves, fluxes, names = fetch_catID(selected_catalogid, selected_designid, redshift)
+	except: return go.Figure()
 
 	fig = go.Figure()
 	fig.layout.xaxis.range = [wave_min / (1 + redshift), wave_max / (1 + redshift)]
