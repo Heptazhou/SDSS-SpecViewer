@@ -23,7 +23,7 @@ programs, fieldIDs, catalogIDs = json.load(open("dictionaries.txt"))
 # # print(catalogIDs['27021598150201532'])
 # print("those were catalogIDs")
 
-redshifts = json.load(open("redshifts.txt"))
+# redshifts = json.load(open("redshifts.txt"))
 redshift = 0
 authen = './authentication.txt'
 
@@ -205,14 +205,14 @@ app.layout = html.Div(className='container', children=[
                         placeholder='Catalog ID',
                     )], style={"width": "30%", 'display': 'inline-block'}),
 
-		## catalog ID dropdown
+		## redshift input
 		html.Div(children=[
-                    dcc.Dropdown(
-                        id='redshift_dropdown',
-                        options=[
-                            {'label': i, 'value': i} for i in redshifts],
-                        placeholder='Redshift',
-                    )], style={"width": "10%", 'display': 'inline-block'}),
+                    dcc.Input(
+                        id='redshift_input', # redshift_dropdown
+                        type="number",
+                        value=redshift,
+                        style={"height": "36px"},
+                    )], style={"width": "10%", 'display': 'inline-block', "vertical-align": "top"}),
 	]),
 
 	## multiepoch spectra plot
@@ -230,7 +230,7 @@ app.layout = html.Div(className='container', children=[
 		], style={"width": "10%", 'display': 'inline-block'}),
 
 		html.Div(children=[
-			dcc.Input(id="binning_input", type="number", value=5),
+			dcc.Input(id="binning_input", type="number", value=5, style={"height": "36px"}),
 		], style={"width": "20%", 'display': 'inline-block'}),
 
 		## label important spectral lines
@@ -316,11 +316,11 @@ def set_catalogid_value(available_catalogid_options):
 	# print("set_catalogid_value", available_catalogid_options[0]['value']) # for testing
 	return available_catalogid_options[0]['value']
 
-@app.callback(
-	Output('redshift_dropdown', 'value'),
-	Input('redshift_dropdown', 'options'))
-def set_redshift_value(available_redshift_options):
-	return available_redshift_options[0]['value']
+# @app.callback(
+# 	Output('redshift_dropdown', 'value'),
+# 	Input('redshift_dropdown', 'options'))
+# def set_redshift_value(available_redshift_options):
+# 	return available_redshift_options[0]['value']
 
 
 ## plotting the spectra
@@ -328,7 +328,7 @@ def set_redshift_value(available_redshift_options):
 	Output('spectra_plot', 'figure'),
 	Input('fieldid_dropdown', 'value'),
 	Input('catalogid_dropdown', 'value'),
-	Input('redshift_dropdown', 'value'))
+	Input('redshift_input', 'value')) # redshift_dropdown
 def make_multiepoch_spectra(selected_designid, selected_catalogid, redshift):
 	waves, fluxes, names = fetch_catID(selected_catalogid, selected_designid, redshift)
 
