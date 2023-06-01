@@ -1,0 +1,57 @@
+#Short script that takes an ra, dec, and desired zoom, spits out helpful links.
+#intial code from kevin welch, 9th Version
+
+def main():
+    #Basic while loop, only breaks on user input and takes input for ra, dec, zoom and passes to another function
+    while True:
+        #the printing of the line is for formatting. the rest of code collects the ra, dec, zoom from the user
+        print("-"*30)
+        RA = float(input("Please Input Object RA: "))
+        DEC = float(input("Please Input Object DEC: "))
+        ZOOM = float(input("Please Input Desired Zoom(16 is recommended): "))
+        links = link_central(RA, DEC, ZOOM)
+        #iterate through the returned list and print
+        i = 0
+        while i < len(links):
+            print(links[i])
+            i += 1
+        #allows user to exit program.
+        if int(input("\nEnter 1 to Exit: ")) == 1:
+            break
+        print("-"*30)
+        print("\n"*2)
+
+def link_central(RA, DEC, ZOOM):
+    #This function will take a provided RA, DEC, ZOOM; doing a fast error check then returns a list of links.
+    #This function was coded in such a way to make refactoring a bit easier, if more links are needed it may make sense to split of each link generation + error code as its own function for readability
+    Error = False
+    Error_list = []
+    link_list = []
+    #Some basic error checking for out of bound values.
+    if RA > 360 or RA < 0:
+        Error_list.append("RA is out of bounds!")
+        Error = True
+
+    if DEC > 90 or DEC < -90:
+        Error_list.append("DEC is out of bounds!")
+        Error = True
+
+    if ZOOM < 1 or ZOOM > 16:
+        Error_list.append("ZOOM is out of bounds! Choose between 1 and 16 inclusive.")
+        Error = True
+
+    #Generate legacy link and add to list
+    link_list.append(f"\nLegacy Survey(Required for posting): \n https://www.legacysurvey.org/viewer?ra={RA}&dec={DEC}&zoom={ZOOM}")
+    #Generate link for sdss skyserver
+    link_list.append(f"\nSDSS SkyServer(Required for posting): \n https://skyserver.sdss.org/dr17/VisualTools/explore/summary?ra={RA}&dec={DEC}")
+    #Generate link for simbad
+    link_list.append(f"\nsimbad: \n http://simbad.u-strasbg.fr/simbad/sim-coo?Coord={RA}d{DEC}d&CooFrame=ICRS&CooEpoch=2000&CooEqui=2000&Radius=2&Radius.unit=arcmin&submit=submit+query&CoordList=")
+
+    #checks if an error has happened, if not it will return the list of links
+    if Error == False:
+        return link_list
+    else:
+        return [f"There seems to be a/or error/s: {Error_list}"]
+
+
+main()
