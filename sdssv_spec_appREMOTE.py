@@ -28,12 +28,11 @@ redshift = 0
 authen = './authentication.txt'
 
 ### css files
-external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css',
-                        'https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css',
-                        'https://aladin.u-strasbg.fr/AladinLite/api/v2/latest/aladin.min.css',
-                        'https://use.fontawesome.com/releases/v5.13.0/css/all.css',
-                        'https://use.fontawesome.com/releases/v5.13.0/css/v4-shims.css',
-                        ]
+external_stylesheets = [ 'https://codepen.io/chriddyp/pen/bWLwgP.css',
+                         'https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css',
+                         'https://aladin.u-strasbg.fr/AladinLite/api/v2/latest/aladin.min.css',
+                         'https://use.fontawesome.com/releases/v5.13.0/css/all.css',
+                         'https://use.fontawesome.com/releases/v5.13.0/css/v4-shims.css', ]
 
 ###
 ### Any necessary functions

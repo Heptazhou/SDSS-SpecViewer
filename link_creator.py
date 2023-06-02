@@ -3,9 +3,9 @@
 # modified by Michael
 
 def main():
-    # Basic while loop, only breaks on user input and takes input for ra, dec, zoom and passes to another function
+    # Basic while loop, only breaks on user input and takes input for ra, dec, zoom and passes to another function to create and return links.
     while True:
-        # the printing of the line is for formatting. the rest of code collects the ra, dec, zoom from the user
+        # printing lines and breaks to make it a bit more visually easier to read when using the program.
         print("-" * 30)
         RA = tryparse(float, input("Please Input Object RA: "), 0)
         DEC = tryparse(float, input("Please Input Object DEC: "), 0)
@@ -30,7 +30,7 @@ def tryparse(type, value, default):
 
 def link_central(RA, DEC, ZOOM):
     # This function will take a provided RA, DEC, ZOOM; doing a fast error check then returns a list of links.
-    # This function was coded in such a way to make refactoring a bit easier, if more links are needed it may make sense to split of each link generation + error code as its own function for readability
+    # This function is coded in such a way to hopefully make refactoring a bit easier, if more links are needed it may make sense to split of each link generation + error code as its own function for readability. If other data retireval from coord is important in the future than this function should just be calling separate functions alongside an error function. Might be able to come up with something better.
     Error_list = []
     link_list = []
     # Some basic error checking for out of bound values.
