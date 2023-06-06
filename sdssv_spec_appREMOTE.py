@@ -1,11 +1,13 @@
-import dash
-from dash import dcc, html
-from dash.dependencies import Input, Output, State
-import plotly.graph_objects as go
-from astropy.io import fits
-import requests
 import io
 import json
+import math
+
+import dash
+import plotly.graph_objects as go
+import requests
+from astropy.io import fits
+from dash import dcc, html
+from dash.dependencies import Input, Output, State
 
 ###
 ### input the data directory path
@@ -23,9 +25,18 @@ programs, fieldIDs, catalogIDs = json.load(open("dictionaries.txt"))
 # # print(catalogIDs['27021598150201532'])
 # print("those were catalogIDs")
 
-# redshifts = json.load(open("redshifts.txt"))
-redshift = 0
+# the stepping is for easier adjustment using arrow keys, the redshift itself is of any precision
+redshift_stepping = 0.01
+redshift_default = 0
+redshift = None
 authen = './authentication.txt'
+
+# global dict to save results of `fetch_catID`, which greatly improves responsiveness after the first plot
+cache: dict[tuple, tuple] = {}
+
+# global y-axis range of spectrum plots
+y_min = -10
+y_max = 100
 
 ### css files
 external_stylesheets = [ 'https://codepen.io/chriddyp/pen/bWLwgP.css',
@@ -74,6 +85,8 @@ def fetch_catID(catID, field, redshift):
 	# 	print(waves)
 	# 	return waves, fluxes, names
 	# print("fetch_catID", catID, field) # for testing
+	if (field, catID) in cache:
+		return cache[(field, catID)]
 	fluxes = []
 	waves = []
 	names = []
@@ -94,10 +107,10 @@ def fetch_catID(catID, field, redshift):
 				fluxes.append(dat[1])
 				waves.append(dat[0])
 				names.append(i[3])
-			else:
-				continue
 	# print(fluxes) # for testing
-	return waves, fluxes, names
+	cache[(field, catID)] = waves, fluxes, names
+	return cache[(field, catID)]
+
 
 
 ###
@@ -134,11 +147,12 @@ spectral_lines = { 'Ha': [6564],
                    'Lya': [1215], }
 
 ### wavelength plotting range
-wave_min = 3500
-wave_max = 10500
+wave_min = 3500.
+wave_max = 10500.
 
 ### starting the dash app
-app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
+app = dash.Dash(__name__, external_stylesheets=external_stylesheets,
+                title="SpecViewer", update_title="Loading...")
 
 ### get object info
 ### organize by program, fieldid, catalogid
@@ -208,8 +222,8 @@ app.layout = html.Div(className='container', children=[
 		html.Div(children=[
                     dcc.Input(
                         id='redshift_input', # redshift_dropdown
-                        type="number",
-                        value=redshift,
+                        type="number", min=0,
+                        value=redshift, placeholder=redshift_default,
                         style={"height": "36px"},
                     )], style={"width": "10%", 'display': 'inline-block', "vertical-align": "top"}),
 	]),
@@ -338,12 +352,16 @@ def set_catalogid_value(available_catalogid_options):
 	Input('catalogid_dropdown', 'value'),
 	Input('redshift_input', 'value')) # redshift_dropdown
 def make_multiepoch_spectra(selected_designid, selected_catalogid, redshift):
+	if not redshift: redshift = redshift_default
 	try: waves, fluxes, names = fetch_catID(selected_catalogid, selected_designid, redshift)
 	except: return go.Figure()
 
+	x_min = math.floor(wave_min / (1 + redshift))
+	x_max = math.ceil(wave_max / (1 + redshift))
+
 	fig = go.Figure()
-	fig.layout.xaxis.range = [wave_min / (1 + redshift), wave_max / (1 + redshift)]
-	fig.layout.yaxis.range = [-10, 100]
+	fig.layout.xaxis.range = [x_min, x_max]
+	fig.layout.yaxis.range = [y_min, y_max]
 
 	print(redshift)
 	for i in range(0, len(waves)):
@@ -351,9 +369,9 @@ def make_multiepoch_spectra(selected_designid, selected_catalogid, redshift):
                            opacity=1. / 2., mode='lines'))
 
 	for j in spectral_lines.keys():
-		if (spectral_lines[j][0] >= wave_min / (1 + redshift)) & (spectral_lines[j][0] <= wave_max / (1 + redshift)):
+		if (spectral_lines[j][0] >= x_min and spectral_lines[j][0] <= x_max):
 			xj = [ spectral_lines[j][0], spectral_lines[j][0] ]
-			yj = [ -10, 100 ]
+			yj = [ y_min, y_max ]
 			# print(xj, yj) # for testing
 			fig.add_trace(go.Scatter(x=xj, y=yj, opacity=1. / 2., name=j, mode='lines')) # , line=go.scatter.Line(color="black")))
 
@@ -372,16 +390,16 @@ def make_multiepoch_spectra(selected_designid, selected_catalogid, redshift):
 #
 # 	fig = go.Figure()
 # 	fig.layout.xaxis.range = [wave_min / (1 + redshift), wave_max / (1 + redshift)]
-# 	fig.layout.yaxis.range = [-10, 100]
+# 	fig.layout.yaxis.range = [y_min, y_max]
 #
 # 	for i in range(0, len(waves)):
 # 		fig.add_trace(go.Scatter(x=waves[i] / (1 + redshift), y=fluxes[i], name=names[i],
 #                            opacity=1. / 2., mode='lines'))
 #
 # 	for j in spectral_lines.keys():
-# 		if (spectral_lines[j][0] >= wave_min / (1 + redshift)) & (spectral_lines[j][0] <= wave_max / (1 + redshift)):
+# 		if (spectral_lines[j][0] >= wave_min / (1 + redshift) and spectral_lines[j][0] <= wave_max / (1 + redshift)):
 # 			xj = [ spectral_lines[j][0], spectral_lines[j][0] ]
-# 			yj = [ -10, 100 ]
+# 			yj = [ y_min, y_max ]
 # 			print(xj, yj)
 # 			fig.add_trace(go.Scatter(x=xj, y=yj, opacity=1. / 2., name=j, mode='lines')) # , line=go.scatter.Line(color="black")))
 #
