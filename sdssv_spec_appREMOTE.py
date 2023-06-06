@@ -29,10 +29,10 @@ authen = './authentication.txt'
 
 ### css files
 external_stylesheets = [ 'https://codepen.io/chriddyp/pen/bWLwgP.css',
-                         'https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css',
+                         'https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css',
                          'https://aladin.u-strasbg.fr/AladinLite/api/v2/latest/aladin.min.css',
-                         'https://use.fontawesome.com/releases/v5.13.0/css/all.css',
-                         'https://use.fontawesome.com/releases/v5.13.0/css/v4-shims.css', ]
+                         'https://use.fontawesome.com/releases/v5.15.4/css/all.css',
+                         'https://use.fontawesome.com/releases/v5.15.4/css/v4-shims.css', ]
 
 ###
 ### Any necessary functions
@@ -45,8 +45,8 @@ def SDSSV_buildURL(fieldID, MJD, objID):
 	Field IDs don't start with zero but the URLs need leading zeroes;
 	using zfill(6) fixes this.
 	"""
-	url = "https://data.sdss5.org/sas/sdsswork/bhm/boss/spectro/redux/v6_1_0/" \
-		+ "spectra/lite/{}/{}/spec-{}-{}-{}.fits".format(str(fieldID).zfill(6), str(MJD), str(fieldID).zfill(6), str(MJD), str(objID))
+	url = "https://data.sdss5.org/sas/sdsswork/bhm/boss/spectro/redux/v6_1_0/spectra/lite/" \
+		+ "{}/{}/spec-{}-{}-{}.fits".format(str(fieldID).zfill(6), MJD, str(fieldID).zfill(6), MJD, objID)
 	print(url) # for testing
 
 	return url
@@ -129,7 +129,7 @@ except:
 spectral_lines = { 'Ha': [6564],
                    'Hb': [4862],
                    'MgII': [2798],
-                   'CIII': [1908],
+                   'CIII]': [1908],
                    'CIV': [1549],
                    'Lya': [1215], }
 
