@@ -15,6 +15,7 @@ from dash.dependencies import Input, Output, State
 
 # NOTE TO CODER: JSON LIKES STRING KEYS FOR DICTIONARIES!!!!!!
 programs, fieldIDs, catalogIDs = json.load(open("dictionaries.txt"))
+authentication = "authentication.txt"
 
 # for testing
 # print(programs)
@@ -25,11 +26,10 @@ programs, fieldIDs, catalogIDs = json.load(open("dictionaries.txt"))
 # # print(catalogIDs['27021598150201532'])
 # print("those were catalogIDs")
 
-# the stepping is for easier adjustment using arrow keys, the redshift itself is of any precision
-redshift_stepping = 0.01
+# the redshift and a stepping of it for easier adjustment using arrow keys or mouse wheel
 redshift_default = 0
 redshift = None
-authen = './authentication.txt'
+stepping = None
 
 # global dict to save results of `fetch_catID`, which greatly improves responsiveness after the first plot
 cache: dict[tuple, tuple] = {}
@@ -118,7 +118,7 @@ def fetch_catID(catID, field, redshift):
 ###
 try:
 	print("Reading authentication file.")
-	with open(authen, 'r') as i:
+	with open(authentication, "r") as i:
 		lines = i.readlines()
 		username = lines[0][:-1] # there will be a \n on the username
 		password = lines[1][:-1] # and on the password, at least for some file systems
@@ -212,7 +212,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 			),
 			dcc.Input(
 				id='redshift_input', # redshift_dropdown
-				type="number", min=0,
+				type="number", min=0, step=stepping if stepping else "Any",
 				value=redshift, placeholder=redshift_default,
 				style={"height": "36px", "width": "100%"},
 			)]),
@@ -224,7 +224,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 			),
 			dcc.Dropdown(
 				id="redshift_step", options=["Any", 0.1, 0.01, 0.001, 0.0001],
-				placeholder="Any",
+				value=stepping, placeholder="Any",
 			)]),
 
 	]),
