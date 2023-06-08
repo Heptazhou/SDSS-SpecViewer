@@ -172,37 +172,11 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 
 	html.Div(className="row", children=[
 
-		## dropdown menu titles
-		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
-			html.H4(children=['Program'])
-		]),
-
-		## fieldID dropdown
-		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
-			html.H4(children=['Field ID'])
-		]),
-
-		## catalog ID dropdown
-		html.Div(className="col-lg-4 col-md-6 col-sm-8 col-xs-12", children=[
-			html.H4(children=['Catalog ID'])
-		]),
-
-		## redshift input
-		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
-			html.H4(children=['Redshift'])
-		]),
-
-		## redshift stepping dropdown
-		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
-			html.H4(children=['Redshift stepping'])
-		]),
-
-	]),
-
-	html.Div(className="row", children=[
-
 		## dropdown menu for program/designid/catalogid
 		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
+			html.Label(
+				html.H4("Program"),
+			),
 			dcc.Dropdown(
 				id='program_dropdown',
 				options=[
@@ -213,6 +187,9 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 
 		## Field ID dropdown
 		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
+			html.Label(
+				html.H4("Field ID"),
+			),
 			dcc.Dropdown(
 				id='fieldid_dropdown',
 				placeholder='Field ID',
@@ -220,6 +197,9 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 
 		## catalog ID dropdown
 		html.Div(className="col-lg-4 col-md-6 col-sm-8 col-xs-12", children=[
+			html.Label(
+				html.H4("Catalog ID"),
+			),
 			dcc.Dropdown(
 				id='catalogid_dropdown',
 				placeholder='Catalog ID',
@@ -227,6 +207,9 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 
 		## redshift input
 		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
+			html.Label(
+				html.H4("Redshift (z)"),
+			),
 			dcc.Input(
 				id='redshift_input', # redshift_dropdown
 				type="number", min=0,
@@ -236,6 +219,9 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 
 		## redshift stepping dropdown
 		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
+			html.Label(
+				html.H4("z stepping"),
+			),
 			dcc.Dropdown(
 				id="redshift_step", options=["Any", 0.1, 0.01, 0.001, 0.0001],
 				placeholder="Any",
