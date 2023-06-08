@@ -165,67 +165,82 @@ app = dash.Dash(__name__, external_stylesheets=external_stylesheets,
 ###
 ### the webpage layout
 ###
-app.layout = html.Div(className='container', children=[
+
+# see https://getbootstrap.com/docs/3.4/css/#grid
+app.layout = html.Div(className="container-fluid", style={"width": "90%"}, children=[
 	html.H2(children=['SDSSV-BHM Spectra Viewer (remote version)']),
 
-	html.Div([
+	html.Div(className="row", children=[
 
 		## dropdown menu titles
-		html.Div([
+		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
 			html.H4(children=['Program'])
-		], style={"width": "30%", 'display': 'inline-block'}),
+		]),
 
 		## fieldID dropdown
-		html.Div(children=[
-                    html.H4(children=['Field ID'])
-		], style={"width": "30%", 'display': 'inline-block'}),
+		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
+			html.H4(children=['Field ID'])
+		]),
 
 		## catalog ID dropdown
-		html.Div(children=[
-                    html.H4(children=['Catalog ID'])
-		], style={"width": "30%", 'display': 'inline-block'}),
+		html.Div(className="col-lg-4 col-md-6 col-sm-8 col-xs-12", children=[
+			html.H4(children=['Catalog ID'])
+		]),
 
-		## catalog ID dropdown
-		html.Div(children=[
-                    html.H4(children=['Redshift'])
-		], style={"width": "10%", 'display': 'inline-block'}),
+		## redshift input
+		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
+			html.H4(children=['Redshift'])
+		]),
+
+		## redshift stepping dropdown
+		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
+			html.H4(children=['Redshift stepping'])
+		]),
 
 	]),
 
-	html.Div([
+	html.Div(className="row", children=[
 
 		## dropdown menu for program/designid/catalogid
-		html.Div([
-                    dcc.Dropdown(
-                        id='program_dropdown',
-                        options=[
-                            {'label': i, 'value': i} for i in programs.keys()],
-                        placeholder="Program",
-                        # value='SDSS-RM',
-                    )], style={"width": "30%", 'display': 'inline-block'}),
+		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
+			dcc.Dropdown(
+				id='program_dropdown',
+				options=[
+					{'label': i, 'value': i} for i in programs.keys()],
+				placeholder="Program",
+				# value='SDSS-RM',
+			)]),
 
 		## Field ID dropdown
-		html.Div(children=[
-                    dcc.Dropdown(
-                        id='fieldid_dropdown',
-                        placeholder='Field ID',
-                    )], style={"width": "30%", 'display': 'inline-block'}),
+		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
+			dcc.Dropdown(
+				id='fieldid_dropdown',
+				placeholder='Field ID',
+			)]),
 
 		## catalog ID dropdown
-		html.Div(children=[
-                    dcc.Dropdown(
-                        id='catalogid_dropdown',
-                        placeholder='Catalog ID',
-                    )], style={"width": "30%", 'display': 'inline-block'}),
+		html.Div(className="col-lg-4 col-md-6 col-sm-8 col-xs-12", children=[
+			dcc.Dropdown(
+				id='catalogid_dropdown',
+				placeholder='Catalog ID',
+			)]),
 
 		## redshift input
-		html.Div(children=[
-                    dcc.Input(
-                        id='redshift_input', # redshift_dropdown
-                        type="number", min=0,
-                        value=redshift, placeholder=redshift_default,
-                        style={"height": "36px"},
-                    )], style={"width": "10%", 'display': 'inline-block', "verticalAlign": "top"}),
+		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
+			dcc.Input(
+				id='redshift_input', # redshift_dropdown
+				type="number", min=0,
+				value=redshift, placeholder=redshift_default,
+				style={"height": "36px", "width": "100%"},
+			)]),
+
+		## redshift stepping dropdown
+		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
+			dcc.Dropdown(
+				id="redshift_step", options=["Any", 0.1, 0.01, 0.001, 0.0001],
+				placeholder="Any",
+			)]),
+
 	]),
 
 	## multiepoch spectra plot
@@ -254,7 +269,7 @@ app.layout = html.Div(className='container', children=[
 		html.Div(children=[
 			dcc.Checklist(id="line_list", options=[
 				{'label': i + ' (' + str(int(spectral_lines[i][0])) + 'A)', 'value': i} for i in spectral_lines.keys()
-                            ],
+			],
 				value=list(spectral_lines.keys())),
 		], style={"width": "20%", 'display': 'inline-block', "verticalAlign": "top"}),
 
