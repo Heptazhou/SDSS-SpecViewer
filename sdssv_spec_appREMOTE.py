@@ -168,7 +168,9 @@ app = dash.Dash(__name__, external_stylesheets=external_stylesheets,
 
 # see https://getbootstrap.com/docs/3.4/css/#grid
 app.layout = html.Div(className="container-fluid", style={"width": "90%"}, children=[
-	html.H2(children=['SDSSV-BHM Spectra Viewer (remote version)']),
+	html.Div(className="row", children=[
+		html.H2("SDSSV-BHM Spectra Viewer (remote version)"),
+	]),
 
 	html.Div(className="row", children=[
 
@@ -205,6 +207,10 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 				placeholder='Catalog ID',
 			)]),
 
+		## whitespace (NOT A FIELD)
+		html.Div(className="col-sm-4 visible-sm-block", style={"visibility": "hidden"},
+                    children=[html.Label(html.H4(" ")), dcc.Dropdown()]),
+
 		## redshift input
 		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
 			html.Label(
@@ -212,9 +218,9 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 			),
 			dcc.Input(
 				id='redshift_input', # redshift_dropdown
-				type="number", min=0, step=stepping if stepping else "Any",
-				value=redshift, placeholder=redshift_default,
-				style={"height": "36px", "width": "100%"},
+				type="text", step="any", pattern="\d+(\.\d*)?|\.\d+",
+				value=redshift, placeholder=redshift_default, min=0,
+				style={"height": "36px", "width": "100%"}, inputMode="numeric",
 			)]),
 
 		## redshift stepping dropdown
@@ -223,7 +229,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 				html.H4("z stepping"),
 			),
 			dcc.Dropdown(
-				id="redshift_step", options=["Any", 0.1, 0.01, 0.001, 0.0001],
+				id="redshift_step", options=["any", 0.1, 0.01, 0.001, 0.0001],
 				value=stepping, placeholder="Any",
 			)]),
 
@@ -339,11 +345,21 @@ def set_catalogid_value(available_catalogid_options):
 	except:
 		return
 
-# @app.callback(
-# 	Output('redshift_dropdown', 'value'),
-# 	Input('redshift_dropdown', 'options'))
-# def set_redshift_value(available_redshift_options):
-# 	return available_redshift_options[0]['value']
+@app.callback(
+	Output("redshift_input", "value"),
+	Output("redshift_input", "type"),
+	Output("redshift_input", "step"),
+	State("redshift_input", "value"),
+	Input("redshift_step", "value"))
+def set_redshift_stepping(z, step):
+	if not step: step = "any"
+	if str(step).lower() == "any":
+		type = "text"
+	else:
+		type = "number"
+	if type == "number" and z:
+		z = f"%0.{-int(math.log10(step))}f" % float(z)
+	return z, type, step
 
 
 ## plotting the spectra
@@ -357,6 +373,7 @@ def make_multiepoch_spectra(selected_designid, selected_catalogid, redshift):
 	try: waves, fluxes, names = fetch_catID(selected_catalogid, selected_designid, redshift)
 	except: return go.Figure()
 
+	redshift = float(redshift)
 	x_min = math.floor(wave_min / (1 + redshift))
 	x_max = math.ceil(wave_max / (1 + redshift))
 
