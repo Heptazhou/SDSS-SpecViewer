@@ -26,7 +26,7 @@ authentication = "authentication.txt"
 # # print(catalogIDs['27021598150201532'])
 # print("those were catalogIDs")
 
-# the redshift and a stepping of it for easier adjustment using arrow keys or mouse wheel
+# the redshift and stepping to easily adjust redshift using arrow keys or mouse wheel, disabled by default
 redshift_default = 0
 redshift = None
 stepping = None
@@ -34,9 +34,9 @@ stepping = None
 # global dict to save results of `fetch_catID`, which greatly improves responsiveness after the first plot
 cache: dict[tuple, tuple] = {}
 
-# global y-axis range of spectrum plots
-y_min = -10
-y_max = 100
+# default y-axis range of spectrum plots
+y_max_default = 100
+y_min_default = -10
 
 ### css files
 external_stylesheets = [ 'https://codepen.io/chriddyp/pen/bWLwgP.css',
@@ -139,12 +139,12 @@ except:
 
 
 ### important spectra lines to label in plots
-spectral_lines = { 'Ha': [6564],
-                   'Hb': [4862],
-                   'MgII': [2798],
-                   'CIII]': [1908],
-                   'CIV': [1549],
-                   'Lya': [1215], }
+spectral_lines = { "H α": [6564],
+                   "H β": [4862],
+                   "Mg II": [2798],
+                   "C III ]": [1908],
+                   "C IV": [1549],
+                   "Ly α": [1215], }
 
 ### wavelength plotting range
 wave_min = 3500.
@@ -247,6 +247,21 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 
 	html.Div(className="row", children=[
 
+		## y-axis range
+		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
+			html.Label(
+				html.H4("Y-axis range"),
+			),
+			dcc.Input(
+				id="axis_y_max", type="number", step=1, value=y_max_default, placeholder="Max",
+				style={"height": "36px", "width": "100%"},
+			),
+			dcc.Input(
+				id="axis_y_min", type="number", step=1, value=y_min_default, placeholder="Min",
+				style={"height": "36px", "width": "100%"},
+			),
+		]),
+
 		## spectral binning
 		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
 			html.Label(
@@ -264,9 +279,12 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 				html.H4("Lines"),
 			),
 			dcc.Checklist(id="line_list", options=[
-				{'label': i + ' (' + str(int(spectral_lines[i][0])) + 'A)', 'value': i} for i in spectral_lines.keys()
+				{"label": i + " \t (" + str(int(spectral_lines[i][0])) + "Å)", "value": i} for i in spectral_lines.keys()
 			],
-				value=list(spectral_lines.keys())),
+				value=list(spectral_lines.keys()),
+				inputStyle={"margin-right": "5px"},
+				labelStyle={"white-space": "pre-wrap"},
+			),
 		]),
 
 		# ## user-adjustable redshift
@@ -371,13 +389,21 @@ def set_redshift_stepping(z, step):
 	Output('spectra_plot', 'figure'),
 	Input('fieldid_dropdown', 'value'),
 	Input('catalogid_dropdown', 'value'),
-	Input('redshift_input', 'value')) # redshift_dropdown
-def make_multiepoch_spectra(selected_designid, selected_catalogid, redshift):
-	if not redshift: redshift = redshift_default
-	try: waves, fluxes, names = fetch_catID(selected_catalogid, selected_designid, redshift)
-	except: return go.Figure()
+	Input('redshift_input', 'value'), # redshift_dropdown
+	Input('axis_y_max', 'value'),
+	Input('axis_y_min', 'value'),
+	State('spectra_plot', 'figure'))
+def make_multiepoch_spectra(selected_designid, selected_catalogid, redshift, y_max, y_min, fig):
+	try:
+		if not redshift: redshift = redshift_default
+		waves, fluxes, names = fetch_catID(selected_catalogid, selected_designid, redshift)
+		redshift = float(redshift)
+	except:
+		return go.Figure()
 
-	redshift = float(redshift)
+	if not y_max: return fig
+	if not y_min: return fig
+	if y_max < y_min: y_min, y_max = y_max, y_min
 	x_min = math.floor(wave_min / (1 + redshift))
 	x_max = math.ceil(wave_max / (1 + redshift))
 
