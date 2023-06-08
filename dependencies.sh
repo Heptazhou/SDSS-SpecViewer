@@ -4,4 +4,4 @@
 # pip install dash
 # pip install plotly
 # pip install numpy
-conda install astropy dash numpy plotly requests
+conda install astropy dash plotly requests
