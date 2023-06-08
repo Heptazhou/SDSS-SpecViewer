@@ -248,25 +248,26 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 	html.Div(className="row", children=[
 
 		## spectral binning
-		html.Div(children=[
-			html.H4(children=['Binning:'])
-		], style={"width": "10%", 'display': 'inline-block', "verticalAlign": "top"}),
-
-		html.Div(children=[
-			dcc.Input(id="binning_input", type="number", value=5, style={"height": "36px"}),
-		], style={"width": "20%", 'display': 'inline-block', "verticalAlign": "top"}),
+		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
+			html.Label(
+				html.H4("Binning"),
+			),
+			dcc.Input(
+				id="binning_input", type="number", step=1, min=1, value=1,
+				style={"height": "36px", "width": "100%"},
+			),
+		]),
 
 		## label important spectral lines
-		html.Div(children=[
-			html.H4(children=['Lines:'])
-		], style={"width": "10%", 'display': 'inline-block', "verticalAlign": "top"}),
-
-		html.Div(children=[
+		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
+			html.Label(
+				html.H4("Lines"),
+			),
 			dcc.Checklist(id="line_list", options=[
 				{'label': i + ' (' + str(int(spectral_lines[i][0])) + 'A)', 'value': i} for i in spectral_lines.keys()
 			],
 				value=list(spectral_lines.keys())),
-		], style={"width": "20%", 'display': 'inline-block', "verticalAlign": "top"}),
+		]),
 
 		# ## user-adjustable redshift
 		# html.Div(children=[
