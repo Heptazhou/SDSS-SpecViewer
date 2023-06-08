@@ -236,13 +236,16 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 	]),
 
 	## multiepoch spectra plot
-	dcc.Checklist(
-		id="epoch_list",
-		labelStyle={'display': 'inline-block'}
-	),
-	dcc.Graph(id="spectra_plot"),
+	# dcc.Checklist(
+	# 	id="epoch_list",
+	# 	labelStyle={'display': 'inline-block'}
+	# ),
 
-	html.Div([
+	html.Div(className="row", children=[
+		dcc.Graph(id="spectra_plot"),
+	]),
+
+	html.Div(className="row", children=[
 
 		## spectral binning
 		html.Div(children=[
@@ -282,9 +285,9 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 	]),
 
 	## TODO: print source information (ra, dec, z, etc...) from some catalog
-	html.Div([
-		html.H5(id='property_text')
-	])
+	# html.Div([
+	# 	html.H5(id='property_text')
+	# ])
 
 ])
 
