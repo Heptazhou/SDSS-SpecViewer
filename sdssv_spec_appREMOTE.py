@@ -326,6 +326,35 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 # 		print("redshift is ", redshift)
 # 		return redshift
 
+## input manually
+@app.callback(
+	Output("fieldid_input", "hidden"),
+	Output("catalogid_input", "hidden"),
+	Output("fieldid_dropdown", "hidden"),
+	Output("catalogid_dropdown", "hidden"),
+	Output("fieldid_input", "value"),
+	Output("catalogid_input", "value"),
+	Input("program_dropdown", "value"))
+def set_input_or_dropdown(program):
+	if program and program == "(other)":
+		return False, False, True, True, None, None
+	else:
+		return True, True, False, False, None, None
+
+@app.callback(
+	Output("fieldid_dropdown", "value"),
+	State("fieldid_dropdown", "value"),
+	Input("fieldid_input", "value"))
+def set_fieldid_value_by_input(state, input):
+	return input or state
+
+@app.callback(
+	Output("catalogid_dropdown", "value"),
+	State("catalogid_dropdown", "value"),
+	Input("catalogid_input", "value"))
+def set_catalogid_value_by_input(state, input):
+	return input or state
+
 ## dropdown menu
 @app.callback(
 	Output('fieldid_dropdown', 'options'),
@@ -400,6 +429,7 @@ def make_multiepoch_spectra(selected_designid, selected_catalogid, redshift, y_m
 	except:
 		return go.Figure()
 
+	if not y_max and not y_min: return fig
 	if not y_max: y_max = 0
 	if not y_min: y_min = 0
 	if y_max < y_min: y_min, y_max = y_max, y_min
