@@ -182,9 +182,8 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 			dcc.Dropdown(
 				id='program_dropdown',
 				options=[
-					{'label': i, 'value': i} for i in programs.keys()],
+					{"label": i, "value": i} for i in [*programs.keys(), "(other)"]],
 				placeholder="Program",
-				# value='SDSS-RM',
 			)]),
 
 		## Field ID dropdown
@@ -219,7 +218,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 			dcc.Input(
 				id='redshift_input', # redshift_dropdown
 				type="text", step="any", pattern="\d+(\.\d*)?|\.\d+",
-				value=redshift, placeholder=redshift_default, min=0,
+				value=redshift or "", placeholder=redshift_default, min=0,
 				style={"height": "36px", "width": "100%"}, inputMode="numeric",
 			)]),
 
@@ -282,8 +281,8 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 				{"label": i + " \t (" + str(int(spectral_lines[i][0])) + "Å)", "value": i} for i in spectral_lines.keys()
 			],
 				value=list(spectral_lines.keys()),
-				inputStyle={"margin-right": "5px"},
-				labelStyle={"white-space": "pre-wrap"},
+				inputStyle={"marginRight": "5px"},
+				labelStyle={"whiteSpace": "pre-wrap"},
 			),
 		]),
 
@@ -332,7 +331,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 	Output('fieldid_dropdown', 'options'),
 	Input('program_dropdown', 'value'))
 def set_fieldid_options(selected_program):
-	if not selected_program: return []
+	if not selected_program or selected_program == "(other)": return []
 	return [{'label': i, 'value': i} for i in programs[selected_program]]
 
 @app.callback(
@@ -401,8 +400,8 @@ def make_multiepoch_spectra(selected_designid, selected_catalogid, redshift, y_m
 	except:
 		return go.Figure()
 
-	if not y_max: return fig
-	if not y_min: return fig
+	if not y_max: y_max = 0
+	if not y_min: y_min = 0
 	if y_max < y_min: y_min, y_max = y_max, y_min
 	x_min = math.floor(wave_min / (1 + redshift))
 	x_max = math.ceil(wave_max / (1 + redshift))
