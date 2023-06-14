@@ -1,6 +1,7 @@
 import io
 import json
 import math
+import re
 
 import dash
 import plotly.graph_objects as go
@@ -186,15 +187,35 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 				placeholder="Program",
 			)]),
 
+		## Field ID input
+		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
+			html.Label(
+				html.H4("Field & MJD"),
+			),
+			dcc.Input(
+				id="fieldid_input", type="text",
+				placeholder="FieldID-MJD", style={"height": "36px", "width": "100%"},
+			)], id="fieldid_input_div", hidden=True),
+
 		## Field ID dropdown
 		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
 			html.Label(
 				html.H4("Field ID"),
 			),
 			dcc.Dropdown(
-				id='fieldid_dropdown',
-				placeholder='Field ID',
-			)]),
+				id="fieldid_dropdown",
+				placeholder="FieldID",
+			)], id="fieldid_dropdown_div", hidden=False),
+
+		## catalog ID input
+		html.Div(className="col-lg-4 col-md-6 col-sm-8 col-xs-12", children=[
+			html.Label(
+				html.H4("Catalog ID"),
+			),
+			dcc.Input(
+				id="catalogid_input", type="text",
+				placeholder="CatalogID", style={"height": "36px", "width": "100%"},
+			)], id="catalogid_input_div", hidden=True),
 
 		## catalog ID dropdown
 		html.Div(className="col-lg-4 col-md-6 col-sm-8 col-xs-12", children=[
@@ -202,13 +223,13 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 				html.H4("Catalog ID"),
 			),
 			dcc.Dropdown(
-				id='catalogid_dropdown',
-				placeholder='Catalog ID',
-			)]),
+				id="catalogid_dropdown",
+				placeholder="CatalogID",
+			)], id="catalogid_dropdown_div", hidden=False),
 
 		## whitespace (NOT A FIELD)
 		html.Div(className="col-sm-4 visible-sm-block", style={"visibility": "hidden"},
-                    children=[html.Label(html.H4(" ")), dcc.Dropdown()]),
+                    children=[html.Label(html.H4("-")), dcc.Dropdown()]),
 
 		## redshift input
 		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
@@ -328,10 +349,10 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 
 ## input manually
 @app.callback(
-	Output("fieldid_input", "hidden"),
-	Output("catalogid_input", "hidden"),
-	Output("fieldid_dropdown", "hidden"),
-	Output("catalogid_dropdown", "hidden"),
+	Output("fieldid_input_div", "hidden"),
+	Output("catalogid_input_div", "hidden"),
+	Output("fieldid_dropdown_div", "hidden"),
+	Output("catalogid_dropdown_div", "hidden"),
 	Output("fieldid_input", "value"),
 	Output("catalogid_input", "value"),
 	Input("program_dropdown", "value"))
@@ -340,20 +361,6 @@ def set_input_or_dropdown(program):
 		return False, False, True, True, None, None
 	else:
 		return True, True, False, False, None, None
-
-@app.callback(
-	Output("fieldid_dropdown", "value"),
-	State("fieldid_dropdown", "value"),
-	Input("fieldid_input", "value"))
-def set_fieldid_value_by_input(state, input):
-	return input or state
-
-@app.callback(
-	Output("catalogid_dropdown", "value"),
-	State("catalogid_dropdown", "value"),
-	Input("catalogid_input", "value"))
-def set_catalogid_value_by_input(state, input):
-	return input or state
 
 ## dropdown menu
 @app.callback(
