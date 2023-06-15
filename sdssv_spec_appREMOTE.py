@@ -26,7 +26,7 @@ authentication = "authentication.txt"
 # print(fieldIDs)
 # print("those were fieldIDs")
 # print(catalogIDs)
-# # print(catalogIDs['27021598150201532'])
+# # print(catalogIDs["27021598150201532"])
 # print("those were catalogIDs")
 
 # the redshift and stepping to easily adjust redshift using arrow keys or mouse wheel, disabled by default
@@ -42,11 +42,11 @@ y_max_default = 100
 y_min_default = -10
 
 ### css files
-external_stylesheets = [ 'https://codepen.io/chriddyp/pen/bWLwgP.css',
-                         'https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css',
-                         'https://aladin.u-strasbg.fr/AladinLite/api/v2/latest/aladin.min.css',
-                         'https://use.fontawesome.com/releases/v5.15.4/css/all.css',
-                         'https://use.fontawesome.com/releases/v5.15.4/css/v4-shims.css', ]
+external_stylesheets = [ "https://codepen.io/chriddyp/pen/bWLwgP.css",
+                         "https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css",
+                         "https://aladin.u-strasbg.fr/AladinLite/api/v2/latest/aladin.min.css",
+                         "https://use.fontawesome.com/releases/v5.15.4/css/all.css",
+                         "https://use.fontawesome.com/releases/v5.15.4/css/v4-shims.css", ]
 
 ###
 ### Any necessary functions
@@ -80,8 +80,8 @@ def SDSSV_fetch(username, password, fieldID, MJD, objID, branch="v6_1_0"):
 	r = requests.get(url, auth=(username, password))
 	r.raise_for_status()
 	data_test = fits.open(io.BytesIO(r.content))
-	flux = data_test[1].data['FLUX']
-	wave = 10**data_test[1].data['loglam']
+	flux = data_test[1].data["FLUX"]
+	wave = 10**data_test[1].data["loglam"]
 	# print(flux) # for testing
 	return wave, flux
 
@@ -166,9 +166,9 @@ app = dash.Dash(__name__, external_stylesheets=external_stylesheets,
 
 ### get object info
 ### organize by program, fieldid, catalogid
-# programname = ['COSMOS']
-# programname = ['AQMES-Medium', 'AQMES-Wide', 'AQMES-Bonus', 'bhm_aqmes']
-# programname = ['SDSS-RM', 'XMM-LSS', 'COSMOS', 'AQMES-Medium', 'AQMES-Wide'] # , 'eFEDS1', 'eFEDS2']
+# programname = ["COSMOS"]
+# programname = ["AQMES-Medium", "AQMES-Wide", "AQMES-Bonus", "bhm_aqmes"]
+# programname = ["SDSS-RM", "XMM-LSS", "COSMOS", "AQMES-Medium", "AQMES-Wide"] # , "eFEDS1", "eFEDS2"]
 
 
 
@@ -190,7 +190,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 				html.H4("Program"),
 			),
 			dcc.Dropdown(
-				id='program_dropdown',
+				id="program_dropdown",
 				options=[
 					{"label": i, "value": i} for i in [*programs.keys(), "(other)"]],
 				placeholder="Program",
@@ -246,7 +246,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 				html.H4("Redshift (z)"),
 			),
 			dcc.Input(
-				id='redshift_input', # redshift_dropdown
+				id="redshift_input", # redshift_dropdown
 				type="text", step="any", pattern="\d+(\.\d*)?|\.\d+",
 				value=redshift or "", placeholder=redshift_default, min=0,
 				style={"height": "36px", "width": "100%"}, inputMode="numeric",
@@ -267,7 +267,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 	## multiepoch spectra plot
 	# dcc.Checklist(
 	# 	id="epoch_list",
-	# 	labelStyle={'display': 'inline-block'}
+	# 	labelStyle={"display": "inline-block"}
 	# ),
 
 	html.Div(className="row", children=[
@@ -321,23 +321,23 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 
 		# ## user-adjustable redshift
 		# html.Div(children=[
-		# 	html.H4(children=['Redshift:'])
-		# ], style={"width": "10%", 'display': 'inline-block'}),
+		# 	html.H4(children=["Redshift:"])
+		# ], style={"width": "10%", "display": "inline-block"}),
 		#
 		# html.Div(children=[
 		#             dcc.Textarea(
-		#                 id='user_redshift',
-		#                 value='0'
+		#                 id="user_redshift",
+		#                 value="0"
 		#             ),
-		#             html.Button('Submit', id='user_redshift_button', n_clicks=0),
-		#             html.Div(id='user_redshift_output', style={'whiteSpace': 'pre-line'})
-		# ], style={"width": "30%", 'display': 'inline-block'}),
+		#             html.Button("Submit", id="user_redshift_button", n_clicks=0),
+		#             html.Div(id="user_redshift_output", style={"whiteSpace": "pre-line"})
+		# ], style={"width": "30%", "display": "inline-block"}),
 
 	]),
 
 	## TODO: print source information (ra, dec, z, etc...) from some catalog
 	# html.Div([
-	# 	html.H5(id='property_text')
+	# 	html.H5(id="property_text")
 	# ])
 
 ])
@@ -349,9 +349,9 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 
 ### redshift
 # @app.callback(
-# 	Output('user_redshift_output', 'value'), # , 'children'),
-# 	Input('user_redshift_button', 'n_clicks'),
-# 	State('user_redshift', 'value')
+# 	Output("user_redshift_output", "value"), # , "children"),
+# 	Input("user_redshift_button", "n_clicks"),
+# 	State("user_redshift", "value")
 # )
 # def update_redshift(n_clicks, user_redshift):
 # 	if n_clicks > 0:
@@ -376,47 +376,47 @@ def set_input_or_dropdown(program):
 
 ## dropdown menu
 @app.callback(
-	Output('fieldid_dropdown', 'options'),
-	Input('program_dropdown', 'value'))
+	Output("fieldid_dropdown", "options"),
+	Input("program_dropdown", "value"))
 def set_fieldid_options(selected_program):
 	if not selected_program or selected_program == "(other)": return []
-	return [{'label': i, 'value': i} for i in programs[selected_program]]
+	return [{"label": i, "value": i} for i in programs[selected_program]]
 
 @app.callback(
-	Output('catalogid_dropdown', 'options'),
-	Input('fieldid_dropdown', 'value'),
-	Input('program_dropdown', 'value'))
+	Output("catalogid_dropdown", "options"),
+	Input("fieldid_dropdown", "value"),
+	Input("program_dropdown", "value"))
 def set_catalogid_options(selected_designid, selected_program):
 	if not selected_program or selected_program == "(other)": return []
 	if not selected_designid: return []
-	if selected_designid != 'all':
-		return [{'label': i, 'value': i} for i in fieldIDs[str(selected_designid)]]
+	if selected_designid != "all":
+		return [{"label": i, "value": i} for i in fieldIDs[str(selected_designid)]]
 	else:
-		return [{'label': i, 'value': i} for i in fieldIDs[str(selected_program) + "-" + str(selected_designid)]]
+		return [{"label": i, "value": i} for i in fieldIDs[str(selected_program) + "-" + str(selected_designid)]]
 
 @app.callback(
-	Output('fieldid_dropdown', 'value'),
-	Input('fieldid_dropdown', 'options'),
-	Input('fieldid_input', 'value'),
-	State('program_dropdown', 'value'))
+	Output("fieldid_dropdown", "value"),
+	Input("fieldid_dropdown", "options"),
+	Input("fieldid_input", "value"),
+	State("program_dropdown", "value"))
 def set_fieldid_value(available_fieldid_options, input, program):
 	try:
 		if program == "(other)": return input or ""
-		# print("set_fieldid_value", available_fieldid_options[0]['value']) # for testing
-		return available_fieldid_options[0]['value']
+		# print("set_fieldid_value", available_fieldid_options[0]["value"]) # for testing
+		return available_fieldid_options[0]["value"]
 	except:
 		return
 
 @app.callback(
-	Output('catalogid_dropdown', 'value'),
-	Input('catalogid_dropdown', 'options'),
-	Input('catalogid_input', 'value'),
-	State('program_dropdown', 'value'))
+	Output("catalogid_dropdown", "value"),
+	Input("catalogid_dropdown", "options"),
+	Input("catalogid_input", "value"),
+	State("program_dropdown", "value"))
 def set_catalogid_value(available_catalogid_options, input, program):
 	try:
 		if program == "(other)": return input or ""
-		# print("set_catalogid_value", available_catalogid_options[0]['value']) # for testing
-		return available_catalogid_options[0]['value']
+		# print("set_catalogid_value", available_catalogid_options[0]["value"]) # for testing
+		return available_catalogid_options[0]["value"]
 	except:
 		return
 
@@ -439,13 +439,13 @@ def set_redshift_stepping(z, step):
 
 ## plotting the spectra
 @app.callback(
-	Output('spectra_plot', 'figure'),
-	Input('fieldid_dropdown', 'value'),
-	Input('catalogid_dropdown', 'value'),
-	Input('redshift_input', 'value'), # redshift_dropdown
-	Input('axis_y_max', 'value'),
-	Input('axis_y_min', 'value'),
-	Input('binning_input', 'value'))
+	Output("spectra_plot", "figure"),
+	Input("fieldid_dropdown", "value"),
+	Input("catalogid_dropdown", "value"),
+	Input("redshift_input", "value"), # redshift_dropdown
+	Input("axis_y_max", "value"),
+	Input("axis_y_min", "value"),
+	Input("binning_input", "value"))
 def make_multiepoch_spectra(selected_designid, selected_catalogid, redshift, y_max, y_min, binning):
 	try:
 		if not redshift: redshift = redshift_default
@@ -496,8 +496,8 @@ def make_multiepoch_spectra(selected_designid, selected_catalogid, redshift, y_m
 
 ### changing just the redshift
 # @app.callback(
-# 	Output('spectra_plot', 'figure'),
-# 	Input('redshift_dropdown', 'value'))
+# 	Output("spectra_plot", "figure"),
+# 	Input("redshift_dropdown", "value"))
 # def adjust_redshift_spectra(redshift):
 #
 # 	fig = go.Figure()
@@ -506,39 +506,39 @@ def make_multiepoch_spectra(selected_designid, selected_catalogid, redshift, y_m
 #
 # 	for i in range(0, len(waves)):
 # 		fig.add_trace(go.Scatter(x=waves[i] / (1 + redshift), y=fluxes[i], name=names[i],
-#                            opacity=1. / 2., mode='lines'))
+#                            opacity=1. / 2., mode="lines"))
 #
 # 	for j in spectral_lines.keys():
 # 		if (spectral_lines[j][0] >= wave_min / (1 + redshift) and spectral_lines[j][0] <= wave_max / (1 + redshift)):
 # 			xj = [ spectral_lines[j][0], spectral_lines[j][0] ]
 # 			yj = [ y_min, y_max ]
 # 			print(xj, yj)
-# 			fig.add_trace(go.Scatter(x=xj, y=yj, opacity=1. / 2., name=j, mode='lines')) # , line=go.scatter.Line(color="black")))
+# 			fig.add_trace(go.Scatter(x=xj, y=yj, opacity=1. / 2., name=j, mode="lines")) # , line=go.scatter.Line(color="black")))
 #
 # 	return fig
 
 
 ### setting the selected epochs for plotting
 # @app.callback(
-# 	Output('epoch_list', 'value'),
-# 	Input('fieldid_dropdown', 'value'),
-# 	Input('catalogid_dropdown', 'value'))
+# 	Output("epoch_list", "value"),
+# 	Input("fieldid_dropdown", "value"),
+# 	Input("catalogid_dropdown", "value"))
 # def set_epoch_value(selected_designid, selected_catalogid):
 # 	filename = np.array([])
 # 	for i in fieldid[selected_designid]:
-# 		tmp = glob.glob(dir_spectra + str(i) + 'p/coadd/*/spSpec-' + str(i) + '-*-' + str(selected_catalogid).zfill(11) + '.fits')
+# 		tmp = glob.glob(dir_spectra + str(i) + "p/coadd/*/spSpec-" + str(i) + "-*-" + str(selected_catalogid).zfill(11) + ".fits")
 # 		if len(tmp) > 0:
 # 			filename = np.append(filename, tmp, axis=0)
 # 	epoch = np.array([])
 # 	for f in filename:
-# 		mjd = f.split('/')[-2]
-# 		field = f.split('/')[-4][:5]
+# 		mjd = f.split("/")[-2]
+# 		field = f.split("/")[-4][:5]
 # 		epoch = np.append(epoch, float(field) + float(mjd) / 1e5)
-# 	return [{'label': i, 'value': i} for i in epoch]
+# 	return [{"label": i, "value": i} for i in epoch]
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
 	# app.run_server(debug=True)
-	app.run_server(host='127.0.0.1', port=8050, debug=True)
+	app.run_server(host="127.0.0.1", port=8050, debug=True)
 
 
