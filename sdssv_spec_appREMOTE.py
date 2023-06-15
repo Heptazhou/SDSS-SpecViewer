@@ -71,21 +71,26 @@ def SDSSV_fetch(username, password, fieldID, MJD, objID):
 
 	TO DO: allow for multiple MJDs and fields, for loop it up
 	"""
+	if not (fieldID and MJD and objID):
+		raise Exception((fieldID, MJD, objID))
 	url = SDSSV_buildURL(fieldID, MJD, objID)
 	# print(url) # for testing
 	r = requests.get(url, auth=(username, password))
+	print(r.status_code)
+	if r.status_code >= 400:
+		raise Exception(r.status_code)
 	data_test = fits.open(io.BytesIO(r.content))
 	flux = data_test[1].data['FLUX']
 	wave = 10**data_test[1].data['loglam']
 	# print(flux) # for testing
 	return wave, flux
 
-def fetch_catID(catID, field, redshift):
+def fetch_catID(field, catID, redshift):
 	# if (redshift > 0):
-	# 	print("fetch_catID", catID, field) # for testing
+	# 	print("fetch_catID", field, catID) # for testing
 	# 	print(waves)
 	# 	return waves, fluxes, names
-	# print("fetch_catID", catID, field) # for testing
+	# print("fetch_catID", field, catID) # for testing
 	if (field, catID) in cache:
 		return cache[(field, catID)]
 	fluxes = []
@@ -95,19 +100,26 @@ def fetch_catID(catID, field, redshift):
 	# # print ("catalogIDs[str(catID)]")
 	# testval = catalogIDs[str(catID)]
 	# print (testval)
-	for i in catalogIDs[str(catID)]:
-		if field == "all":
-			# print(i[0], i[1], catID) # for testing
-			dat = SDSSV_fetch(username, password, i[0], i[1], catID)
-			fluxes.append(dat[1])
-			waves.append(dat[0])
-			names.append(i[3])
-		else:
-			if i[0] == field:
+	if re.fullmatch("\d+-\d+", str(field).strip()):
+		fld, mjd = str(field).strip().split("-", 1)
+		dat = SDSSV_fetch(username, password, fld, mjd, catID)
+		fluxes.append(dat[1])
+		waves.append(dat[0])
+		names.append(mjd)
+	else:
+		for i in catalogIDs[str(catID)]:
+			if field == "all":
+				# print(i[0], i[1], catID) # for testing
 				dat = SDSSV_fetch(username, password, i[0], i[1], catID)
 				fluxes.append(dat[1])
 				waves.append(dat[0])
 				names.append(i[3])
+			else:
+				if i[0] == field:
+					dat = SDSSV_fetch(username, password, i[0], i[1], catID)
+					fluxes.append(dat[1])
+					waves.append(dat[0])
+					names.append(i[3])
 	# print(fluxes) # for testing
 	cache[(field, catID)] = waves, fluxes, names
 	return cache[(field, catID)]
@@ -375,8 +387,8 @@ def set_fieldid_options(selected_program):
 	Input('fieldid_dropdown', 'value'),
 	Input('program_dropdown', 'value'))
 def set_catalogid_options(selected_designid, selected_program):
+	if not selected_program or selected_program == "(other)": return []
 	if not selected_designid: return []
-	if not selected_program: return []
 	if selected_designid != 'all':
 		return [{'label': i, 'value': i} for i in fieldIDs[str(selected_designid)]]
 	else:
@@ -384,9 +396,12 @@ def set_catalogid_options(selected_designid, selected_program):
 
 @app.callback(
 	Output('fieldid_dropdown', 'value'),
-	Input('fieldid_dropdown', 'options'))
-def set_fieldid_value(available_fieldid_options):
+	Input('fieldid_dropdown', 'options'),
+	Input('fieldid_input', 'value'),
+	State('program_dropdown', 'value'))
+def set_fieldid_value(available_fieldid_options, input, program):
 	try:
+		if program == "(other)": return input
 		# print("set_fieldid_value", available_fieldid_options[0]['value']) # for testing
 		return available_fieldid_options[0]['value']
 	except:
@@ -394,9 +409,12 @@ def set_fieldid_value(available_fieldid_options):
 
 @app.callback(
 	Output('catalogid_dropdown', 'value'),
-	Input('catalogid_dropdown', 'options'))
-def set_catalogid_value(available_catalogid_options):
+	Input('catalogid_dropdown', 'options'),
+	Input('catalogid_input', 'value'),
+	State('program_dropdown', 'value'))
+def set_catalogid_value(available_catalogid_options, input, program):
 	try:
+		if program == "(other)": return input
 		# print("set_catalogid_value", available_catalogid_options[0]['value']) # for testing
 		return available_catalogid_options[0]['value']
 	except:
@@ -431,7 +449,7 @@ def set_redshift_stepping(z, step):
 def make_multiepoch_spectra(selected_designid, selected_catalogid, redshift, y_max, y_min, fig):
 	try:
 		if not redshift: redshift = redshift_default
-		waves, fluxes, names = fetch_catID(selected_catalogid, selected_designid, redshift)
+		waves, fluxes, names = fetch_catID(selected_designid, selected_catalogid, redshift)
 		redshift = float(redshift)
 	except:
 		return go.Figure()
