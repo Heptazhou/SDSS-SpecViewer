@@ -50,20 +50,20 @@ external_stylesheets = [ 'https://codepen.io/chriddyp/pen/bWLwgP.css',
 ### Any necessary functions
 ###
 
-def SDSSV_buildURL(fieldID, MJD, objID):
+def SDSSV_buildURL(fieldID, MJD, objID, branch):
 	"""
 	A function to build the url that will be used to fetch the data.
 
 	Field IDs don't start with zero but the URLs need leading zeroes;
 	using zfill(6) fixes this.
 	"""
-	url = "https://data.sdss5.org/sas/sdsswork/bhm/boss/spectro/redux/v6_1_0/spectra/lite/" \
+	url = "https://data.sdss5.org/sas/sdsswork/bhm/boss/spectro/redux/{}/spectra/lite/".format(branch) \
 		+ "{}/{}/spec-{}-{}-{}.fits".format(str(fieldID).zfill(6), MJD, str(fieldID).zfill(6), MJD, objID)
 	print(url) # for testing
 
 	return url
 
-def SDSSV_fetch(username, password, fieldID, MJD, objID):
+def SDSSV_fetch(username, password, fieldID, MJD, objID, branch="v6_1_0"):
 	"""
 	Fetches spectral data for a SDSS-RM object on a
 		specific field on a specific MJD. Uses the user
@@ -73,7 +73,7 @@ def SDSSV_fetch(username, password, fieldID, MJD, objID):
 	"""
 	if not (fieldID and MJD and objID):
 		raise Exception((fieldID, MJD, objID))
-	url = SDSSV_buildURL(fieldID, MJD, objID)
+	url = SDSSV_buildURL(fieldID, MJD, objID, branch)
 	# print(url) # for testing
 	r = requests.get(url, auth=(username, password))
 	print(r.status_code)
@@ -102,24 +102,21 @@ def fetch_catID(field, catID, redshift):
 	# print (testval)
 	if re.fullmatch("\d+-\d+", str(field).strip()):
 		fld, mjd = str(field).strip().split("-", 1)
-		dat = SDSSV_fetch(username, password, fld, mjd, catID)
+		try:
+			dat = SDSSV_fetch(username, password, fld, mjd, str(catID).strip(), "master")
+		except:
+			dat = SDSSV_fetch(username, password, fld, mjd, str(catID).strip())
 		fluxes.append(dat[1])
 		waves.append(dat[0])
 		names.append(mjd)
 	else:
 		for i in catalogIDs[str(catID)]:
-			if field == "all":
+			if field == "all" or field == i[0]:
 				# print(i[0], i[1], catID) # for testing
 				dat = SDSSV_fetch(username, password, i[0], i[1], catID)
 				fluxes.append(dat[1])
 				waves.append(dat[0])
 				names.append(i[3])
-			else:
-				if i[0] == field:
-					dat = SDSSV_fetch(username, password, i[0], i[1], catID)
-					fluxes.append(dat[1])
-					waves.append(dat[0])
-					names.append(i[3])
 	# print(fluxes) # for testing
 	cache[(field, catID)] = waves, fluxes, names
 	return cache[(field, catID)]
@@ -274,7 +271,10 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 	# ),
 
 	html.Div(className="row", children=[
-		dcc.Graph(id="spectra_plot"),
+		dcc.Graph(
+			id="spectra_plot",
+			style={"position": "relative", "overflow": "hidden", "width": "108%", "left": "-4%"},
+		),
 	]),
 
 	html.Div(className="row", children=[
@@ -370,9 +370,9 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 	Input("program_dropdown", "value"))
 def set_input_or_dropdown(program):
 	if program and program == "(other)":
-		return False, False, True, True, None, None
+		return False, False, True, True, "", ""
 	else:
-		return True, True, False, False, None, None
+		return True, True, False, False, "", ""
 
 ## dropdown menu
 @app.callback(
@@ -401,7 +401,7 @@ def set_catalogid_options(selected_designid, selected_program):
 	State('program_dropdown', 'value'))
 def set_fieldid_value(available_fieldid_options, input, program):
 	try:
-		if program == "(other)": return input
+		if program == "(other)": return input or ""
 		# print("set_fieldid_value", available_fieldid_options[0]['value']) # for testing
 		return available_fieldid_options[0]['value']
 	except:
@@ -414,7 +414,7 @@ def set_fieldid_value(available_fieldid_options, input, program):
 	State('program_dropdown', 'value'))
 def set_catalogid_value(available_catalogid_options, input, program):
 	try:
-		if program == "(other)": return input
+		if program == "(other)": return input or ""
 		# print("set_catalogid_value", available_catalogid_options[0]['value']) # for testing
 		return available_catalogid_options[0]['value']
 	except:
@@ -445,8 +445,8 @@ def set_redshift_stepping(z, step):
 	Input('redshift_input', 'value'), # redshift_dropdown
 	Input('axis_y_max', 'value'),
 	Input('axis_y_min', 'value'),
-	State('spectra_plot', 'figure'))
-def make_multiepoch_spectra(selected_designid, selected_catalogid, redshift, y_max, y_min, fig):
+	Input('binning_input', 'value'))
+def make_multiepoch_spectra(selected_designid, selected_catalogid, redshift, y_max, y_min, bins):
 	try:
 		if not redshift: redshift = redshift_default
 		waves, fluxes, names = fetch_catID(selected_designid, selected_catalogid, redshift)
@@ -454,7 +454,7 @@ def make_multiepoch_spectra(selected_designid, selected_catalogid, redshift, y_m
 	except:
 		return go.Figure()
 
-	if not y_max and not y_min: return fig
+	if not y_max and not y_min: y_max, y_min = y_max_default, y_min_default
 	if not y_max: y_max = 0
 	if not y_min: y_min = 0
 	if y_max < y_min: y_min, y_max = y_max, y_min
