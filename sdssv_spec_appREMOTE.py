@@ -2,8 +2,10 @@ import io
 import json
 import math
 import re
+import statistics
 
 import dash
+import numpy as np
 import plotly.graph_objects as go
 import requests
 from astropy.io import fits
@@ -76,16 +78,14 @@ def SDSSV_fetch(username, password, fieldID, MJD, objID, branch="v6_1_0"):
 	url = SDSSV_buildURL(fieldID, MJD, objID, branch)
 	# print(url) # for testing
 	r = requests.get(url, auth=(username, password))
-	print(r.status_code)
-	if r.status_code >= 400:
-		raise Exception(r.status_code)
+	r.raise_for_status()
 	data_test = fits.open(io.BytesIO(r.content))
 	flux = data_test[1].data['FLUX']
 	wave = 10**data_test[1].data['loglam']
 	# print(flux) # for testing
 	return wave, flux
 
-def fetch_catID(field, catID, redshift):
+def fetch_catID(field, catID, redshift=0):
 	# if (redshift > 0):
 	# 	print("fetch_catID", field, catID) # for testing
 	# 	print(waves)
@@ -446,10 +446,10 @@ def set_redshift_stepping(z, step):
 	Input('axis_y_max', 'value'),
 	Input('axis_y_min', 'value'),
 	Input('binning_input', 'value'))
-def make_multiepoch_spectra(selected_designid, selected_catalogid, redshift, y_max, y_min, bins):
+def make_multiepoch_spectra(selected_designid, selected_catalogid, redshift, y_max, y_min, binning):
 	try:
 		if not redshift: redshift = redshift_default
-		waves, fluxes, names = fetch_catID(selected_designid, selected_catalogid, redshift)
+		waves, fluxes, names = fetch_catID(selected_designid, selected_catalogid)
 		redshift = float(redshift)
 	except:
 		return go.Figure()
@@ -467,15 +467,25 @@ def make_multiepoch_spectra(selected_designid, selected_catalogid, redshift, y_m
 
 	print(redshift)
 	for i in range(0, len(waves)):
-		fig.add_trace(go.Scatter(x=waves[i] / (1 + redshift), y=fluxes[i], name=names[i],
-                           opacity=1. / 2., mode='lines'))
+		xs, ys = waves[i], fluxes[i]
+		if binning and binning > 1:
+			x_, y_, k = [], [], 0
+			while k < len(xs) and k < len(ys):
+				x_.append(statistics.mean(xs[k:k + binning]))
+				y_.append(statistics.mean(ys[k:k + binning]))
+				k += binning
+			xs, ys = np.asarray(x_), np.asarray(y_)
+		fig.add_trace(go.Scatter(
+			x=xs / (1. + redshift), y=ys, name=names[i],
+			opacity=1. / 2., mode="lines"))
 
 	for j in spectral_lines.keys():
 		if (spectral_lines[j][0] >= x_min and spectral_lines[j][0] <= x_max):
 			xj = [ spectral_lines[j][0], spectral_lines[j][0] ]
 			yj = [ y_min, y_max ]
 			# print(xj, yj) # for testing
-			fig.add_trace(go.Scatter(x=xj, y=yj, opacity=1. / 2., name=j, mode='lines')) # , line=go.scatter.Line(color="black")))
+			fig.add_trace(go.Scatter(x=xj, y=yj, opacity=1. / 2., name=j, mode="lines"))
+			# , line=go.scatter.Line(color="black")))
 
 	return fig
 
