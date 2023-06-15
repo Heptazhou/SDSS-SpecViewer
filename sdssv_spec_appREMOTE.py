@@ -300,7 +300,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 				html.H4("Binning"),
 			),
 			dcc.Input(
-				id="binning_input", type="number", step=1, min=1, value=1,
+				id="binning_input", type="number", step=1, min=1, placeholder="1 (no binning)",
 				style={"height": "36px", "width": "100%"},
 			),
 		]),
@@ -401,7 +401,7 @@ def set_catalogid_options(selected_designid, selected_program):
 	State("program_dropdown", "value"))
 def set_fieldid_value(available_fieldid_options, input, program):
 	try:
-		if program == "(other)": return input or ""
+		if program and program == "(other)": return input or ""
 		# print("set_fieldid_value", available_fieldid_options[0]["value"]) # for testing
 		return available_fieldid_options[0]["value"]
 	except:
@@ -414,7 +414,7 @@ def set_fieldid_value(available_fieldid_options, input, program):
 	State("program_dropdown", "value"))
 def set_catalogid_value(available_catalogid_options, input, program):
 	try:
-		if program == "(other)": return input or ""
+		if program and program == "(other)": return input or ""
 		# print("set_catalogid_value", available_catalogid_options[0]["value"]) # for testing
 		return available_catalogid_options[0]["value"]
 	except:
@@ -448,9 +448,8 @@ def set_redshift_stepping(z, step):
 	Input("binning_input", "value"))
 def make_multiepoch_spectra(selected_designid, selected_catalogid, redshift, y_max, y_min, binning):
 	try:
-		if not redshift: redshift = redshift_default
+		binning, redshift = int(binning or 1), float(redshift or redshift_default)
 		waves, fluxes, names = fetch_catID(selected_designid, selected_catalogid)
-		redshift = float(redshift)
 	except:
 		return go.Figure()
 
@@ -465,10 +464,10 @@ def make_multiepoch_spectra(selected_designid, selected_catalogid, redshift, y_m
 	fig.layout.xaxis.range = [x_min, x_max]
 	fig.layout.yaxis.range = [y_min, y_max]
 
-	print(redshift)
+	print(f"redshift: {redshift}")
 	for i in range(0, len(waves)):
 		xs, ys = waves[i], fluxes[i]
-		if binning and binning > 1:
+		if binning > 1:
 			x_, y_, k = [], [], 0
 			while k < len(xs) and k < len(ys):
 				x_.append(statistics.mean(xs[k:k + binning]))
