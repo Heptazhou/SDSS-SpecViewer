@@ -1,3 +1,9 @@
+### SpecViewer for Python 3.9+
+
+"""
+Excelsior!
+"""
+
 import io
 import json
 import math
@@ -26,8 +32,9 @@ authentication = "authentication.txt"
 # print(fieldIDs)
 # print("those were fieldIDs")
 # print(catalogIDs)
-# # print(catalogIDs["27021598150201532"])
 # print("those were catalogIDs")
+# print("catalog*5", catalogIDs["27021598109009995"]) # for testing
+# print("field17049", fieldIDs["17049"]) # for testing
 
 # the redshift and stepping to easily adjust redshift using arrow keys or mouse wheel, disabled by default
 redshift_default = 0
@@ -40,6 +47,7 @@ cache: dict[tuple, tuple] = {}
 # default y-axis range of spectrum plots
 y_max_default = 100
 y_min_default = -10
+binning_default = 1
 
 ### css files
 external_stylesheets = [ "https://codepen.io/chriddyp/pen/bWLwgP.css",
@@ -112,7 +120,7 @@ def fetch_catID(field, catID, redshift=0):
 	else:
 		for i in catalogIDs[str(catID)]:
 			if field == "all" or field == i[0]:
-				# print(i[0], i[1], catID) # for testing
+				# print("all", i[0], i[1], catID) # for testing
 				dat = SDSSV_fetch(username, password, i[0], i[1], catID)
 				fluxes.append(dat[1])
 				waves.append(dat[0])
@@ -152,7 +160,7 @@ except:
 spectral_lines = { "H α": [6564],
                    "H β": [4862],
                    "Mg II": [2798],
-                   "C III ]": [1908],
+                   "C III]": [1908],
                    "C IV": [1549],
                    "Ly α": [1215], }
 
@@ -184,7 +192,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 
 	html.Div(className="row", children=[
 
-		## dropdown menu for program/designid/catalogid
+		## dropdown menu for program/fieldid/catalogid
 		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
 			html.Label(
 				html.H4("Program"),
@@ -300,7 +308,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 				html.H4("Binning"),
 			),
 			dcc.Input(
-				id="binning_input", type="number", step=1, min=1, placeholder="1 (no binning)",
+				id="binning_input", type="number", step=2, min=1, value=binning_default, placeholder="BinValue",
 				style={"height": "36px", "width": "100%"},
 			),
 		]),
@@ -319,20 +327,6 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 			),
 		]),
 
-		# ## user-adjustable redshift
-		# html.Div(children=[
-		# 	html.H4(children=["Redshift:"])
-		# ], style={"width": "10%", "display": "inline-block"}),
-		#
-		# html.Div(children=[
-		#             dcc.Textarea(
-		#                 id="user_redshift",
-		#                 value="0"
-		#             ),
-		#             html.Button("Submit", id="user_redshift_button", n_clicks=0),
-		#             html.Div(id="user_redshift_output", style={"whiteSpace": "pre-line"})
-		# ], style={"width": "30%", "display": "inline-block"}),
-
 	]),
 
 	## TODO: print source information (ra, dec, z, etc...) from some catalog
@@ -346,18 +340,6 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 ###
 ### interactive callback functions for updating spectral plot
 ###
-
-### redshift
-# @app.callback(
-# 	Output("user_redshift_output", "value"), # , "children"),
-# 	Input("user_redshift_button", "n_clicks"),
-# 	State("user_redshift", "value")
-# )
-# def update_redshift(n_clicks, user_redshift):
-# 	if n_clicks > 0:
-# 		redshift = user_redshift
-# 		print("redshift is ", redshift)
-# 		return redshift
 
 ## input manually
 @app.callback(
@@ -380,20 +362,23 @@ def set_input_or_dropdown(program):
 	Input("program_dropdown", "value"))
 def set_fieldid_options(selected_program):
 	if not selected_program or selected_program == "(other)": return []
+	# print(selected_program) # for testing
 	return [{"label": i, "value": i} for i in programs[selected_program]]
 
 @app.callback(
 	Output("catalogid_dropdown", "options"),
 	Input("fieldid_dropdown", "value"),
 	Input("program_dropdown", "value"))
-def set_catalogid_options(selected_designid, selected_program):
+def set_catalogid_options(selected_fieldid, selected_program):
 	if not selected_program or selected_program == "(other)": return []
-	if not selected_designid: return []
-	if selected_designid != "all":
-		return [{"label": i, "value": i} for i in fieldIDs[str(selected_designid)]]
+	if not selected_fieldid: return []
+	# --- next lines are where field numbers are obtained. Use strings not values.
+	if selected_fieldid != "all":
+		return [{"label": i, "value": str(i)} for i in fieldIDs[str(selected_fieldid)]]
 	else:
-		return [{"label": i, "value": i} for i in fieldIDs[str(selected_program) + "-" + str(selected_designid)]]
+		return [{"label": i, "value": str(i)} for i in fieldIDs[str(selected_program) + "-" + str(selected_fieldid)]]
 
+# set_fieldid_value is only run when program is switched
 @app.callback(
 	Output("fieldid_dropdown", "value"),
 	Input("fieldid_dropdown", "options"),
@@ -402,9 +387,11 @@ def set_catalogid_options(selected_designid, selected_program):
 def set_fieldid_value(available_fieldid_options, input, program):
 	try:
 		if program and program == "(other)": return input or ""
-		# print("set_fieldid_value", available_fieldid_options[0]["value"]) # for testing
+		# print("set_fieldid_value", available_fieldid_options[0]["value"], available_catalogid_options[0]["value"]) # for testing
 		return available_fieldid_options[0]["value"]
 	except:
+		# print("set_fieldid_value except", available_fieldid_options) # for testing
+		# print("set_fieldid_value except") # for testing
 		return
 
 @app.callback(
@@ -415,9 +402,10 @@ def set_fieldid_value(available_fieldid_options, input, program):
 def set_catalogid_value(available_catalogid_options, input, program):
 	try:
 		if program and program == "(other)": return input or ""
-		# print("set_catalogid_value", available_catalogid_options[0]["value"]) # for testing
-		return available_catalogid_options[0]["value"]
+		# print("set_catalogid_value", available_catalogid_options[0]["value"]-1) # for testing
+		return available_catalogid_options[0]["value"] - 1 # -1 doesn't work
 	except:
+		# print("set_catalogid_value except", catalogid_dropdown) # for testing
 		return
 
 @app.callback(
@@ -446,11 +434,13 @@ def set_redshift_stepping(z, step):
 	Input("axis_y_max", "value"),
 	Input("axis_y_min", "value"),
 	Input("binning_input", "value"))
-def make_multiepoch_spectra(selected_designid, selected_catalogid, redshift, y_max, y_min, binning):
+def make_multiepoch_spectra(selected_fieldid, selected_catalogid, redshift, y_max, y_min, binning):
 	try:
 		binning, redshift = int(binning or 1), float(redshift or redshift_default)
-		waves, fluxes, names = fetch_catID(selected_designid, selected_catalogid)
+		waves, fluxes, names = fetch_catID(selected_fieldid, selected_catalogid)
+		# print("make_multiepoch_spectra try") # for testing
 	except:
+		# print("make_multiepoch_spectra except") # for testing
 		return go.Figure()
 
 	if not y_max and not y_min: y_max, y_min = y_max_default, y_min_default
@@ -464,7 +454,7 @@ def make_multiepoch_spectra(selected_designid, selected_catalogid, redshift, y_m
 	fig.layout.xaxis.range = [x_min, x_max]
 	fig.layout.yaxis.range = [y_min, y_max]
 
-	print(f"redshift: {redshift}")
+	# print(f"redshift: {redshift}")
 	for i in range(0, len(waves)):
 		xs, ys = waves[i], fluxes[i]
 		if binning > 1:
@@ -482,58 +472,12 @@ def make_multiepoch_spectra(selected_designid, selected_catalogid, redshift, y_m
 		if (spectral_lines[j][0] >= x_min and spectral_lines[j][0] <= x_max):
 			xj = [ spectral_lines[j][0], spectral_lines[j][0] ]
 			yj = [ y_min, y_max ]
-			# print(xj, yj) # for testing
+			# print("make_multiepoch_spectra xj, yj", xj, yj) # for testing
 			fig.add_trace(go.Scatter(x=xj, y=yj, opacity=1. / 2., name=j, mode="lines"))
 			# , line=go.scatter.Line(color="black")))
 
 	return fig
 
-
-# https://dash.plotly.com/basic-callbacks
-
-
-
-### changing just the redshift
-# @app.callback(
-# 	Output("spectra_plot", "figure"),
-# 	Input("redshift_dropdown", "value"))
-# def adjust_redshift_spectra(redshift):
-#
-# 	fig = go.Figure()
-# 	fig.layout.xaxis.range = [wave_min / (1 + redshift), wave_max / (1 + redshift)]
-# 	fig.layout.yaxis.range = [y_min, y_max]
-#
-# 	for i in range(0, len(waves)):
-# 		fig.add_trace(go.Scatter(x=waves[i] / (1 + redshift), y=fluxes[i], name=names[i],
-#                            opacity=1. / 2., mode="lines"))
-#
-# 	for j in spectral_lines.keys():
-# 		if (spectral_lines[j][0] >= wave_min / (1 + redshift) and spectral_lines[j][0] <= wave_max / (1 + redshift)):
-# 			xj = [ spectral_lines[j][0], spectral_lines[j][0] ]
-# 			yj = [ y_min, y_max ]
-# 			print(xj, yj)
-# 			fig.add_trace(go.Scatter(x=xj, y=yj, opacity=1. / 2., name=j, mode="lines")) # , line=go.scatter.Line(color="black")))
-#
-# 	return fig
-
-
-### setting the selected epochs for plotting
-# @app.callback(
-# 	Output("epoch_list", "value"),
-# 	Input("fieldid_dropdown", "value"),
-# 	Input("catalogid_dropdown", "value"))
-# def set_epoch_value(selected_designid, selected_catalogid):
-# 	filename = np.array([])
-# 	for i in fieldid[selected_designid]:
-# 		tmp = glob.glob(dir_spectra + str(i) + "p/coadd/*/spSpec-" + str(i) + "-*-" + str(selected_catalogid).zfill(11) + ".fits")
-# 		if len(tmp) > 0:
-# 			filename = np.append(filename, tmp, axis=0)
-# 	epoch = np.array([])
-# 	for f in filename:
-# 		mjd = f.split("/")[-2]
-# 		field = f.split("/")[-4][:5]
-# 		epoch = np.append(epoch, float(field) + float(mjd) / 1e5)
-# 	return [{"label": i, "value": i} for i in epoch]
 
 
 if __name__ == "__main__":
