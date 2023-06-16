@@ -14,6 +14,7 @@ import dash
 import numpy as np
 import plotly.graph_objects as go
 import requests
+from astropy.convolution import Box1DKernel, convolve
 from astropy.io import fits
 from dash import dcc, html
 from dash.dependencies import Input, Output, State
@@ -456,17 +457,11 @@ def make_multiepoch_spectra(selected_fieldid, selected_catalogid, redshift, y_ma
 
 	# print(f"redshift: {redshift}")
 	for i in range(0, len(waves)):
-		xs, ys = waves[i], fluxes[i]
-		if binning > 1:
-			x_, y_, k = [], [], 0
-			while k < len(xs) and k < len(ys):
-				x_.append(statistics.mean(xs[k:k + binning]))
-				y_.append(statistics.mean(ys[k:k + binning]))
-				k += binning
-			xs, ys = np.asarray(x_), np.asarray(y_)
+		# fig.add_trace(go.Scatter(x=waves[i] / (1. + redshift), y=fluxes[i],
 		fig.add_trace(go.Scatter(
-			x=xs / (1. + redshift), y=ys, name=names[i],
-			opacity=1. / 2., mode="lines"))
+			x=waves[i] / (1. + redshift),
+			y=convolve(fluxes[i], Box1DKernel(binning)),
+			name=names[i], opacity=1. / 2., mode="lines"))
 
 	for j in spectral_lines.keys():
 		if (spectral_lines[j][0] >= x_min and spectral_lines[j][0] <= x_max):
