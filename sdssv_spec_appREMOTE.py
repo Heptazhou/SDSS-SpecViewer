@@ -8,10 +8,8 @@ import io
 import json
 import math
 import re
-import statistics
 
 import dash
-import numpy as np
 import plotly.graph_objects as go
 import requests
 from astropy.convolution import Box1DKernel, convolve
@@ -38,6 +36,9 @@ authentication = "authentication.txt"
 # print("field17049", fieldIDs["17049"]) # for testing
 
 # the redshift and stepping to easily adjust redshift using arrow keys or mouse wheel, disabled by default
+# because unfortunately, setting a numeric `step` attribute for an `input` element also means the value of
+# it must adhere such granularity (specified by the HTML specification, no way to bypass this behavior),
+# making an arbitrary input to be invalid, but we always want to accept redshift of any precision
 redshift_default = 0
 redshift = None
 stepping = None
@@ -48,7 +49,11 @@ cache: dict[tuple, tuple] = {}
 # default y-axis range of spectrum plots
 y_max_default = 100
 y_min_default = -10
+
+# binning/smoothing along x-axis, disabled by default (1 means no binning)
+# we need an upper limit since a very large `binning` freezes the program
 binning_default = 1
+binning_max = 10000
 
 ### css files
 external_stylesheets = [ "https://codepen.io/chriddyp/pen/bWLwgP.css",
@@ -205,14 +210,16 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 				placeholder="Program",
 			)]),
 
-		## Field ID input
+		## setting an empty value beforehand for next four fields is to suppress the warning from React.js
+
+		## Field ID input (w/ MJD)
 		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
 			html.Label(
 				html.H4("Field & MJD"),
 			),
 			dcc.Input(
 				id="fieldid_input", type="text",
-				placeholder="FieldID-MJD", style={"height": "36px", "width": "100%"},
+				placeholder="FieldID-MJD", value="", style={"height": "36px", "width": "100%"},
 			)], id="fieldid_input_div", hidden=True),
 
 		## Field ID dropdown
@@ -222,7 +229,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 			),
 			dcc.Dropdown(
 				id="fieldid_dropdown",
-				placeholder="FieldID",
+				placeholder="FieldID", value="",
 			)], id="fieldid_dropdown_div", hidden=False),
 
 		## catalog ID input
@@ -232,7 +239,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 			),
 			dcc.Input(
 				id="catalogid_input", type="text",
-				placeholder="CatalogID", style={"height": "36px", "width": "100%"},
+				placeholder="CatalogID", value="", style={"height": "36px", "width": "100%"},
 			)], id="catalogid_input_div", hidden=True),
 
 		## catalog ID dropdown
@@ -242,10 +249,10 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 			),
 			dcc.Dropdown(
 				id="catalogid_dropdown",
-				placeholder="CatalogID",
+				placeholder="CatalogID", value="",
 			)], id="catalogid_dropdown_div", hidden=False),
 
-		## whitespace (NOT A FIELD)
+		## whitespace (not a field)
 		html.Div(className="col-sm-4 visible-sm-block", style={"visibility": "hidden"},
                     children=[html.Label(html.H4("-")), dcc.Dropdown()]),
 
@@ -254,7 +261,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 			html.Label(
 				html.H4("Redshift (z)"),
 			),
-			dcc.Input(
+			dcc.Input( # do not use type="number"! it is automatically updated when the next field changes
 				id="redshift_input", # redshift_dropdown
 				type="text", step="any", pattern="\d+(\.\d*)?|\.\d+",
 				value=redshift or "", placeholder=redshift_default, min=0,
@@ -309,8 +316,8 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 				html.H4("Binning"),
 			),
 			dcc.Input(
-				id="binning_input", type="number", step=2, min=1, value=binning_default, placeholder="BinValue",
-				style={"height": "36px", "width": "100%"},
+				id="binning_input", type="number", step=1, min=1, value=binning_default, placeholder="BinValue",
+				style={"height": "36px", "width": "100%"}, max=binning_max,
 			),
 		]),
 
@@ -342,7 +349,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 ### interactive callback functions for updating spectral plot
 ###
 
-## input manually
+## switch between known program(s) or manual input
 @app.callback(
 	Output("fieldid_input_div", "hidden"),
 	Output("catalogid_input_div", "hidden"),
@@ -373,7 +380,7 @@ def set_fieldid_options(selected_program):
 def set_catalogid_options(selected_fieldid, selected_program):
 	if not selected_program or selected_program == "(other)": return []
 	if not selected_fieldid: return []
-	# --- next lines are where field numbers are obtained. Use strings not values.
+	# the following lines are where field numbers are obtained, use strings not numbers
 	if selected_fieldid != "all":
 		return [{"label": i, "value": str(i)} for i in fieldIDs[str(selected_fieldid)]]
 	else:
@@ -389,11 +396,12 @@ def set_fieldid_value(available_fieldid_options, input, program):
 	try:
 		if program and program == "(other)": return input or ""
 		# print("set_fieldid_value", available_fieldid_options[0]["value"], available_catalogid_options[0]["value"]) # for testing
-		return available_fieldid_options[0]["value"]
+		# return available_fieldid_options[0]["value"] # automatically choose the first field in the program
+		return ""
 	except:
 		# print("set_fieldid_value except", available_fieldid_options) # for testing
 		# print("set_fieldid_value except") # for testing
-		return
+		return ""
 
 @app.callback(
 	Output("catalogid_dropdown", "value"),
@@ -403,12 +411,14 @@ def set_fieldid_value(available_fieldid_options, input, program):
 def set_catalogid_value(available_catalogid_options, input, program):
 	try:
 		if program and program == "(other)": return input or ""
-		# print("set_catalogid_value", available_catalogid_options[0]["value"]-1) # for testing
-		return available_catalogid_options[0]["value"] - 1 # -1 doesn't work
+		# print("set_catalogid_value", available_catalogid_options[0]["value"]) # for testing
+		# return available_catalogid_options[0]["value"] # automatically choose the first catid in the field
+		return ""
 	except:
 		# print("set_catalogid_value except", catalogid_dropdown) # for testing
-		return
+		return ""
 
+# enable/disable stepping for the redshift input (see comment in the beginning of the file)
 @app.callback(
 	Output("redshift_input", "value"),
 	Output("redshift_input", "type"),
@@ -437,7 +447,7 @@ def set_redshift_stepping(z, step):
 	Input("binning_input", "value"))
 def make_multiepoch_spectra(selected_fieldid, selected_catalogid, redshift, y_max, y_min, binning):
 	try:
-		binning, redshift = int(binning or 1), float(redshift or redshift_default)
+		binning, redshift = int(binning or binning_default), float(redshift or redshift_default)
 		waves, fluxes, names = fetch_catID(selected_fieldid, selected_catalogid)
 		# print("make_multiepoch_spectra try") # for testing
 	except:
@@ -448,8 +458,8 @@ def make_multiepoch_spectra(selected_fieldid, selected_catalogid, redshift, y_ma
 	if not y_max: y_max = 0
 	if not y_min: y_min = 0
 	if y_max < y_min: y_min, y_max = y_max, y_min
-	x_min = math.floor(wave_min / (1. + redshift))
-	x_max = math.ceil(wave_max / (1. + redshift))
+	x_min = math.floor(wave_min / (1 + redshift))
+	x_max = math.ceil(wave_max / (1 + redshift))
 
 	fig = go.Figure()
 	fig.layout.xaxis.range = [x_min, x_max]
@@ -457,9 +467,9 @@ def make_multiepoch_spectra(selected_fieldid, selected_catalogid, redshift, y_ma
 
 	# print(f"redshift: {redshift}")
 	for i in range(0, len(waves)):
-		# fig.add_trace(go.Scatter(x=waves[i] / (1. + redshift), y=fluxes[i],
+		# fig.add_trace(go.Scatter(x=waves[i] / (1 + redshift), y=fluxes[i],
 		fig.add_trace(go.Scatter(
-			x=waves[i] / (1. + redshift),
+			x=waves[i] / (1 + redshift),
 			y=convolve(fluxes[i], Box1DKernel(binning)),
 			name=names[i], opacity=1. / 2., mode="lines"))
 
