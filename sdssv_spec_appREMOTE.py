@@ -457,8 +457,8 @@ def make_multiepoch_spectra(selected_designid, selected_catalogid, redshift, y_m
 	if not y_max: y_max = 0
 	if not y_min: y_min = 0
 	if y_max < y_min: y_min, y_max = y_max, y_min
-	x_min = math.floor(wave_min / (1 + redshift))
-	x_max = math.ceil(wave_max / (1 + redshift))
+	x_min = math.floor(wave_min / (1. + redshift))
+	x_max = math.ceil(wave_max / (1. + redshift))
 
 	fig = go.Figure()
 	fig.layout.xaxis.range = [x_min, x_max]
