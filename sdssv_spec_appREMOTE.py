@@ -10,6 +10,7 @@ import math
 import re
 
 import dash
+import numpy
 import plotly.graph_objects as go
 import requests
 from astropy.convolution import Box1DKernel, convolve
@@ -105,6 +106,8 @@ def fetch_catID(field, catID, redshift=0):
 	# 	print(waves)
 	# 	return waves, fluxes, names
 	# print("fetch_catID", field, catID) # for testing
+	if not (field and catID):
+		raise Exception((field, catID))
 	if (field, catID) in cache:
 		return cache[(field, catID)]
 	fluxes = []
@@ -132,6 +135,8 @@ def fetch_catID(field, catID, redshift=0):
 				waves.append(dat[0])
 				names.append(i[3])
 	# print(fluxes) # for testing
+	if not (waves and fluxes and names):
+		raise Exception((field, catID))
 	cache[(field, catID)] = waves, fluxes, names
 	return cache[(field, catID)]
 
@@ -157,18 +162,47 @@ try:
 	fetch_test = SDSSV_fetch(username, password, 112359, 60086, 27021600949438682)
 	print("Verification successful.")
 except:
-	print("Authentication error, please ctrl-c and fix authentication.txt.")
+	print("Authentication error, please press Ctrl+C and fix authentication.txt.")
 	# print("Contact Meg (megan.c.davis@uconn.edu) if the issue persists.")
 
 
 
-### important spectra lines to label in plots
-spectral_lines = { "H α": [6564],
-                   "H β": [4862],
-                   "Mg II": [2798],
-                   "C III]": [1908],
-                   "C IV": [1549],
-                   "Ly α": [1215], }
+### spectral lines to label in plot
+# https://classic.sdss.org/dr6/algorithms/linestable.html
+# the first column means whether to show this line or not by default
+spec_line_emi = numpy.asarray([
+	[1, 6564.61, "H α"    ],
+	[1, 5008.24, "[O III]"],
+	[1, 4960.30, "[O III]"],
+	[1, 4862.68, "H β"    ],
+	[1, 4341.68, "H γ"    ],
+	[1, 4102.89, "H δ"    ],
+	[1, 3889.00, "He I"   ],
+	[1, 3727.09, "O II"   ],
+	[1, 2798.75, "Mg II"  ],
+	[1, 2326.00, "C II"   ],
+	[1, 1908.73, "C III]" ],
+	[1, 1640.40, "He II"  ],
+	[1, 1549.06, "C IV"   ],
+	[1, 1396.75, "Si IV"  ],
+	[1, 1305.53, "O I"    ],
+	[1, 1240.00, "N V"    ],
+	[1, 1215.67, "Ly α"   ],
+	[1, 1123.00, "P V"    ],
+	[1, 1034.00, "O VI"   ],
+	[1, 1025.72, "Ly β"   ],
+])
+spec_line_abs = numpy.asarray([
+	[0, 2800.00, "Mg II"  ],
+	[0, 2747.00, "Fe II"  ],
+	[0, 2600.00, "Fe II"  ],
+	[0, 2400.00, "Fe II"  ],
+	[1, 1860.00, "Al III" ],
+	[0, 1550.00, "C IV"   ],
+	[0, 1400.00, "Si IV"  ],
+	[0, 1335.00, "C II"   ],
+	[0, 1240.00, "N V"    ],
+])
 
 ### wavelength plotting range
 wave_min = 3500.
@@ -289,7 +323,9 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 	html.Div(className="row", children=[
 		dcc.Graph(
 			id="spectra_plot",
-			style={"position": "relative", "overflow": "hidden", "width": "108%", "left": "-4%"},
+			style={
+				"position": "relative", "overflow": "hidden",
+				"height": "max(450px, min(64vw, 80vh))", "width": "108%", "left": "-4%"},
 		),
 	]),
 
@@ -321,15 +357,29 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 			),
 		]),
 
-		## label important spectral lines
+		## label spectral lines (emission)
 		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
 			html.Label(
-				html.H4("Lines"),
+				html.H4("Emission lines"),
 			),
-			dcc.Checklist(id="line_list", options=[
-				{"label": i + " \t (" + str(int(spectral_lines[i][0])) + "Å)", "value": i} for i in spectral_lines.keys()
+			dcc.Checklist(id="line_list_emi", options=[
+				{"label": "{}\t ({}Å)".format(i[2], int(float(i[1]))), "value": i[1]} for i in spec_line_emi
 			],
-				value=list(spectral_lines.keys()),
+				value=list(spec_line_emi[numpy.bool_(spec_line_emi[:, 0]), 1]),
+				inputStyle={"marginRight": "5px"},
+				labelStyle={"whiteSpace": "pre-wrap"},
+			),
+		]),
+
+		## label spectral lines (absorption)
+		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
+			html.Label(
+				html.H4("Absorption lines"),
+			),
+			dcc.Checklist(id="line_list_abs", options=[
+				{"label": "{}\t ({}Å)".format(i[2], int(float(i[1]))), "value": i[1]} for i in spec_line_abs
+			],
+				value=list(spec_line_abs[numpy.bool_(spec_line_abs[:, 0]), 1]),
 				inputStyle={"marginRight": "5px"},
 				labelStyle={"whiteSpace": "pre-wrap"},
 			),
@@ -444,8 +494,10 @@ def set_redshift_stepping(z, step):
 	Input("redshift_input", "value"), # redshift_dropdown
 	Input("axis_y_max", "value"),
 	Input("axis_y_min", "value"),
+	Input("line_list_emi", "value"),
+	Input("line_list_abs", "value"),
 	Input("binning_input", "value"))
-def make_multiepoch_spectra(selected_fieldid, selected_catalogid, redshift, y_max, y_min, binning):
+def make_multiepoch_spectra(selected_fieldid, selected_catalogid, redshift, y_max, y_min, list_emi, list_abs, binning):
 	try:
 		binning, redshift = int(binning or binning_default), float(redshift or redshift_default)
 		waves, fluxes, names = fetch_catID(selected_fieldid, selected_catalogid)
@@ -454,7 +506,7 @@ def make_multiepoch_spectra(selected_fieldid, selected_catalogid, redshift, y_ma
 		# print("make_multiepoch_spectra except") # for testing
 		return go.Figure()
 
-	if not y_max and not y_min: y_max, y_min = y_max_default, y_min_default
+	if not y_min and not y_max: y_min, y_max = y_min_default, y_max_default
 	if not y_max: y_max = 0
 	if not y_min: y_min = 0
 	if y_max < y_min: y_min, y_max = y_max, y_min
@@ -471,15 +523,23 @@ def make_multiepoch_spectra(selected_fieldid, selected_catalogid, redshift, y_ma
 		fig.add_trace(go.Scatter(
 			x=waves[i] / (1 + redshift),
 			y=convolve(fluxes[i], Box1DKernel(binning)),
-			name=names[i], opacity=1. / 2., mode="lines"))
+			name=names[i], opacity=1 / 2, mode="lines"))
 
-	for j in spectral_lines.keys():
-		if (spectral_lines[j][0] >= x_min and spectral_lines[j][0] <= x_max):
-			xj = [ spectral_lines[j][0], spectral_lines[j][0] ]
-			yj = [ y_min, y_max ]
-			# print("make_multiepoch_spectra xj, yj", xj, yj) # for testing
-			fig.add_trace(go.Scatter(x=xj, y=yj, opacity=1. / 2., name=j, mode="lines"))
-			# , line=go.scatter.Line(color="black")))
+	for i in spec_line_emi:
+		j, x = i[2], i[1]
+		if x not in list_emi: continue
+		x = float(x)
+		if (x_min <= x and x <= x_max):
+			fig.add_vline(x=x, line_dash="solid", opacity=1 / 3)
+			fig.add_annotation(x=x, y=y_max, text=j, hovertext=f" {j} ({x} Å)", textangle=70)
+
+	for i in spec_line_abs:
+		j, x = i[2], i[1]
+		if x not in list_abs: continue
+		x = float(x)
+		if (x_min <= x and x <= x_max):
+			fig.add_vline(x=x, line_dash="dot", opacity=1 / 2)
+			fig.add_annotation(x=x, y=y_min, text=j, hovertext=f" {j} ({x} Å)", textangle=70)
 
 	return fig
 
