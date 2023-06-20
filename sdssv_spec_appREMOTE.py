@@ -177,18 +177,18 @@ spec_line_emi = numpy.asarray([
 	[1, 4862.68, "H β"    ],
 	[1, 4341.68, "H γ"    ],
 	[1, 4102.89, "H δ"    ],
-	[1, 3889.00, "He I"   ],
+	[0, 3889.00, "He I"   ],
 	[1, 3727.09, "O II"   ],
 	[1, 2798.75, "Mg II"  ],
 	[1, 2326.00, "C II"   ],
 	[1, 1908.73, "C III]" ],
-	[1, 1640.40, "He II"  ],
+	[0, 1640.40, "He II"  ],
 	[1, 1549.06, "C IV"   ],
 	[1, 1396.75, "Si IV"  ],
-	[1, 1305.53, "O I"    ],
+	[0, 1305.53, "O I"    ],
 	[1, 1240.00, "N V"    ],
 	[1, 1215.67, "Ly α"   ],
-	[1, 1123.00, "P V"    ],
+	[0, 1123.00, "P V"    ],
 	[1, 1034.00, "O VI"   ],
 	[1, 1025.72, "Ly β"   ],
 ])
@@ -357,8 +357,8 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 			),
 		]),
 
-		## label spectral lines (emission)
-		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
+		## label spectral lines (emission) (2 columns)
+		html.Div(className="col-lg-4 col-md-6 col-sm-8 col-xs-12", children=[
 			html.Label(
 				html.H4("Emission lines"),
 			),
@@ -366,12 +366,13 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 				{"label": "{}\t ({}Å)".format(i[2], int(float(i[1]))), "value": i[1]} for i in spec_line_emi
 			],
 				value=list(spec_line_emi[numpy.bool_(spec_line_emi[:, 0]), 1]),
+				style={"columnCount": "2"},
 				inputStyle={"marginRight": "5px"},
 				labelStyle={"whiteSpace": "pre-wrap"},
 			),
 		]),
 
-		## label spectral lines (absorption)
+		## label spectral lines (absorption) (1 column)
 		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
 			html.Label(
 				html.H4("Absorption lines"),
@@ -380,6 +381,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 				{"label": "{}\t ({}Å)".format(i[2], int(float(i[1]))), "value": i[1]} for i in spec_line_abs
 			],
 				value=list(spec_line_abs[numpy.bool_(spec_line_abs[:, 0]), 1]),
+				style={"columnCount": "1"},
 				inputStyle={"marginRight": "5px"},
 				labelStyle={"whiteSpace": "pre-wrap"},
 			),
