@@ -205,8 +205,8 @@ spec_line_abs = numpy.asarray([
 ])
 
 ### wavelength plotting range
-wave_min = 3500.
 wave_max = 10500.
+wave_min = 3500.
 
 ### starting the dash app
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets,
@@ -331,19 +331,37 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 
 	html.Div(className="row", children=[
 
-		## y-axis range
+		## axis range (note: these settings are volatile/auto-resetted)
 		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
-			html.Label(
-				html.H4("Y-axis range"),
-			),
-			dcc.Input(
-				id="axis_y_max", type="number", step=1, value=y_max_default, placeholder="Max",
-				style={"height": "36px", "width": "100%"},
-			),
-			dcc.Input(
-				id="axis_y_min", type="number", step=1, value=y_min_default, placeholder="Min",
-				style={"height": "36px", "width": "100%"},
-			),
+
+			## y-axis range
+			html.Div(className="row", children=[
+				html.Label(
+					html.H4("Y-axis range"),
+				),
+				dcc.Input(
+					id="axis_y_max", type="number", step=1, value=y_max_default, placeholder="Max",
+					style={"height": "36px", "width": "100%"},
+				),
+				dcc.Input(
+					id="axis_y_min", type="number", step=1, value=y_min_default, placeholder="Min",
+					style={"height": "36px", "width": "100%"},
+				)]),
+
+			## x-axis range
+			html.Div(className="row", children=[
+				html.Label(
+					html.H4("X-axis range"),
+				),
+				dcc.Input(
+					id="axis_x_max", type="number", step=1, value=int(wave_max), placeholder="Max",
+					style={"height": "36px", "width": "100%"},
+				),
+				dcc.Input(
+					id="axis_x_min", type="number", step=1, value=int(wave_min), placeholder="Min",
+					style={"height": "36px", "width": "100%"},
+				)]),
+
 		]),
 
 		## spectral binning
@@ -357,13 +375,19 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 			),
 		]),
 
+		## whitespace (not a field)
+		html.Div(className="col-sm-8 visible-sm-block", style={"visibility": "hidden"},
+                    children=[html.Label(html.H4("-")), dcc.Dropdown()]),
+		html.Div(className="col-sm-8 visible-sm-block", style={"visibility": "hidden"},
+                    children=[html.Label(html.H4("-")), dcc.Dropdown()]),
+
 		## label spectral lines (emission) (2 columns)
 		html.Div(className="col-lg-4 col-md-6 col-sm-8 col-xs-12", children=[
 			html.Label(
 				html.H4("Emission lines"),
 			),
 			dcc.Checklist(id="line_list_emi", options=[
-				{"label": "{}\t ({}Å)".format(i[2], int(float(i[1]))), "value": i[1]} for i in spec_line_emi
+				{"label": "{: <12}\t({}Å)".format(i[2], int(float(i[1]))), "value": i[1]} for i in spec_line_emi
 			],
 				value=list(spec_line_emi[numpy.bool_(spec_line_emi[:, 0]), 1]),
 				style={"columnCount": "2"},
@@ -378,7 +402,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 				html.H4("Absorption lines"),
 			),
 			dcc.Checklist(id="line_list_abs", options=[
-				{"label": "{}\t ({}Å)".format(i[2], int(float(i[1]))), "value": i[1]} for i in spec_line_abs
+				{"label": "{: <12}\t({}Å)".format(i[2], int(float(i[1]))), "value": i[1]} for i in spec_line_abs
 			],
 				value=list(spec_line_abs[numpy.bool_(spec_line_abs[:, 0]), 1]),
 				style={"columnCount": "1"},
@@ -448,7 +472,8 @@ def set_fieldid_value(available_fieldid_options, input, program):
 	try:
 		if program and program == "(other)": return input or ""
 		# print("set_fieldid_value", available_fieldid_options[0]["value"], available_catalogid_options[0]["value"]) # for testing
-		# return available_fieldid_options[0]["value"] # automatically choose the first field in the program
+		# uncomment the following line if you prefer to automatically choose the first field in the program
+		# return available_fieldid_options[0]["value"]
 		return ""
 	except:
 		# print("set_fieldid_value except", available_fieldid_options) # for testing
@@ -464,7 +489,8 @@ def set_catalogid_value(available_catalogid_options, input, program):
 	try:
 		if program and program == "(other)": return input or ""
 		# print("set_catalogid_value", available_catalogid_options[0]["value"]) # for testing
-		# return available_catalogid_options[0]["value"] # automatically choose the first catid in the field
+		# uncomment the following line if you prefer to automatically choose the first catid in the field
+		# return available_catalogid_options[0]["value"]
 		return ""
 	except:
 		# print("set_catalogid_value except", catalogid_dropdown) # for testing
@@ -487,6 +513,18 @@ def set_redshift_stepping(z, step):
 		z = f"%0.{-int(math.log10(step))}f" % float(z)
 	return z, type, step
 
+# reset the axis range whenever any of program/fieldid/catid changes
+@app.callback(
+	Output("axis_y_max", "value"),
+	Output("axis_y_min", "value"),
+	Output("axis_x_max", "value"),
+	Output("axis_x_min", "value"),
+	Input("program_dropdown", "value"),
+	Input("fieldid_dropdown", "value"),
+	Input("catalogid_dropdown", "value"))
+def reset_axis_range(*_):
+	return y_max_default, y_min_default, int(wave_max), int(wave_min)
+
 
 ## plotting the spectra
 @app.callback(
@@ -496,10 +534,13 @@ def set_redshift_stepping(z, step):
 	Input("redshift_input", "value"), # redshift_dropdown
 	Input("axis_y_max", "value"),
 	Input("axis_y_min", "value"),
+	Input("axis_x_max", "value"),
+	Input("axis_x_min", "value"),
 	Input("line_list_emi", "value"),
 	Input("line_list_abs", "value"),
 	Input("binning_input", "value"))
-def make_multiepoch_spectra(selected_fieldid, selected_catalogid, redshift, y_max, y_min, list_emi, list_abs, binning):
+def make_multiepoch_spectra(selected_fieldid, selected_catalogid, redshift,
+                            y_max, y_min, x_max, x_min, list_emi, list_abs, binning):
 	try:
 		binning, redshift = int(binning or binning_default), float(redshift or redshift_default)
 		waves, fluxes, names = fetch_catID(selected_fieldid, selected_catalogid)
@@ -509,15 +550,19 @@ def make_multiepoch_spectra(selected_fieldid, selected_catalogid, redshift, y_ma
 		return go.Figure()
 
 	if not y_min and not y_max: y_min, y_max = y_min_default, y_max_default
+	if not x_min and not x_max: x_min, x_max = int(wave_max), int(wave_min)
 	if not y_max: y_max = 0
+	if not x_max: x_max = 0
 	if not y_min: y_min = 0
+	if not x_min: x_min = 0
 	if y_max < y_min: y_min, y_max = y_max, y_min
-	x_min = math.floor(wave_min / (1 + redshift))
-	x_max = math.ceil(wave_max / (1 + redshift))
+	if x_max < x_min: x_min, x_max = x_max, x_min
+	x_max = math.ceil(x_max / (1 + redshift))
+	x_min = math.floor(x_min / (1 + redshift))
 
 	fig = go.Figure()
-	fig.layout.xaxis.range = [x_min, x_max]
 	fig.layout.yaxis.range = [y_min, y_max]
+	fig.layout.xaxis.range = [x_min, x_max]
 
 	# print(f"redshift: {redshift}")
 	for i in range(0, len(waves)):
