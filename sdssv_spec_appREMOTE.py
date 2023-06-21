@@ -226,6 +226,9 @@ app = dash.Dash(__name__, external_stylesheets=external_stylesheets,
 
 # see https://getbootstrap.com/docs/3.4/css/#grid
 app.layout = html.Div(className="container-fluid", style={"width": "90%"}, children=[
+	# https://dash.plotly.com/dash-core-components/location
+	dcc.Location(id="window_location", refresh=False),
+
 	html.Div(className="row", children=[
 		html.H2("SDSSV-BHM Spectra Viewer (remote version)"),
 	]),
@@ -426,19 +429,53 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 ###
 
 ## switch between known program(s) or manual input
+# use values specified through `search` and `hash` if applicable
+# see https://developer.mozilla.org/docs/Web/API/Location for definition
+# ps: `location.search` is cleared when `program` is no longer "(other)"
 @app.callback(
 	Output("fieldid_input_div", "hidden"),
 	Output("catalogid_input_div", "hidden"),
 	Output("fieldid_dropdown_div", "hidden"),
 	Output("catalogid_dropdown_div", "hidden"),
+	Output("window_location", "search"),
+	Output("program_dropdown", "value"),
 	Output("fieldid_input", "value"),
 	Output("catalogid_input", "value"),
-	Input("program_dropdown", "value"))
-def set_input_or_dropdown(program):
+	Output("redshift_input", "value", True),
+	Output("binning_input", "value", True),
+	Output("axis_y_max", "value", True),
+	Output("axis_y_min", "value", True),
+	Output("axis_x_max", "value", True),
+	Output("axis_x_min", "value", True),
+	Input("window_location", "search"),
+	Input("program_dropdown", "value"),
+	Input("window_location", "hash"),
+	prevent_initial_call="initial_duplicate")
+def set_input_or_dropdown(query, program, hash):
+	if query: query = str(query).lstrip("?")
+	if program and program != "(other)": query = ""
+	fld_mjd, catalog, redshift = "", "", redshift_default
+	binning = binning_default
+	y_min, y_max = y_min_default, y_max_default
+	x_min, x_max = int(wave_min), int(wave_max)
+	hash = str(hash).lstrip("#").split("&") if hash else []
+	if query and re.fullmatch("\d+-\d+-[^-].+[^-]", query):
+		for x in hash:
+			if not re.fullmatch("[^=]+=[^=]+", x): continue
+			k, v = x.split("=", 1)
+			if k == "z": redshift = v
+			if k == "b": binning = v
+			if k == "y" and re.fullmatch("[^,]+,[^,]+", v): y_min, y_max = v.split(",", 1)
+			if k == "x" and re.fullmatch("[^,]+,[^,]+", v): x_min, x_max = v.split(",", 1)
+		program = "(other)"
+		fld_mjd = "-".join(query.split("-", 2)[:2])
+		catalog = "-".join(query.split("-", 2)[2:])
+	if query and query != "": query = "?" + query
+	ret = query, program, fld_mjd, catalog, redshift, binning, y_min, y_max, x_min, x_max
 	if program and program == "(other)":
-		return False, False, True, True, "", ""
+		return False, False, True, True, *ret
 	else:
-		return True, True, False, False, "", ""
+		return True, True, False, False, *ret
 
 ## dropdown menu
 @app.callback(
@@ -502,7 +539,8 @@ def set_catalogid_value(available_catalogid_options, input, program):
 	Output("redshift_input", "type"),
 	Output("redshift_input", "step"),
 	State("redshift_input", "value"),
-	Input("redshift_step", "value"))
+	Input("redshift_step", "value"),
+	prevent_initial_call=True)
 def set_redshift_stepping(z, step):
 	if not step: step = "any"
 	if str(step).lower() == "any":
@@ -513,17 +551,19 @@ def set_redshift_stepping(z, step):
 		z = f"%0.{-int(math.log10(step))}f" % float(z)
 	return z, type, step
 
-# reset the axis range whenever any of program/fieldid/catid changes
+# reset the axes range and binning value whenever any of program/fieldid/catid changes
 @app.callback(
 	Output("axis_y_max", "value"),
 	Output("axis_y_min", "value"),
 	Output("axis_x_max", "value"),
 	Output("axis_x_min", "value"),
+	Output("binning_input", "value"),
 	Input("program_dropdown", "value"),
 	Input("fieldid_dropdown", "value"),
-	Input("catalogid_dropdown", "value"))
+	Input("catalogid_dropdown", "value"),
+	prevent_initial_call=True)
 def reset_axis_range(*_):
-	return y_max_default, y_min_default, int(wave_max), int(wave_min)
+	return y_max_default, y_min_default, int(wave_max), int(wave_min), binning_default
 
 
 ## plotting the spectra
