@@ -592,10 +592,8 @@ def make_multiepoch_spectra(selected_fieldid, selected_catalogid, redshift,
 
 	if not y_min and not y_max: y_min, y_max = y_min_default, y_max_default
 	if not x_min and not x_max: x_min, x_max = int(wave_max), int(wave_min)
-	if not y_max: y_max = 0
-	if not x_max: x_max = 0
-	if not y_min: y_min = 0
-	if not x_min: x_min = 0
+	y_min, y_max = int(y_min or 0), int(y_max or 0)
+	x_min, x_max = int(x_min or 0), int(x_max or 0)
 	if y_max < y_min: y_min, y_max = y_max, y_min
 	if x_max < x_min: x_min, x_max = x_max, x_min
 	x_max = math.ceil(x_max / (1 + redshift))
