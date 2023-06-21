@@ -193,15 +193,27 @@ spec_line_emi = numpy.asarray([
 	[1, 1025.72, "Ly β"   ],
 ])
 spec_line_abs = numpy.asarray([
-	[0, 2800.00, "Mg II"  ],
-	[0, 2747.00, "Fe II"  ],
-	[0, 2600.00, "Fe II"  ],
-	[0, 2400.00, "Fe II"  ],
-	[1, 1860.00, "Al III" ],
-	[0, 1550.00, "C IV"   ],
-	[0, 1400.00, "Si IV"  ],
-	[0, 1335.00, "C II"   ],
-	[0, 1240.00, "N V"    ],
+	[1, 5891.58, "Na I"   ],
+	[0, 4227.92, "Ca I"   ],
+	[0, 3934.78, "Ca II"  ],
+	[1, 2852.96, "Mg I"   ],
+	[0, 2796.35, "Mg II"  ],
+	[0, 2586.65, "Fe II"  ],
+	[0, 2344.21, "Fe II"  ],
+	[1, 2062.26, "Cr II"  ],
+	[1, 1854.72, "Al III" ],
+	[1, 1670.79, "Al III" ],
+	[0, 1608.45, "Fe II"  ],
+	[0, 1548.20, "C IV"   ],
+	[0, 1526.71, "Si IV"  ],
+	[0, 1393.76, "Si IV"  ],
+	[0, 1334.53, "C II"   ],
+	[0, 1302.17, "O I"    ],
+	[0, 1260.42, "Si II"  ],
+	[0, 1238.82, "N V"    ],
+	[0, 1206.50, "Si III" ],
+	[0, 1199.55, "N I"    ],
+	[0, 1190.42, "Si II"  ],
 ])
 
 ### wavelength plotting range
@@ -399,8 +411,8 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 			),
 		]),
 
-		## label spectral lines (absorption) (1 column)
-		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
+		## label spectral lines (absorption) (2 columns)
+		html.Div(className="col-lg-4 col-md-6 col-sm-8 col-xs-12", children=[
 			html.Label(
 				html.H4("Absorption lines"),
 			),
@@ -408,7 +420,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 				{"label": "{: <12}\t({}Å)".format(i[2], int(float(i[1]))), "value": i[1]} for i in spec_line_abs
 			],
 				value=list(spec_line_abs[numpy.bool_(spec_line_abs[:, 0]), 1]),
-				style={"columnCount": "1"},
+				style={"columnCount": "2"},
 				inputStyle={"marginRight": "5px"},
 				labelStyle={"whiteSpace": "pre-wrap"},
 			),
