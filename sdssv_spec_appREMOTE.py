@@ -464,9 +464,6 @@ def set_input_or_dropdown(query, program, hash):
 			if not re.fullmatch("[^=]+=[^=]+", x): continue
 			k, v = x.split("=", 1)
 			if k == "z": redshift = v
-			if k == "b": binning = v
-			if k == "y" and re.fullmatch("[^,]+,[^,]+", v): y_min, y_max = v.split(",", 1)
-			if k == "x" and re.fullmatch("[^,]+,[^,]+", v): x_min, x_max = v.split(",", 1)
 		program = "(other)"
 		fld_mjd = "-".join(query.split("-", 2)[:2])
 		catalog = "-".join(query.split("-", 2)[2:])
@@ -558,12 +555,24 @@ def set_redshift_stepping(z, step):
 	Output("axis_x_max", "value"),
 	Output("axis_x_min", "value"),
 	Output("binning_input", "value"),
+	Input("window_location", "hash"),
 	Input("program_dropdown", "value"),
 	Input("fieldid_dropdown", "value"),
 	Input("catalogid_dropdown", "value"),
 	prevent_initial_call=True)
-def reset_axis_range(*_):
-	return y_max_default, y_min_default, int(wave_max), int(wave_min), binning_default
+def reset_axis_range(hash, program, *_):
+	binning = binning_default
+	y_min, y_max = y_min_default, y_max_default
+	x_min, x_max = int(wave_min), int(wave_max)
+	hash = str(hash).lstrip("#").split("&") if hash else []
+	if program and program == "(other)":
+		for x in hash:
+			if not re.fullmatch("[^=]+=[^=]+", x): continue
+			k, v = x.split("=", 1)
+			if k == "b": binning = v
+			if k == "y" and re.fullmatch("[^,]+,[^,]+", v): y_min, y_max = v.split(",", 1)
+			if k == "x" and re.fullmatch("[^,]+,[^,]+", v): x_min, x_max = v.split(",", 1)
+	return y_max, y_min, x_max, x_min, binning
 
 
 ## plotting the spectra
