@@ -441,12 +441,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 	Output("program_dropdown", "value"),
 	Output("fieldid_input", "value"),
 	Output("catalogid_input", "value"),
-	Output("redshift_input", "value", True),
-	Output("binning_input", "value", True),
-	Output("axis_y_max", "value", True),
-	Output("axis_y_min", "value", True),
-	Output("axis_x_max", "value", True),
-	Output("axis_x_min", "value", True),
+	Output("redshift_input", "value", allow_duplicate=True),
 	Input("window_location", "search"),
 	Input("program_dropdown", "value"),
 	Input("window_location", "hash"),
@@ -454,10 +449,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 def set_input_or_dropdown(query, program, hash):
 	if query: query = str(query).lstrip("?")
 	if program and program != "(other)": query = ""
-	fld_mjd, catalog, redshift = "", "", redshift_default
-	binning = binning_default
-	y_min, y_max = y_min_default, y_max_default
-	x_min, x_max = int(wave_min), int(wave_max)
+	fld_mjd, catalog, redshift = "", "", ""
 	hash = str(hash).lstrip("#").split("&") if hash else []
 	if query and re.fullmatch("\d+-\d+-[^-].+[^-]", query):
 		for x in hash:
@@ -468,7 +460,7 @@ def set_input_or_dropdown(query, program, hash):
 		fld_mjd = "-".join(query.split("-", 2)[:2])
 		catalog = "-".join(query.split("-", 2)[2:])
 	if query and query != "": query = "?" + query
-	ret = query, program, fld_mjd, catalog, redshift, binning, y_min, y_max, x_min, x_max
+	ret = query, program, fld_mjd, catalog, redshift
 	if program and program == "(other)":
 		return False, False, True, True, *ret
 	else:
