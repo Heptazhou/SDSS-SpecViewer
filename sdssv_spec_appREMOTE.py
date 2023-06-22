@@ -1,219 +1,435 @@
-import dash 
-import dash_core_components as dcc
-import dash_html_components as html
-import plotly.graph_objects as go
-from dash.dependencies import Input, Output
-from astropy.io import fits
-import requests
+### SpecViewer for Python 3.9+
+
+"""
+Excelsior!
+"""
+
 import io
 import json
+import math
+import re
+
+import dash
+import numpy
+import plotly.graph_objects as go
+import requests
+from astropy.convolution import Box1DKernel, convolve
+from astropy.io import fits
+from dash import dcc, html
+from dash.dependencies import Input, Output, State
 
 ###
-### input the data directory path 
+### input the data directory path
 ###
 
-#NOTE TO CODER: JSON LIKES STRING KEYS FOR DICTIONARIES!!!!!!
-programs, plateIDs, catalogIDs = json.load(open("dictionaries.txt"))
-authen = './authentication.txt'
+# NOTE TO CODER: JSON LIKES STRING KEYS FOR DICTIONARIES!!!!!!
+programs, fieldIDs, catalogIDs = json.load(open("dictionaries.txt"))
+authentication = "authentication.txt"
+
+# for testing
+# print(programs)
+# print("those were programs")
+# print(fieldIDs)
+# print("those were fieldIDs")
+# print(catalogIDs)
+# print("those were catalogIDs")
+# print("catalog*5", catalogIDs["27021598109009995"]) # for testing
+# print("field17049", fieldIDs["17049"]) # for testing
+
+# the redshift and stepping to easily adjust redshift using arrow keys or mouse wheel, disabled by default
+# because unfortunately, setting a numeric `step` attribute for an `input` element also means the value of
+# it must adhere such granularity (specified by the HTML specification, no way to bypass this behavior),
+# making an arbitrary input to be invalid, but we always want to accept redshift of any precision
+redshift_default = 0
+redshift = None
+stepping = None
+
+# global dict to save results of `fetch_catID`, which greatly improves responsiveness after the first plot
+cache: dict[tuple, tuple] = {}
+
+# default y-axis range of spectrum plots
+y_max_default = 100
+y_min_default = -10
+
+# smoothing along x-axis, disabled by default (one means no smoothing)
+# we need an upper limit since a very large value freezes the program
+smooth_default = 1
+smooth_max = 10000
 
 ### css files
-external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css', \
-'//maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css', \
-'http://aladin.u-strasbg.fr/AladinLite/api/v2/latest/aladin.min.css', \
-'https://use.fontawesome.com/releases/v5.13.0/css/all.css', \
-'https://use.fontawesome.com/releases/v5.13.0/css/v4-shims.css', \
-]
+external_stylesheets = [ "https://codepen.io/chriddyp/pen/bWLwgP.css",
+                         "https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css",
+                         "https://aladin.u-strasbg.fr/AladinLite/api/v2/latest/aladin.min.css",
+                         "https://use.fontawesome.com/releases/v5.15.4/css/all.css",
+                         "https://use.fontawesome.com/releases/v5.15.4/css/v4-shims.css", ]
 
 ###
 ### Any necessary functions
 ###
 
-def SDSSV_buildURL(plateID, MJD, objID):
-    """
-    A function to build the url that will be used to fetch the data. 
-    
-    Catalog IDs don't start with zero but the URL needs it too,
-    using zfill(11) fixes this.
-    """
-    url = "https://data.sdss5.org/sas/sdsswork/bhm/boss/spectro/redux/v6_0_2/" \
-    +"spectra/lite/{}p/{}/spec-{}-{}-{}.fits".format(str(plateID), str(MJD), str(plateID), str(MJD), str(objID).zfill(11))
-    
-    return url
+def SDSSV_buildURL(fieldID, MJD, objID, branch):
+	"""
+	A function to build the url that will be used to fetch the data.
 
-def SDSSV_fetch(username, password, plateID, MJD, objID):
-    """
-    Fetches spectral data for a SDSS-RM object on a 
-       specific plate on a specific MJD. Uses the user
-       supplied authentication. 
-    
-    TO DO: allow for multiple MJDs and plates, for loop it up
-    """
-    url = SDSSV_buildURL(plateID, MJD, objID)
-    r = requests.get(url, auth=(username, password))  
-    data_test = fits.open(io.BytesIO(r.content))
-    flux = data_test[1].data['FLUX']
-    wave = 10**data_test[1].data['loglam']
-    return wave, flux 
-   
-def fetch_catID(catID, plate):
-    fluxes = []
-    waves = []
-    names = []
-    for i in catalogIDs[str(catID)]:
-        if plate == "all":
-            dat = SDSSV_fetch(username, password,i[0], i[1], catID)
-            fluxes.append(dat[1])
-            waves.append(dat[0])
-            names.append(i[3])
-        else:
-            if i[0] == plate:
-                dat = SDSSV_fetch(username, password,i[0], i[1], catID)
-                fluxes.append(dat[1])
-                waves.append(dat[0])
-                names.append(i[3])
-            else:
-                continue
-    return waves, fluxes, names
-    
+	Field IDs don't start with zero but the URLs need leading zeroes;
+	using zfill(6) fixes this.
+	"""
+	url = "https://data.sdss5.org/sas/sdsswork/bhm/boss/spectro/redux/{}/spectra/lite/".format(branch) \
+		+ "{}/{}/spec-{}-{}-{}.fits".format(str(fieldID).zfill(6), MJD, str(fieldID).zfill(6), MJD, objID)
+	print(url) # for testing
+
+	return url
+
+def SDSSV_fetch(username, password, fieldID, MJD, objID, branch="v6_1_0"):
+	"""
+	Fetches spectral data for a SDSS-RM object on a
+		specific field on a specific MJD. Uses the user
+		supplied authentication.
+	"""
+	if not (fieldID and MJD and objID):
+		raise Exception((fieldID, MJD, objID))
+	url = SDSSV_buildURL(fieldID, MJD, objID, branch)
+	# print(url) # for testing
+	r = requests.get(url, auth=(username, password))
+	r.raise_for_status()
+	data_test = fits.open(io.BytesIO(r.content))
+	flux = data_test[1].data["FLUX"]
+	wave = 10**data_test[1].data["loglam"]
+	# print(flux) # for testing
+	return wave, flux
+
+def fetch_catID(field, catID, redshift=0):
+	# if (redshift > 0):
+	# 	print("fetch_catID", field, catID) # for testing
+	# 	print(waves)
+	# 	return waves, fluxes, names
+	# print("fetch_catID", field, catID) # for testing
+	if not (field and catID):
+		raise Exception((field, catID))
+	if (field, catID) in cache:
+		return cache[(field, catID)]
+	fluxes = []
+	waves = []
+	names = []
+	# print (str(catID))
+	# # print ("catalogIDs[str(catID)]")
+	# testval = catalogIDs[str(catID)]
+	# print (testval)
+	if re.fullmatch("\d+-\d+", str(field).strip()):
+		fld, mjd = str(field).strip().split("-", 1)
+		try:
+			dat = SDSSV_fetch(username, password, fld, mjd, str(catID).strip(), "master")
+		except:
+			dat = SDSSV_fetch(username, password, fld, mjd, str(catID).strip())
+		fluxes.append(dat[1])
+		waves.append(dat[0])
+		names.append(mjd)
+	else:
+		for i in catalogIDs[str(catID)]:
+			if field == "all" or field == i[0]:
+				# print("all", i[0], i[1], catID) # for testing
+				dat = SDSSV_fetch(username, password, i[0], i[1], catID)
+				fluxes.append(dat[1])
+				waves.append(dat[0])
+				names.append(i[3])
+	# print(fluxes) # for testing
+	if not (waves and fluxes and names):
+		raise Exception((field, catID))
+	cache[(field, catID)] = waves, fluxes, names
+	return cache[(field, catID)]
+
+
+
 ###
 ### Authentication
-###    
+###
 try:
-    print("Reading authentication file.")
-    with open(authen,'r') as i:
-        lines = i.readlines()
-        username = lines[0][:-1] #there will be a \n on the username
-        password = lines[1]
-except: #any error from above will fall through to here.
-    print("authentication.txt not provided or incomplete. Please enter authentication.")
-    username = input("Enter SDSS-V username:")
-    password = input("Enter SDSS-V password:") 
+	print("Reading authentication file.")
+	with open(authentication, "r") as i:
+		lines = i.readlines()
+		username = lines[0][:-1] # there will be a \n on the username
+		password = lines[1][:-1] # and on the password, at least for some file systems
+except: # any error from above will fall through to here.
+	print("authentication.txt not provided or incomplete. Please enter authentication.")
+	username = input("Enter SDSS-V username:")
+	password = input("Enter SDSS-V password:")
 
 try:
-    print("Verifying authentication...")
-    fetch_test = SDSSV_fetch(username, password, 15173,59281, 4350951054)
-    print("Verification successful.")
+	print("Verifying authentication...")
+	# fetch_test = SDSSV_fetch(username, password, 15173, 59281, 4350951054)
+	fetch_test = SDSSV_fetch(username, password, 112359, 60086, 27021600949438682)
+	print("Verification successful.")
 except:
-    print("Authentication error, please cntrl-c and fix authentication.txt.")
-    print("Contact Meg (megan.c.davis@uconn.edu) is the issue persists.")
- 
+	print("Authentication error, please press Ctrl+C and fix authentication.txt.")
+	# print("Contact Meg (megan.c.davis@uconn.edu) if the issue persists.")
 
-    
-### important spectra lines to label in plots
-spectral_lines = { 'Ha': [6564], 
-                   'Hb': [4862],
-                   'MgII': [2798],
-                   'CIII': [1908],
-                   'CIV': [1549],
-                   'Lya': [1215],}
+
+
+### spectral lines to label in plot
+# https://classic.sdss.org/dr6/algorithms/linestable.html
+# the first column means whether to show this line or not by default
+spec_line_emi = numpy.asarray([
+	[1, 6564.61, "H α"    ],
+	[1, 5008.24, "[O III]"],
+	[1, 4960.30, "[O III]"],
+	[1, 4862.68, "H β"    ],
+	[1, 4341.68, "H γ"    ],
+	[1, 4102.89, "H δ"    ],
+	[0, 3889.00, "He I"   ],
+	[1, 3727.09, "O II"   ],
+	[1, 2798.75, "Mg II"  ],
+	[1, 2326.00, "C II"   ],
+	[1, 1908.73, "C III]" ],
+	[0, 1640.40, "He II"  ],
+	[1, 1549.06, "C IV"   ],
+	[1, 1396.75, "Si IV"  ],
+	[0, 1305.53, "O I"    ],
+	[1, 1240.00, "N V"    ],
+	[1, 1215.67, "Ly α"   ],
+	[0, 1123.00, "P V"    ],
+	[1, 1034.00, "O VI"   ],
+	[1, 1025.72, "Ly β"   ],
+])
+spec_line_abs = numpy.asarray([
+	[1, 5891.58, "Na I"   ],
+	[0, 4227.92, "Ca I"   ],
+	[0, 3934.78, "Ca II"  ],
+	[1, 2852.96, "Mg I"   ],
+	[0, 2796.35, "Mg II"  ],
+	[0, 2586.65, "Fe II"  ],
+	[0, 2344.21, "Fe II"  ],
+	[1, 2062.26, "Cr II"  ],
+	[1, 1854.72, "Al III" ],
+	[1, 1670.79, "Al III" ],
+	[0, 1608.45, "Fe II"  ],
+	[0, 1548.20, "C IV"   ],
+	[0, 1526.71, "Si IV"  ],
+	[0, 1393.76, "Si IV"  ],
+	[0, 1334.53, "C II"   ],
+	[0, 1302.17, "O I"    ],
+	[0, 1260.42, "Si II"  ],
+	[0, 1238.82, "N V"    ],
+	[0, 1206.50, "Si III" ],
+	[0, 1199.55, "N I"    ],
+	[0, 1190.42, "Si II"  ],
+])
 
 ### wavelength plotting range
-wave_min = 3750
-wave_max = 11000
+wave_max = 10500.
+wave_min = 3500.
 
 ### starting the dash app
-app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
+app = dash.Dash(__name__, external_stylesheets=external_stylesheets,
+                title="SpecViewer", update_title="Loading...")
 
 ### get object info
-### organize by program, plateid, catalogid
-programname = ['SDSS-RM','XMM-LSS','COSMOS','AQMES-Medium','AQMES-Wide']#,'eFEDS1','eFEDS2']
+### organize by program, fieldid, catalogid
+# programname = ["COSMOS"]
+# programname = ["AQMES-Medium", "AQMES-Wide", "AQMES-Bonus", "bhm_aqmes"]
+# programname = ["SDSS-RM", "XMM-LSS", "COSMOS", "AQMES-Medium", "AQMES-Wide"] # , "eFEDS1", "eFEDS2"]
 
 
 
-### 
-### the webpage layout 
 ###
-app.layout = html.Div(className='container',children=[
-    html.H2(children=['SDSSV-BHM Spectra Viewer (remote version)']),
+### the webpage layout
+###
 
-    html.Div([
+# see https://getbootstrap.com/docs/3.4/css/#grid
+app.layout = html.Div(className="container-fluid", style={"width": "90%"}, children=[
+	# https://dash.plotly.com/dash-core-components/location
+	dcc.Location(id="window_location", refresh=False),
 
-        ## dropdown menu titles
-        html.Div([
-            html.H4(children=['Program'])
-        ],style={"width": "33%",'display': 'inline-block'}),
+	html.Div(className="row", children=[
+		html.H2("SDSSV-BHM Spectra Viewer (remote version)"),
+	]),
 
-        ## plate ID dropdown
-        html.Div(children=[
-             html.H4(children=['Plate ID'])
-        ],style={"width": "33%",'display': 'inline-block'}),
+	html.Div(className="row", children=[
 
-        ## catalog ID dropdown
-        html.Div(children=[
-             html.H4(children=['Catalog ID'])
-        ],style={"width": "33%",'display': 'inline-block'}),
+		## dropdown menu for program/fieldid/catalogid
+		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
+			html.Label(
+				html.H4("Program"),
+			),
+			dcc.Dropdown(
+				id="program_dropdown",
+				options=[
+					{"label": i, "value": i} for i in [*programs.keys(), "(other)"]],
+				placeholder="Program",
+			)]),
 
-    ]),
+		## setting an empty value beforehand for next four fields is to suppress the warning from React.js
 
-    html.Div([
+		## Field ID input (w/ MJD)
+		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
+			html.Label(
+				html.H4("Field & MJD"),
+			),
+			dcc.Input(
+				id="fieldid_input", type="text",
+				placeholder="FieldID-MJD", value="", style={"height": "36px", "width": "100%"},
+			)], id="fieldid_input_div", hidden=True),
 
-        ## dropdown menu for program/designid/catalogid
-        html.Div([
-        dcc.Dropdown(
-            id='program_dropdown',
-            options=[
-                {'label': i, 'value': i} for i in programs.keys()],
-            placeholder="Program",
-            value='SDSS-RM',
-            #style={'display': 'inline-block'},
-        )],style={"width": "33%",'display': 'inline-block'}),
+		## Field ID dropdown
+		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
+			html.Label(
+				html.H4("Field ID"),
+			),
+			dcc.Dropdown(
+				id="fieldid_dropdown",
+				placeholder="FieldID", value="",
+			)], id="fieldid_dropdown_div", hidden=False),
 
-        ## plate ID dropdown
-        html.Div(children=[
-        dcc.Dropdown(
-            id='plateid_dropdown',
-            placeholder='Plate ID',
-            #style={'width':'50%','display': 'inline-block'},
-        )],style={"width": "33%",'display': 'inline-block'}),
+		## catalog ID input
+		html.Div(className="col-lg-4 col-md-6 col-sm-8 col-xs-12", children=[
+			html.Label(
+				html.H4("Catalog ID"),
+			),
+			dcc.Input(
+				id="catalogid_input", type="text",
+				placeholder="CatalogID", value="", style={"height": "36px", "width": "100%"},
+			)], id="catalogid_input_div", hidden=True),
 
+		## catalog ID dropdown
+		html.Div(className="col-lg-4 col-md-6 col-sm-8 col-xs-12", children=[
+			html.Label(
+				html.H4("Catalog ID"),
+			),
+			dcc.Dropdown(
+				id="catalogid_dropdown",
+				placeholder="CatalogID", value="",
+			)], id="catalogid_dropdown_div", hidden=False),
 
-        ## catalog ID dropdown
-        html.Div(children=[
-        dcc.Dropdown(
-            id='catalogid_dropdown',
-            placeholder='Catalog ID',
-            #style={'width':'50%','display': 'inline-block'},
-        )],style={"width": "33%",'display': 'inline-block'}),
+		## whitespace (not a field)
+		html.Div(className="col-sm-4 visible-sm-block", style={"visibility": "hidden"},
+                    children=[html.Label(html.H4("-")), dcc.Dropdown()]),
 
-    ]),
+		## redshift input
+		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
+			html.Label(
+				html.H4("Redshift (z)"),
+			),
+			dcc.Input( # do not use type="number"! it is automatically updated when the next field changes
+				id="redshift_input", # redshift_dropdown
+				type="text", step="any", pattern="\d+(\.\d*)?|\.\d+",
+				value=redshift or "", placeholder=redshift_default, min=0,
+				style={"height": "36px", "width": "100%"}, inputMode="numeric",
+			)]),
 
-    ## multiepoch spectra plot
-    dcc.Checklist(
-        id="epoch_list",
-        labelStyle={'display': 'inline-block'}
-    ),
-    dcc.Graph(id="spectra_plot"),
+		## redshift stepping dropdown
+		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
+			html.Label(
+				html.H4("z stepping"),
+			),
+			dcc.Dropdown(
+				id="redshift_step", options=["any", 0.1, 0.01, 0.001, 0.0001],
+				value=stepping, placeholder="Any",
+			)]),
 
-    html.Div([
+	]),
 
-    	## spectral binning
-        html.Div(children=[
-            html.H4(children=['Binning:'])
-        ],style={"width": "10%",'display': 'inline-block'}),
+	## multiepoch spectra plot
+	# dcc.Checklist(
+	# 	id="epoch_list",
+	# 	labelStyle={"display": "inline-block"}
+	# ),
 
-        html.Div(children=[
-            dcc.Input(id="binning_input", type="number", value=5),
-        ],style={"width": "20%",'display': 'inline-block'}), 
+	html.Div(className="row", children=[
+		dcc.Graph(
+			id="spectra_plot",
+			style={
+				"position": "relative", "overflow": "hidden",
+				"height": "max(450px, min(64vw, 80vh))", "width": "108%", "left": "-4%"},
+		),
+	]),
 
-        ## label important spectral lines
-        html.Div(children=[
-            html.H4(children=['Lines:'])
-        ],style={"width": "10%",'display': 'inline-block'}),   
+	html.Div(className="row", children=[
 
-        html.Div(children=[
-            dcc.Checklist(id="line_list",options=[
-                {'label': i+' ('+str(int(spectral_lines[i][0]))+'A)', 'value': i} for i in spectral_lines.keys()
-                ], 
-                value=list(spectral_lines.keys())),
-        ],style={"width": "60%", 'display': 'inline-block'}),    
+		## axis range (note: these settings are volatile/auto-resetted)
+		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
 
-    ]),
-   
-    ## TODO: print source information (ra, dec, z, etc...) from some catalog
-    html.Div([
-    	html.H5(id='property_text')
+			## y-axis range
+			html.Div(className="row", children=[
+				html.Label(
+					html.H4("Y-axis range"),
+				),
+				dcc.Input(
+					id="axis_y_max", type="number", step=1, value=y_max_default, placeholder="Max",
+					style={"height": "36px", "width": "100%"},
+				),
+				dcc.Input(
+					id="axis_y_min", type="number", step=1, value=y_min_default, placeholder="Min",
+					style={"height": "36px", "width": "100%"},
+				)]),
 
-   	 ])
+			## x-axis range
+			html.Div(className="row", children=[
+				html.Label(
+					html.H4("X-axis range"),
+				),
+				dcc.Input(
+					id="axis_x_max", type="number", step=1, value=int(wave_max), placeholder="Max",
+					style={"height": "36px", "width": "100%"},
+				),
+				dcc.Input(
+					id="axis_x_min", type="number", step=1, value=int(wave_min), placeholder="Min",
+					style={"height": "36px", "width": "100%"},
+				)]),
+
+		]),
+
+		## spectral smoothing
+		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
+			html.Label(
+				html.H4("Smoothing"),
+			),
+			dcc.Input(
+				id="smooth_input", type="number", step=2, min=1, value=smooth_default, placeholder="SmoothWidth",
+				style={"height": "36px", "width": "100%"}, max=smooth_max,
+			),
+		]),
+
+		## whitespace (not a field)
+		html.Div(className="col-sm-8 visible-sm-block", style={"visibility": "hidden"},
+                    children=[html.Label(html.H4("-")), dcc.Dropdown()]),
+		html.Div(className="col-sm-8 visible-sm-block", style={"visibility": "hidden"},
+                    children=[html.Label(html.H4("-")), dcc.Dropdown()]),
+
+		## label spectral lines (emission) (2 columns)
+		html.Div(className="col-lg-4 col-md-6 col-sm-8 col-xs-12", children=[
+			html.Label(
+				html.H4("Emission lines"),
+			),
+			dcc.Checklist(id="line_list_emi", options=[
+				{"label": "{: <12}\t({}Å)".format(i[2], int(float(i[1]))), "value": i[1]} for i in spec_line_emi
+			],
+				value=list(spec_line_emi[numpy.bool_(spec_line_emi[:, 0]), 1]),
+				style={"columnCount": "2"},
+				inputStyle={"marginRight": "5px"},
+				labelStyle={"whiteSpace": "pre-wrap"},
+			),
+		]),
+
+		## label spectral lines (absorption) (2 columns)
+		html.Div(className="col-lg-4 col-md-6 col-sm-8 col-xs-12", children=[
+			html.Label(
+				html.H4("Absorption lines"),
+			),
+			dcc.Checklist(id="line_list_abs", options=[
+				{"label": "{: <12}\t({}Å)".format(i[2], int(float(i[1]))), "value": i[1]} for i in spec_line_abs
+			],
+				value=list(spec_line_abs[numpy.bool_(spec_line_abs[:, 0]), 1]),
+				style={"columnCount": "2"},
+				inputStyle={"marginRight": "5px"},
+				labelStyle={"whiteSpace": "pre-wrap"},
+			),
+		]),
+
+	]),
+
+	## TODO: print source information (ra, dec, z, etc...) from some catalog
+	# html.Div([
+	# 	html.H5(id="property_text")
+	# ])
 
 ])
 
@@ -222,72 +438,213 @@ app.layout = html.Div(className='container',children=[
 ### interactive callback functions for updating spectral plot
 ###
 
+## switch between known program(s) or manual input
+# use values specified through `search` and `hash` if applicable
+# see https://developer.mozilla.org/docs/Web/API/Location for definition
+# ps: `search` and `hash` are cleared when program is no longer "(other)"
+@app.callback(
+	Output("fieldid_input_div", "hidden"),
+	Output("catalogid_input_div", "hidden"),
+	Output("fieldid_dropdown_div", "hidden"),
+	Output("catalogid_dropdown_div", "hidden"),
+	Output("window_location", "search"),
+	Output("window_location", "hash"),
+	Output("program_dropdown", "value"),
+	Output("fieldid_input", "value"),
+	Output("catalogid_input", "value"),
+	Output("redshift_input", "value", allow_duplicate=True),
+	Input("window_location", "search"),
+	Input("window_location", "hash"),
+	Input("program_dropdown", "value"),
+	prevent_initial_call="initial_duplicate")
+def set_input_or_dropdown(query, hash, program):
+	if query: query = str(query).lstrip("?")
+	if program and program != "(other)": query, hash = "", ""
+	fld_mjd, catalog, redshift = "", "", ""
+	hash = str(hash).lstrip("#").split("&") if hash else []
+	if query and re.fullmatch("\d+-\d+-[^-].+[^-]", query):
+		for x in hash:
+			if not re.fullmatch("[^=]+=[^=]+", x): continue
+			k, v = x.split("=", 1)
+			if k == "z": redshift = v
+		program = "(other)"
+		fld_mjd = "-".join(query.split("-", 2)[:2])
+		catalog = "-".join(query.split("-", 2)[2:])
+	query = "?" + query if query else ""
+	hash = "#" + "&".join(hash) if hash else ""
+	ret = query, hash, program, fld_mjd, catalog, redshift
+	if program and program == "(other)":
+		return False, False, True, True, *ret
+	else:
+		return True, True, False, False, *ret
+
 ## dropdown menu
 @app.callback(
-    Output('plateid_dropdown', 'options'),
-    Input('program_dropdown', 'value'))
-def set_plateid_options(selected_program):
-    return [{'label': i, 'value': i} for i in programs[selected_program]]
+	Output("fieldid_dropdown", "options"),
+	Input("program_dropdown", "value"))
+def set_fieldid_options(selected_program):
+	if not selected_program or selected_program == "(other)": return []
+	# print(selected_program) # for testing
+	return [{"label": i, "value": i} for i in programs[selected_program]]
 
 @app.callback(
-    Output('catalogid_dropdown', 'options'),
-    Input('plateid_dropdown', 'value'),
-    Input('program_dropdown', 'value'))
-def set_catalogid_options(selected_designid, selected_program):
-    if selected_designid != 'all':
-        return [{'label': i, 'value': i} for i in plateIDs[str(selected_designid)]]
-    else:
-        return [{'label': i, 'value': i} for i in plateIDs[str(selected_program) +"-"+str(selected_designid)]]
+	Output("catalogid_dropdown", "options"),
+	Input("fieldid_dropdown", "value"),
+	Input("program_dropdown", "value"))
+def set_catalogid_options(selected_fieldid, selected_program):
+	if not selected_program or selected_program == "(other)": return []
+	if not selected_fieldid: return []
+	# the following lines are where field numbers are obtained, use strings not numbers
+	if selected_fieldid != "all":
+		return [{"label": i, "value": str(i)} for i in fieldIDs[str(selected_fieldid)]]
+	else:
+		return [{"label": i, "value": str(i)} for i in fieldIDs[str(selected_program) + "-" + str(selected_fieldid)]]
+
+# set_fieldid_value is only run when program is switched
+@app.callback(
+	Output("fieldid_dropdown", "value"),
+	Input("fieldid_dropdown", "options"),
+	Input("fieldid_input", "value"),
+	State("program_dropdown", "value"))
+def set_fieldid_value(available_fieldid_options, input, program):
+	try:
+		if program and program == "(other)": return input or ""
+		# print("set_fieldid_value", available_fieldid_options[0]["value"], available_catalogid_options[0]["value"]) # for testing
+		# uncomment the following line if you prefer to automatically choose the first field in the program
+		# return available_fieldid_options[0]["value"]
+		return ""
+	except:
+		# print("set_fieldid_value except", available_fieldid_options) # for testing
+		# print("set_fieldid_value except") # for testing
+		return ""
 
 @app.callback(
-    Output('plateid_dropdown', 'value'),
-    Input('plateid_dropdown', 'options'))
-def set_plateid_value(available_plateid_options):
-    return available_plateid_options[0]['value']
+	Output("catalogid_dropdown", "value"),
+	Input("catalogid_dropdown", "options"),
+	Input("catalogid_input", "value"),
+	State("program_dropdown", "value"))
+def set_catalogid_value(available_catalogid_options, input, program):
+	try:
+		if program and program == "(other)": return input or ""
+		# print("set_catalogid_value", available_catalogid_options[0]["value"]) # for testing
+		# uncomment the following line if you prefer to automatically choose the first catid in the field
+		# return available_catalogid_options[0]["value"]
+		return ""
+	except:
+		# print("set_catalogid_value except", catalogid_dropdown) # for testing
+		return ""
 
+# enable/disable stepping for the redshift input (see comment in the beginning of the file)
 @app.callback(
-    Output('catalogid_dropdown', 'value'),
-    Input('catalogid_dropdown', 'options'))
-def set_catalogid_value(available_catalogid_options):
-    return available_catalogid_options[0]['value']
+	Output("redshift_input", "value"),
+	Output("redshift_input", "type"),
+	Output("redshift_input", "step"),
+	State("redshift_input", "value"),
+	Input("redshift_step", "value"),
+	prevent_initial_call=True)
+def set_redshift_stepping(z, step):
+	if not step: step = "any"
+	if str(step).lower() == "any":
+		type = "text"
+	else:
+		type = "number"
+	if type == "number" and z:
+		z = f"%0.{-int(math.log10(step))}f" % float(z)
+	return z, type, step
+
+# reset the axes range and smooth width whenever any of program/fieldid/catid changes
+@app.callback(
+	Output("axis_y_max", "value"),
+	Output("axis_y_min", "value"),
+	Output("axis_x_max", "value"),
+	Output("axis_x_min", "value"),
+	Output("smooth_input", "value"),
+	Input("window_location", "hash"),
+	Input("program_dropdown", "value"),
+	Input("fieldid_dropdown", "value"),
+	Input("catalogid_dropdown", "value"),
+	prevent_initial_call=True)
+def reset_axis_range(hash, program, *_):
+	smooth = smooth_default
+	y_min, y_max = y_min_default, y_max_default
+	x_min, x_max = int(wave_min), int(wave_max)
+	hash = str(hash).lstrip("#").split("&") if hash else []
+	if program and program == "(other)":
+		for x in hash:
+			if not re.fullmatch("[^=]+=[^=]+", x): continue
+			k, v = x.split("=", 1)
+			if k == "m": smooth = v
+			if k == "y" and re.fullmatch("[^,]+,[^,]+", v): y_min, y_max = v.split(",", 1)
+			if k == "x" and re.fullmatch("[^,]+,[^,]+", v): x_min, x_max = v.split(",", 1)
+	return y_max, y_min, x_max, x_min, smooth
 
 
 ## plotting the spectra
 @app.callback(
-    Output('spectra_plot','figure'),
-    Input('plateid_dropdown', 'value'),
-    Input('catalogid_dropdown', 'value'))
-def make_multiepoch_spectra(selected_designid, selected_catalogid):
-    waves, fluxes, names = fetch_catID(selected_catalogid, selected_designid)
+	Output("spectra_plot", "figure"),
+	Input("fieldid_dropdown", "value"),
+	Input("catalogid_dropdown", "value"),
+	Input("redshift_input", "value"), # redshift_dropdown
+	Input("axis_y_max", "value"),
+	Input("axis_y_min", "value"),
+	Input("axis_x_max", "value"),
+	Input("axis_x_min", "value"),
+	Input("line_list_emi", "value"),
+	Input("line_list_abs", "value"),
+	Input("smooth_input", "value"))
+def make_multiepoch_spectra(selected_fieldid, selected_catalogid, redshift,
+                            y_max, y_min, x_max, x_min, list_emi, list_abs, smooth):
+	try:
+		smooth, redshift = int(smooth or smooth_default), float(redshift or redshift_default)
+		waves, fluxes, names = fetch_catID(selected_fieldid, selected_catalogid)
+		# print("make_multiepoch_spectra try") # for testing
+	except:
+		# print("make_multiepoch_spectra except") # for testing
+		return go.Figure()
 
-    fig = go.Figure()
+	if not y_min and not y_max: y_min, y_max = y_min_default, y_max_default
+	if not x_min and not x_max: x_min, x_max = int(wave_max), int(wave_min)
+	y_min, y_max = int(y_min or 0), int(y_max or 0)
+	x_min, x_max = int(x_min or 0), int(x_max or 0)
+	if y_max < y_min: y_min, y_max = y_max, y_min
+	if x_max < x_min: x_min, x_max = x_max, x_min
+	x_max = math.ceil(x_max / (1 + redshift))
+	x_min = math.floor(x_min / (1 + redshift))
 
-    for i in range(0, len(waves)):
-        fig.add_trace(go.Scatter(x=waves[i], y=fluxes[i], name=names[i], \
-                                 opacity = 1./2., mode='lines'))
+	fig = go.Figure()
+	fig.layout.yaxis.range = [y_min, y_max]
+	fig.layout.xaxis.range = [x_min, x_max]
 
-        
-    return fig
+	# print(f"redshift: {redshift}")
+	for i in range(0, len(waves)):
+		# fig.add_trace(go.Scatter(x=waves[i] / (1 + redshift), y=fluxes[i],
+		fig.add_trace(go.Scatter(
+			x=waves[i] / (1 + redshift),
+			y=convolve(fluxes[i], Box1DKernel(smooth)),
+			name=names[i], opacity=1 / 2, mode="lines"))
 
-### setting the selected epochs for plotting
-# @app.callback(
-#     Output('epoch_list','value'),
-#     Input('plateid_dropdown', 'value'),
-#     Input('catalogid_dropdown', 'value'))
-# def set_epoch_value(selected_designid,selected_catalogid):
-#     filename = np.array([])
-#     for i in plateid[selected_designid]:
-#         tmp = glob.glob(dir_spectra+str(i)+'p/coadd/*/spSpec-'+str(i)+'-*-'+str(selected_catalogid).zfill(11)+'.fits')
-#         if len(tmp)>0: 
-#             filename = np.append(filename,tmp,axis=0)
-#     epoch = np.array([])
-#     for f in filename:
-#         mjd = f.split('/')[-2]
-#         plate = f.split('/')[-4][:5]
-#         epoch = np.append(epoch,float(plate)+float(mjd)/1e5)
-#     return [{'label':i, 'value':i} for i in epoch]
+	for i in spec_line_emi:
+		j, x = i[2], i[1]
+		if x not in list_emi: continue
+		x = float(x)
+		if (x_min <= x and x <= x_max):
+			fig.add_vline(x=x, line_dash="solid", opacity=1 / 3)
+			fig.add_annotation(x=x, y=y_max, text=j, hovertext=f" {j} ({x} Å)", textangle=70)
 
-if __name__ == '__main__':
-    app.run_server(debug=True)
+	for i in spec_line_abs:
+		j, x = i[2], i[1]
+		if x not in list_abs: continue
+		x = float(x)
+		if (x_min <= x and x <= x_max):
+			fig.add_vline(x=x, line_dash="dot", opacity=1 / 2)
+			fig.add_annotation(x=x, y=y_min, text=j, hovertext=f" {j} ({x} Å)", textangle=70)
+
+	return fig
+
+
+
+if __name__ == "__main__":
+	# app.run_server(debug=True)
+	app.run_server(host="127.0.0.1", port=8050, debug=True)
 
 
