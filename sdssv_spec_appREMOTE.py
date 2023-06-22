@@ -51,10 +51,10 @@ cache: dict[tuple, tuple] = {}
 y_max_default = 100
 y_min_default = -10
 
-# binning/smoothing along x-axis, disabled by default (1 means no binning)
-# we need an upper limit since a very large `binning` freezes the program
-binning_default = 1
-binning_max = 10000
+# smoothing along x-axis, disabled by default (one means no smoothing)
+# we need an upper limit since a very large value freezes the program
+smooth_default = 1
+smooth_max = 10000
 
 ### css files
 external_stylesheets = [ "https://codepen.io/chriddyp/pen/bWLwgP.css",
@@ -85,8 +85,6 @@ def SDSSV_fetch(username, password, fieldID, MJD, objID, branch="v6_1_0"):
 	Fetches spectral data for a SDSS-RM object on a
 		specific field on a specific MJD. Uses the user
 		supplied authentication.
-
-	TO DO: allow for multiple MJDs and fields, for loop it up
 	"""
 	if not (fieldID and MJD and objID):
 		raise Exception((fieldID, MJD, objID))
@@ -379,14 +377,14 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 
 		]),
 
-		## spectral binning
+		## spectral smoothing
 		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
 			html.Label(
-				html.H4("Binning"),
+				html.H4("Smoothing"),
 			),
 			dcc.Input(
-				id="binning_input", type="number", step=1, min=1, value=binning_default, placeholder="BinValue",
-				style={"height": "36px", "width": "100%"}, max=binning_max,
+				id="smooth_input", type="number", step=2, min=1, value=smooth_default, placeholder="SmoothWidth",
+				style={"height": "36px", "width": "100%"}, max=smooth_max,
 			),
 		]),
 
@@ -443,24 +441,25 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 ## switch between known program(s) or manual input
 # use values specified through `search` and `hash` if applicable
 # see https://developer.mozilla.org/docs/Web/API/Location for definition
-# ps: `location.search` is cleared when `program` is no longer "(other)"
+# ps: `search` and `hash` are cleared when program is no longer "(other)"
 @app.callback(
 	Output("fieldid_input_div", "hidden"),
 	Output("catalogid_input_div", "hidden"),
 	Output("fieldid_dropdown_div", "hidden"),
 	Output("catalogid_dropdown_div", "hidden"),
 	Output("window_location", "search"),
+	Output("window_location", "hash"),
 	Output("program_dropdown", "value"),
 	Output("fieldid_input", "value"),
 	Output("catalogid_input", "value"),
 	Output("redshift_input", "value", allow_duplicate=True),
 	Input("window_location", "search"),
-	Input("program_dropdown", "value"),
 	Input("window_location", "hash"),
+	Input("program_dropdown", "value"),
 	prevent_initial_call="initial_duplicate")
-def set_input_or_dropdown(query, program, hash):
+def set_input_or_dropdown(query, hash, program):
 	if query: query = str(query).lstrip("?")
-	if program and program != "(other)": query = ""
+	if program and program != "(other)": query, hash = "", ""
 	fld_mjd, catalog, redshift = "", "", ""
 	hash = str(hash).lstrip("#").split("&") if hash else []
 	if query and re.fullmatch("\d+-\d+-[^-].+[^-]", query):
@@ -471,8 +470,9 @@ def set_input_or_dropdown(query, program, hash):
 		program = "(other)"
 		fld_mjd = "-".join(query.split("-", 2)[:2])
 		catalog = "-".join(query.split("-", 2)[2:])
-	if query and query != "": query = "?" + query
-	ret = query, program, fld_mjd, catalog, redshift
+	query = "?" + query if query else ""
+	hash = "#" + "&".join(hash) if hash else ""
+	ret = query, hash, program, fld_mjd, catalog, redshift
 	if program and program == "(other)":
 		return False, False, True, True, *ret
 	else:
@@ -552,20 +552,20 @@ def set_redshift_stepping(z, step):
 		z = f"%0.{-int(math.log10(step))}f" % float(z)
 	return z, type, step
 
-# reset the axes range and binning value whenever any of program/fieldid/catid changes
+# reset the axes range and smooth width whenever any of program/fieldid/catid changes
 @app.callback(
 	Output("axis_y_max", "value"),
 	Output("axis_y_min", "value"),
 	Output("axis_x_max", "value"),
 	Output("axis_x_min", "value"),
-	Output("binning_input", "value"),
+	Output("smooth_input", "value"),
 	Input("window_location", "hash"),
 	Input("program_dropdown", "value"),
 	Input("fieldid_dropdown", "value"),
 	Input("catalogid_dropdown", "value"),
 	prevent_initial_call=True)
 def reset_axis_range(hash, program, *_):
-	binning = binning_default
+	smooth = smooth_default
 	y_min, y_max = y_min_default, y_max_default
 	x_min, x_max = int(wave_min), int(wave_max)
 	hash = str(hash).lstrip("#").split("&") if hash else []
@@ -573,10 +573,10 @@ def reset_axis_range(hash, program, *_):
 		for x in hash:
 			if not re.fullmatch("[^=]+=[^=]+", x): continue
 			k, v = x.split("=", 1)
-			if k == "b": binning = v
+			if k == "m": smooth = v
 			if k == "y" and re.fullmatch("[^,]+,[^,]+", v): y_min, y_max = v.split(",", 1)
 			if k == "x" and re.fullmatch("[^,]+,[^,]+", v): x_min, x_max = v.split(",", 1)
-	return y_max, y_min, x_max, x_min, binning
+	return y_max, y_min, x_max, x_min, smooth
 
 
 ## plotting the spectra
@@ -591,11 +591,11 @@ def reset_axis_range(hash, program, *_):
 	Input("axis_x_min", "value"),
 	Input("line_list_emi", "value"),
 	Input("line_list_abs", "value"),
-	Input("binning_input", "value"))
+	Input("smooth_input", "value"))
 def make_multiepoch_spectra(selected_fieldid, selected_catalogid, redshift,
-                            y_max, y_min, x_max, x_min, list_emi, list_abs, binning):
+                            y_max, y_min, x_max, x_min, list_emi, list_abs, smooth):
 	try:
-		binning, redshift = int(binning or binning_default), float(redshift or redshift_default)
+		smooth, redshift = int(smooth or smooth_default), float(redshift or redshift_default)
 		waves, fluxes, names = fetch_catID(selected_fieldid, selected_catalogid)
 		# print("make_multiepoch_spectra try") # for testing
 	except:
@@ -620,7 +620,7 @@ def make_multiepoch_spectra(selected_fieldid, selected_catalogid, redshift,
 		# fig.add_trace(go.Scatter(x=waves[i] / (1 + redshift), y=fluxes[i],
 		fig.add_trace(go.Scatter(
 			x=waves[i] / (1 + redshift),
-			y=convolve(fluxes[i], Box1DKernel(binning)),
+			y=convolve(fluxes[i], Box1DKernel(smooth)),
 			name=names[i], opacity=1 / 2, mode="lines"))
 
 	for i in spec_line_emi:
