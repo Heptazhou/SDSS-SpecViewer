@@ -4,10 +4,11 @@
 Excelsior!
 """
 
-import io
 import json
 import math
-import re
+import sys
+from io import BytesIO
+from re import fullmatch
 
 import dash
 import numpy
@@ -92,7 +93,7 @@ def SDSSV_fetch(username, password, fieldID, MJD, objID, branch="v6_1_0"):
 	# print(url) # for testing
 	r = requests.get(url, auth=(username, password))
 	r.raise_for_status()
-	data_test = fits.open(io.BytesIO(r.content))
+	data_test = fits.open(BytesIO(r.content))
 	flux = data_test[1].data["FLUX"]
 	wave = 10**data_test[1].data["loglam"]
 	# print(flux) # for testing
@@ -111,11 +112,11 @@ def fetch_catID(field, catID, redshift=0):
 	fluxes = []
 	waves = []
 	names = []
-	# print (str(catID))
-	# # print ("catalogIDs[str(catID)]")
+	# print(str(catID))
+	# # print("catalogIDs[str(catID)]")
 	# testval = catalogIDs[str(catID)]
-	# print (testval)
-	if re.fullmatch("\d+-\d+", str(field).strip()):
+	# print(testval)
+	if fullmatch("\d+-\d+", str(field).strip()):
 		fld, mjd = str(field).strip().split("-", 1)
 		try:
 			dat = SDSSV_fetch(username, password, fld, mjd, str(catID).strip(), "master")
@@ -145,23 +146,31 @@ def fetch_catID(field, catID, redshift=0):
 ###
 try:
 	print("Reading authentication file.")
-	with open(authentication, "r") as i:
-		lines = i.readlines()
-		username = lines[0][:-1] # there will be a \n on the username
-		password = lines[1][:-1] # and on the password, at least for some file systems
+	with open(authentication, "r", newline="") as io:
+		lines = io.readlines()
+		username = lines[0].strip()
+		password = lines[1].strip()
 except: # any error from above will fall through to here.
-	print("authentication.txt not provided or incomplete. Please enter authentication.")
-	username = input("Enter SDSS-V username:")
-	password = input("Enter SDSS-V password:")
+	print("authentication.txt broken or not exist. Please enter authentication.")
+	username = input("Enter SDSS-V username: ").strip()
+	password = input("Enter SDSS-V password: ").strip()
+	sys.stdout.write("\x1bc") # "\ec"
+	sys.stdout.flush()
+finally:
+	with open(authentication, "w", newline="") as io:
+		io.write(f"{username}\n{password}\n")
 
 try:
 	print("Verifying authentication...")
 	# fetch_test = SDSSV_fetch(username, password, 15173, 59281, 4350951054)
 	fetch_test = SDSSV_fetch(username, password, 112359, 60086, 27021600949438682)
-	print("Verification successful.")
+	print("Verification succeeded.")
 except:
-	print("Authentication error, please press Ctrl+C and fix authentication.txt.")
+	print("Verification failed.")
+	print("Please make sure you have internet access and/or fix authentication.txt.")
+	print("You may either edit the file to fix it, or simply delete it and rerun this program.")
 	# print("Contact Meg (megan.c.davis@uconn.edu) if the issue persists.")
+	exit(1)
 
 
 
@@ -203,7 +212,7 @@ spec_line_abs = numpy.asarray([
 	[1, 1670.79, "Al III" ],
 	[0, 1608.45, "Fe II"  ],
 	[0, 1548.20, "C IV"   ],
-	[0, 1526.71, "Si IV"  ],
+	[1, 1526.71, "Si IV"  ],
 	[0, 1393.76, "Si IV"  ],
 	[0, 1334.53, "C II"   ],
 	[0, 1302.17, "O I"    ],
@@ -236,6 +245,7 @@ app = dash.Dash(__name__, external_stylesheets=external_stylesheets,
 
 # see https://getbootstrap.com/docs/3.4/css/#grid
 app.layout = html.Div(className="container-fluid", style={"width": "90%"}, children=[
+
 	# https://dash.plotly.com/dash-core-components/location
 	dcc.Location(id="window_location", refresh=False),
 
@@ -462,9 +472,9 @@ def set_input_or_dropdown(query, hash, program):
 	if program and program != "(other)": query, hash = "", ""
 	fld_mjd, catalog, redshift = "", "", ""
 	hash = str(hash).lstrip("#").split("&") if hash else []
-	if query and re.fullmatch("\d+-\d+-[^-].+[^-]", query):
+	if query and fullmatch("\d+-\d+-[^-].+[^-]", query):
 		for x in hash:
-			if not re.fullmatch("[^=]+=[^=]+", x): continue
+			if not fullmatch("[^=]+=[^=]+", x): continue
 			k, v = x.split("=", 1)
 			if k == "z": redshift = v
 		program = "(other)"
@@ -571,11 +581,11 @@ def reset_axis_range(hash, program, *_):
 	hash = str(hash).lstrip("#").split("&") if hash else []
 	if program and program == "(other)":
 		for x in hash:
-			if not re.fullmatch("[^=]+=[^=]+", x): continue
+			if not fullmatch("[^=]+=[^=]+", x): continue
 			k, v = x.split("=", 1)
 			if k == "m": smooth = v
-			if k == "y" and re.fullmatch("[^,]+,[^,]+", v): y_min, y_max = v.split(",", 1)
-			if k == "x" and re.fullmatch("[^,]+,[^,]+", v): x_min, x_max = v.split(",", 1)
+			if k == "y" and fullmatch("[^,]+,[^,]+", v): y_min, y_max = v.split(",", 1)
+			if k == "x" and fullmatch("[^,]+,[^,]+", v): x_min, x_max = v.split(",", 1)
 	return y_max, y_min, x_max, x_min, smooth
 
 
@@ -645,6 +655,7 @@ def make_multiepoch_spectra(selected_fieldid, selected_catalogid, redshift,
 
 if __name__ == "__main__":
 	# app.run_server(debug=True)
+	# app.run_server(host="0.0.0.0", port=8050, debug=True)
 	app.run_server(host="127.0.0.1", port=8050, debug=True)
 
 

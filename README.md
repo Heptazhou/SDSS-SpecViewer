@@ -12,7 +12,7 @@ This is a demo for a multi-epoch spectral viewer for SDSSV-BHM using plotly/dash
 
 ### Authentication
 
-You **must** edit the `authentication.txt` before running with the proper SDSS-V Proprietary Data username and password before running the tool. Please ensure that there are NO extra spaces after the username or password and that the username and password are on separate lines (i.e. just hit enter after the last character you type for the username and then type the password). The code will immediately check the authentication upon start up.
+You **must** have the proper SDSS-V Proprietary Data username and password in the `authentication.txt` (created upon first run) to use this tool, the program will prompt you to input required authentication if the file does not exist yet. The code will immediately check the authentication upon start up.
 
 ### Dependencies
 Please install the following Python packages to use this tool. The provided "dependencies.sh" shell script will pip install these for you, if you run it with: `./dependencies.sh`.
@@ -21,6 +21,11 @@ Please install the following Python packages to use this tool. The provided "dep
 - astropy
 - requests
 - numpy
+
+Or better, if you are using Conda (e.g. Miniconda/Anaconda), you may run (within some [environment](https://conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html)):
+```shell
+conda install astropy dash numpy plotly requests
+```
 
 ### Keeping up-to-date
 
