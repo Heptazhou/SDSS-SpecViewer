@@ -154,7 +154,7 @@ except: # any error from above will fall through to here.
 	print("authentication.txt broken or not exist. Please enter authentication.")
 	username = input("Enter SDSS-V username: ").strip()
 	password = input("Enter SDSS-V password: ").strip()
-	sys.stdout.write("\x1bc") # "\ec"
+	sys.stdout.write("\r\x1bc\r") # "\ec"
 	sys.stdout.flush()
 finally:
 	with open(authentication, "w", newline="") as io:
