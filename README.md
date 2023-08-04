@@ -29,7 +29,7 @@ conda install astropy dash numpy plotly requests
 
 ### Keeping up-to-date
 
-The `dictionaries.txt` file is the backbone to this tool. By running the `update_dictionaries.py` file, it will look for spAll-lite-v6_1_0.fits on your local machine and update said dictionary file. The file provided here is up-to-date for BHM targets ***for GOOD fields ONLY*** as of 2023-05-30. Runtime was ~1 hour on a 2.6 GHz Intel Core i7 MacBook Pro.
+The `dictionaries.txt` file is the backbone to this tool. By running the `update_dictionaries.py` file, it will look for spAll-lite-v6_1_0.fits on your local machine and update said dictionary file. The file provided here is up-to-date for BHM targets ***for GOOD fields ONLY*** as of 2023-07-14. Runtime was ~1 hour on a 2.6 GHz Intel Core i7 MacBook Pro (outdated metrics), ~35min with 4 threads on AMD Zen 1, or ~15min with 8 threads on AMD Zen 3, FWIW.
 
 
 ## Features to be added

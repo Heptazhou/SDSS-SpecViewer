@@ -1,20 +1,36 @@
 import json
+import os
+from concurrent.futures import ThreadPoolExecutor
+
 import numpy as np
 from astropy.io import fits
 
-__author__ = 'Meg Davis <megan.c.davis@uconn.edu>, Pat Hall <phall@yorku.ca>'
+__author__ = "Meg Davis <megan.c.davis@uconn.edu>, Pat Hall <phall@yorku.ca>"
 __year__ = "2021-2023"
 
-print("Loading local copy of spAll-lite-v6_1_0.fits")
-spAll = fits.open('spAll-lite-v6_1_0.fits')
+print("Loading local copy of spAll-lite-*.fits")
+try:
+	spAll = fits.open("spAll-lite-master.fits")
+except:
+	spAll = fits.open("spAll-lite-v6_1_0.fits")
+
+CATALOGID = spAll[1].data["CATALOGID"]
+FIELD = spAll[1].data["FIELD"]
+FIELDQUALITY = spAll[1].data["FIELDQUALITY"]
+MJD = spAll[1].data["MJD"]
+MJD_FINAL = spAll[1].data["MJD_FINAL"]
+OBJTYPE = spAll[1].data["OBJTYPE"]
+PROGRAMNAME = spAll[1].data["PROGRAMNAME"]
+SPEC1_G = spAll[1].data["SPEC1_G"]
+SURVEY = spAll[1].data["SURVEY"]
 
 print("Setting up dictionaries of fieldIDs for each RM_field")
-# syntax: programs = {'RM_field':[fieldIDs,...], ...}
+# syntax: programs = {"RM_field":[fieldIDs,...], ...}
 programs = {}
-programs = {'SDSS-RM': [15171, 15172, 15173, 15290, 16169, 20867, 112359, "all"], 'XMMLSS-RM': [15000, 15002, 23175, 112361, "all"], 'COSMOS-RM': [15038, 15070, 15071, 15252, 15253, 16163, 16164, 16165, 20868, 23288, 112360, "all"]}
-# programs = {'SDSS-RM':[15171, 15172, 15173, 15290, 16169, 20867, 112359, "all"]}
-# programs = {'XMMLSS-RM':[15000, 15002, 23175, 112361, "all"]}
-# programs = {'COSMOS-RM':[15038, 15070, 15071, 15252, 15253, 16163, 16164, 16165, 20868, 23288, 112360, "all"]}
+programs = {"SDSS-RM": [15171, 15172, 15173, 15290, 16169, 20867, 112359, "all"], "XMMLSS-RM": [15000, 15002, 23175, 112361, "all"], "COSMOS-RM": [15038, 15070, 15071, 15252, 15253, 16163, 16164, 16165, 20868, 23288, 112360, "all"]}
+# programs = {"SDSS-RM":[15171, 15172, 15173, 15290, 16169, 20867, 112359, "all"]}
+# programs = {"XMMLSS-RM":[15000, 15002, 23175, 112361, "all"]}
+# programs = {"COSMOS-RM":[15038, 15070, 15071, 15252, 15253, 16163, 16164, 16165, 20868, 23288, 112360, "all"]}
 
 # PROGRAMNAME values with possible quasar targets
 # bhm_rm RM RMv2 RMv2-fewMWM
@@ -23,134 +39,129 @@ programs = {'SDSS-RM': [15171, 15172, 15173, 15290, 16169, 20867, 112359, "all"]
 # bhm_spiders bhm_csc bhm_filler
 # open_fiber
 
-print("Sorting out the fields (including the `all` option if instructed to do so)...")
+print("Sorting out the fields (including the `all` option if instructed to do so) ...")
 
-EFEDS1 = (spAll[1].data["SURVEY"] == 'BHM') & (spAll[1].data["PROGRAMNAME"] == 'eFEDS1') & (spAll[1].data["OBJTYPE"] == 'QSO') & (spAll[1].data["FIELDQUALITY"] == 'good')
+EFEDS1 = \
+	(FIELDQUALITY == "good") & (SURVEY == "BHM") & (OBJTYPE == "QSO") & (PROGRAMNAME == "eFEDS1")
+EFEDS2 = \
+	(FIELDQUALITY == "good") & (SURVEY == "BHM") & (OBJTYPE == "QSO") & (PROGRAMNAME == "eFEDS2")
+EFEDS3 = \
+	(FIELDQUALITY == "good") & (SURVEY == "BHM") & (OBJTYPE == "QSO") & (PROGRAMNAME == "eFEDS3")
+MWM3 = \
+	(FIELDQUALITY == "good") & (SURVEY == "BHM") & (OBJTYPE == "QSO") & (PROGRAMNAME == "MWM3")
+MWM4 = \
+	(FIELDQUALITY == "good") & (SURVEY == "BHM") & (OBJTYPE == "QSO") & (PROGRAMNAME == "MWM4")
+AQMESBONUS = \
+	(FIELDQUALITY == "good") & (SURVEY == "BHM") & (OBJTYPE == "QSO") & (PROGRAMNAME == "AQMES-Bonus")
+AQMESWIDE = \
+	(FIELDQUALITY == "good") & (SURVEY == "BHM") & (OBJTYPE == "QSO") & (PROGRAMNAME == "AQMES-Wide")
+AQMESMED = \
+	(FIELDQUALITY == "good") & (SURVEY == "BHM") & (OBJTYPE == "QSO") & (PROGRAMNAME == "AQMES-Medium")
+RMPLATE = \
+	(FIELDQUALITY == "good") & (SURVEY == "BHM") & (OBJTYPE == "QSO") & ( (PROGRAMNAME == "RM") | (PROGRAMNAME == "RMv2") | (PROGRAMNAME == "RMv2-fewMWM") )
+RMFIBER = \
+	(FIELDQUALITY == "good") & (SURVEY == "BHM") & (OBJTYPE == "science") & (PROGRAMNAME == "bhm_rm")
+BHMAQMES = \
+	(FIELDQUALITY == "good") & (SURVEY == "BHM") & (OBJTYPE == "science") & (PROGRAMNAME == "bhm_aqmes")
+BHMCSC = \
+	(FIELDQUALITY == "good") & (SURVEY == "BHM") & (OBJTYPE == "science") & (PROGRAMNAME == "bhm_csc")
+BHMFILLER = \
+	(FIELDQUALITY == "good") & (SURVEY == "BHM") & (OBJTYPE == "science") & (PROGRAMNAME == "bhm_filler")
+BHMSPIDERS = \
+	(FIELDQUALITY == "good") & (SURVEY == "BHM") & (OBJTYPE == "science") & (PROGRAMNAME == "bhm_spiders")
+OPENFIBER = \
+	(FIELDQUALITY == "good") & (SURVEY == "open_fiber") & (OBJTYPE == "science") & (PROGRAMNAME == "open_fiber")
 
-EFEDS2 = (spAll[1].data["SURVEY"] == 'BHM') & (spAll[1].data["PROGRAMNAME"] == 'eFEDS2') & (spAll[1].data["OBJTYPE"] == 'QSO') & (spAll[1].data["FIELDQUALITY"] == 'good')
+eFEDS1_fields = np.unique(FIELD[EFEDS1]).tolist()
+eFEDS2_fields = np.unique(FIELD[EFEDS2]).tolist()
+eFEDS3_fields = np.unique(FIELD[EFEDS3]).tolist()
+MWM3_fields = np.unique(FIELD[MWM3]).tolist()
+MWM4_fields = np.unique(FIELD[MWM4]).tolist()
+bonus_fields = np.unique(FIELD[AQMESBONUS]).tolist()
+wide_fields = np.unique(FIELD[AQMESWIDE]).tolist()
+med_fields = np.unique(FIELD[AQMESMED]).tolist()
+rmplate_fields = np.unique(FIELD[RMPLATE]).tolist()
+rmfiber_fields = np.unique(FIELD[RMFIBER]).tolist()
+aqbhm_fields = np.unique(FIELD[BHMAQMES]).tolist()
+bhm_csc_fields = np.unique(FIELD[BHMCSC]).tolist()
+bhm_filler_fields = np.unique(FIELD[BHMFILLER]).tolist()
+bhm_spiders_fields = np.unique(FIELD[BHMSPIDERS]).tolist()
+open_fiber_fields = np.unique(FIELD[OPENFIBER]).tolist()
 
-EFEDS3 = (spAll[1].data["SURVEY"] == 'BHM') & (spAll[1].data["PROGRAMNAME"] == 'eFEDS3') & (spAll[1].data["OBJTYPE"] == 'QSO') & (spAll[1].data["FIELDQUALITY"] == 'good')
-
-MWM3 = (spAll[1].data["SURVEY"] == 'BHM') & (spAll[1].data["PROGRAMNAME"] == 'MWM3') & (spAll[1].data["OBJTYPE"] == 'QSO') & (spAll[1].data["FIELDQUALITY"] == 'good')
-
-MWM4 = (spAll[1].data["SURVEY"] == 'BHM') & (spAll[1].data["PROGRAMNAME"] == 'MWM4') & (spAll[1].data["OBJTYPE"] == 'QSO') & (spAll[1].data["FIELDQUALITY"] == 'good')
-
-AQMESBONUS = (spAll[1].data["SURVEY"] == 'BHM') & (spAll[1].data["PROGRAMNAME"] == 'AQMES-Bonus') & (spAll[1].data["OBJTYPE"] == 'QSO') & (spAll[1].data["FIELDQUALITY"] == 'good')
-
-AQMESWIDE = (spAll[1].data["SURVEY"] == 'BHM') & (spAll[1].data["PROGRAMNAME"] == 'AQMES-Wide') & (spAll[1].data["OBJTYPE"] == 'QSO') & (spAll[1].data["FIELDQUALITY"] == 'good')
-
-AQMESMED = (spAll[1].data["SURVEY"] == 'BHM') & (spAll[1].data["PROGRAMNAME"] == 'AQMES-Medium') & (spAll[1].data["OBJTYPE"] == 'QSO') & (spAll[1].data["FIELDQUALITY"] == 'good')
-
-RMPLATE = (spAll[1].data["SURVEY"] == 'BHM') & ( (spAll[1].data["PROGRAMNAME"] == 'RM') | (spAll[1].data["PROGRAMNAME"] == 'RMv2') | (spAll[1].data["PROGRAMNAME"] == 'RMv2-fewMWM') ) & (spAll[1].data["OBJTYPE"] == 'QSO') & (spAll[1].data["FIELDQUALITY"] == 'good')
-
-RMFIBER = (spAll[1].data["SURVEY"] == 'BHM') & (spAll[1].data["PROGRAMNAME"] == 'bhm_rm') & (spAll[1].data["OBJTYPE"] == 'science') & (spAll[1].data["FIELDQUALITY"] == 'good')
-
-BHMAQMES = (spAll[1].data["SURVEY"] == 'BHM') & (spAll[1].data["PROGRAMNAME"] == 'bhm_aqmes') & (spAll[1].data["OBJTYPE"] == 'science') & (spAll[1].data["FIELDQUALITY"] == 'good')
-
-BHMCSC = (spAll[1].data["SURVEY"] == 'BHM') & (spAll[1].data["PROGRAMNAME"] == 'bhm_csc') & (spAll[1].data["OBJTYPE"] == 'science') & (spAll[1].data["FIELDQUALITY"] == 'good')
-
-BHMFILLER = (spAll[1].data["SURVEY"] == 'BHM') & (spAll[1].data["PROGRAMNAME"] == 'bhm_filler') & (spAll[1].data["OBJTYPE"] == 'science') & (spAll[1].data["FIELDQUALITY"] == 'good')
-
-BHMSPIDERS = (spAll[1].data["SURVEY"] == 'BHM') & (spAll[1].data["PROGRAMNAME"] == 'bhm_spiders') & (spAll[1].data["OBJTYPE"] == 'science') & (spAll[1].data["FIELDQUALITY"] == 'good')
-
-OPENFIBER = (spAll[1].data["SURVEY"] == 'open_fiber') & (spAll[1].data["PROGRAMNAME"] == 'open_fiber') & (spAll[1].data["OBJTYPE"] == 'science') & (spAll[1].data["FIELDQUALITY"] == 'good')
-
-eFEDS1_fields = np.unique(spAll[1].data["FIELD"][EFEDS1]).tolist()
-eFEDS1_fields.append("all")
-eFEDS2_fields = np.unique(spAll[1].data["FIELD"][EFEDS2]).tolist()
-eFEDS2_fields.append("all")
-eFEDS3_fields = np.unique(spAll[1].data["FIELD"][EFEDS3]).tolist()
-eFEDS3_fields.append("all")
-MWM3_fields = np.unique(spAll[1].data["FIELD"][MWM3]).tolist()
-MWM3_fields.append("all")
-MWM4_fields = np.unique(spAll[1].data["FIELD"][MWM4]).tolist()
-MWM4_fields.append("all")
-bonus_fields = np.unique(spAll[1].data["FIELD"][AQMESBONUS]).tolist()
-bonus_fields.append("all")
-wide_fields = np.unique(spAll[1].data["FIELD"][AQMESWIDE]).tolist()
-wide_fields.append("all")
-med_fields = np.unique(spAll[1].data["FIELD"][AQMESMED]).tolist()
-med_fields.append("all")
-rmplate_fields = np.unique(spAll[1].data["FIELD"][RMPLATE]).tolist()
-rmplate_fields.append("all")
-rmfiber_fields = np.unique(spAll[1].data["FIELD"][RMFIBER]).tolist()
-rmfiber_fields.append("all")
-aqbhm_fields = np.unique(spAll[1].data["FIELD"][BHMAQMES]).tolist()
-aqbhm_fields.append("all")
-bhm_csc_fields = np.unique(spAll[1].data["FIELD"][BHMCSC]).tolist()
-bhm_csc_fields.append("all")
-bhm_filler_fields = np.unique(spAll[1].data["FIELD"][BHMFILLER]).tolist()
-bhm_filler_fields.append("all")
-bhm_spiders_fields = np.unique(spAll[1].data["FIELD"][BHMSPIDERS]).tolist()
-bhm_spiders_fields.append("all")
-open_fiber_fields = np.unique(spAll[1].data["FIELD"][OPENFIBER]).tolist()
-open_fiber_fields.append("all")
-
-programs['eFEDS1'] = eFEDS1_fields
-programs['eFEDS2'] = eFEDS2_fields
-programs['eFEDS3'] = eFEDS3_fields
-programs['MWM3'] = MWM3_fields
-programs['MWM4'] = MWM4_fields
-programs['AQMES-Bonus'] = bonus_fields
-programs['AQMES-Wide'] = wide_fields
-programs['AQMES-Medium'] = med_fields
-programs['RM-Plates'] = rmplate_fields
-programs['RM-Fibers'] = rmfiber_fields
-programs['bhm_aqmes'] = aqbhm_fields
-programs['bhm_csc'] = bhm_csc_fields
-programs['bhm_filler'] = bhm_filler_fields
-programs['bhm_spiders'] = bhm_spiders_fields
-programs['open_fiber'] = open_fiber_fields
+programs["eFEDS1"] = eFEDS1_fields + ["all"]
+programs["eFEDS2"] = eFEDS2_fields + ["all"]
+programs["eFEDS3"] = eFEDS3_fields + ["all"]
+programs["MWM3"] = MWM3_fields + ["all"]
+programs["MWM4"] = MWM4_fields + ["all"]
+programs["AQMES-Bonus"] = bonus_fields + ["all"]
+programs["AQMES-Wide"] = wide_fields + ["all"]
+programs["AQMES-Medium"] = med_fields + ["all"]
+programs["RM-Plates"] = rmplate_fields + ["all"]
+programs["RM-Fibers"] = rmfiber_fields + ["all"]
+programs["bhm_aqmes"] = aqbhm_fields + ["all"]
+programs["bhm_csc"] = bhm_csc_fields + ["all"]
+programs["bhm_filler"] = bhm_filler_fields + ["all"]
+programs["bhm_spiders"] = bhm_spiders_fields + ["all"]
+programs["open_fiber"] = open_fiber_fields + ["all"]
 
 
 # Combine all masks
-mask_combined = EFEDS1 | EFEDS2 | EFEDS3 | MWM3 | MWM4 | AQMESBONUS | AQMESWIDE | AQMESMED | RMPLATE | RMFIBER | BHMAQMES | BHMCSC | BHMFILLER | BHMSPIDERS | OPENFIBER
-mask = mask_combined
+mask = EFEDS1 | EFEDS2 | EFEDS3 | MWM3 | MWM4 | AQMESBONUS | AQMESWIDE | AQMESMED | RMPLATE | RMFIBER | BHMAQMES | BHMCSC | BHMFILLER | BHMSPIDERS | OPENFIBER
 
 
 # Set up dictionary of field IDs
-# syntax: fieldIDs = {'fieldID':[catalogID, ...], ...}
+# syntax: fieldIDs = {"fieldID":[catalogID, ...], ...}
 fieldIDs = {}
 
 
 print("Filling fieldIDs and catalogIDs with only science targets and completed epochs")
-# for each program i, find all catalogIDs in the defined fields j first, then search for those catalogIDs in all fields from all programs m
-for i in programs.keys():
-	for j in programs[i]:
-		if j != 'all':
-			fieldmask = (spAll[1].data["FIELD"] == j) & ( (spAll[1].data["OBJTYPE"] == 'science') | (spAll[1].data["OBJTYPE"] == 'QSO') ) & (spAll[1].data["SURVEY"] == 'BHM') & (spAll[1].data["FIELDQUALITY"] == 'good')
-			catIDs = np.unique(spAll[1].data['CATALOGID'][fieldmask])
-			catIDs = [ int(x) for x in catIDs ]
-			fieldIDs[int(j)] = list(catIDs)
+# for each program j, find all catalogIDs in the defined fields k first, then search for those catalogIDs in all fields from all programs m
+l = len(programs.keys())
+n = len(str(l))
+for i, j in enumerate(programs.keys()):
+	print("\r\x1b[2K", end="")
+	print(f"\rProcessing %{n}s/%{n}s ... (%s) " % (1 + i, l, len(programs[j])), end="")
+	for i in programs[j]:
+		if i != "all":
+			fieldmask = (FIELD == i) & ( (OBJTYPE == "science") | (OBJTYPE == "QSO") ) & (SURVEY == "BHM") & (FIELDQUALITY == "good")
+			catIDs = np.unique(CATALOGID[fieldmask])
+			catIDs = [int(x) for x in catIDs]
+			fieldIDs[int(i)] = list(catIDs)
 		else:
-			programs[i].remove('all')
+			programs[j].remove("all")
 			cats = []
-			for m in programs[i]:
-				fieldmask = (spAll[1].data["FIELD"] == m) & ( (spAll[1].data["OBJTYPE"] == 'science') | (spAll[1].data["OBJTYPE"] == 'QSO') ) & (spAll[1].data["SURVEY"] == 'BHM') & (spAll[1].data["FIELDQUALITY"] == 'good')
-				catIDs = np.unique(spAll[1].data['CATALOGID'][fieldmask])
-				catIDs = [ int(x) for x in catIDs ]
+			for m in programs[j]:
+				fieldmask = (FIELD == m) & ( (OBJTYPE == "science") | (OBJTYPE == "QSO") ) & (SURVEY == "BHM") & (FIELDQUALITY == "good")
+				catIDs = np.unique(CATALOGID[fieldmask])
+				catIDs = [int(x) for x in catIDs]
 				cats = np.append(cats, catIDs)
 			catIDs = np.unique(cats)
-			catIDs = [ int(x) for x in catIDs ]
-			key = str(i) + '-all'
+			catIDs = [int(x) for x in catIDs]
+			key = "%s-all" % j
 			fieldIDs[key] = list(catIDs)
-			programs[i].append('all')
+			programs[j].append("all")
+print("\r\x1b[2K\r", end="") # "\e[2K"
 
 
 print("Building dictionaries from spAll file (can take a while with AQMES or open fiber targets) ...")
 
-catalogIDs = {}
+def all_mjd_for_cat(cat: str):
+	r = []
+	for i in np.where(CATALOGID[mask] == cat)[0]:
+		v = [int(FIELD[mask][i]), int(MJD[mask][i]), float(SPEC1_G[mask][i]), float(MJD_FINAL[mask][i])]
+		r.append(v)
+	return r
+
+def pool_map(func, iter, size=min((os.cpu_count() or 8) / 2, 10)):
+	size = int(max(size or (8 / 2), 2))
+	print("Processing in %s threads ... (%s)" % (size, len(iter)))
+	with ThreadPoolExecutor(max_workers=size) as pool:
+		dict = { int(k): v for k, v in zip(iter, pool.map(func, iter)) }
+	return dict
 
 # For each unique CATALOGID...
-for k in np.unique(spAll[1].data['CATALOGID'][mask]):
-	all_mjds = []
-	for m in np.where(spAll[1].data['CATALOGID'][mask] == k)[0]:
-		one_mjd = [int(spAll[1].data['FIELD'][mask][m]), int(spAll[1].data['MJD'][mask][m]),
-                    float(spAll[1].data['SPEC1_G'][mask][m]), float(spAll[1].data['MJD_FINAL'][mask][m])]
-		all_mjds.append(one_mjd)
-	# store one catIDs info in dict.
-	catalogIDs[int(k)] = all_mjds
+catalogIDs = pool_map(all_mjd_for_cat, np.unique(CATALOGID[mask]))
 
 # Dump list of dictionaries to file
-json.dump([programs, fieldIDs, catalogIDs], open("dictionaries.txt", 'w'))
+json.dump([programs, fieldIDs, catalogIDs], open("dictionaries.txt", "w"), separators=(",", ":"))
 
