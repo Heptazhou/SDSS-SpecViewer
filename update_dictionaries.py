@@ -116,30 +116,23 @@ fieldIDs = {}
 
 print("Filling fieldIDs and catalogIDs with only science targets and completed epochs")
 # for each program j, find all catalogIDs in the defined fields k first, then search for those catalogIDs in all fields from all programs m
-l = len(programs.keys())
+l = len(programs)
 n = len(str(l))
-for i, j in enumerate(programs.keys()):
+for i, j in enumerate(programs):
 	print("\r\x1b[2K", end="")
-	print(f"\rProcessing %{n}s/%{n}s ... (%s) " % (1 + i, l, len(programs[j])), end="")
+	print(f"\rProcessing %{n}s/%{n}s ... (%s) " % (i + 1, l, len(programs[j])), end="")
+	cats = np.asarray([], np.int64)
 	for i in programs[j]:
-		if i != "all":
-			fieldmask = (FIELD == i) & ( (OBJTYPE == "science") | (OBJTYPE == "QSO") ) & (SURVEY == "BHM") & (FIELDQUALITY == "good")
-			catIDs = np.unique(CATALOGID[fieldmask])
-			catIDs = [int(x) for x in catIDs]
-			fieldIDs[int(i)] = list(catIDs)
-		else:
-			programs[j].remove("all")
-			cats = []
-			for m in programs[j]:
-				fieldmask = (FIELD == m) & ( (OBJTYPE == "science") | (OBJTYPE == "QSO") ) & (SURVEY == "BHM") & (FIELDQUALITY == "good")
-				catIDs = np.unique(CATALOGID[fieldmask])
-				catIDs = [int(x) for x in catIDs]
-				cats = np.append(cats, catIDs)
-			catIDs = np.unique(cats)
-			catIDs = [int(x) for x in catIDs]
-			key = "%s-all" % j
-			fieldIDs[key] = list(catIDs)
-			programs[j].append("all")
+		if i == "all": continue
+		fieldmask = (FIELD == i) & ( (OBJTYPE == "science") | (OBJTYPE == "QSO") ) & (SURVEY == "BHM") & (FIELDQUALITY == "good")
+		catIDs = np.unique(CATALOGID[fieldmask])
+		cats = np.append(cats, catIDs)
+		key = "%s" % i
+		fieldIDs[key] = np.unique(np.append(fieldIDs[key], catIDs)) if key in fieldIDs else catIDs
+	key = "%s-all" % j
+	fieldIDs[key] = np.unique(cats)
+for key in fieldIDs:
+	fieldIDs[key] = fieldIDs[key].tolist()
 print("\r\x1b[2K\r", end="") # "\e[2K"
 
 
@@ -152,10 +145,10 @@ def all_mjd_for_cat(cat: str):
 		r.append(v)
 	return r
 
-def pool_map(func, iter, size=min((os.cpu_count() or 8) / 2, 10)):
-	size = int(max(size or (8 / 2), 2))
-	print("Processing in %s threads ... (%s)" % (size, len(iter)))
-	with ThreadPoolExecutor(max_workers=size) as pool:
+def pool_map(func, iter, nt: int = min((os.cpu_count() or 8) / 2, 10)):
+	nt = int(max(nt or (8 / 2), 2))
+	print("Processing %s entries in %s threads ... " % (len(iter), nt))
+	with ThreadPoolExecutor( max_workers=nt ) as pool:
 		dict = { int(k): v for k, v in zip(iter, pool.map(func, iter)) }
 	return dict
 
