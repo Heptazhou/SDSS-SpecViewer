@@ -31,6 +31,15 @@ conda install astropy dash numpy plotly requests
 
 The `dictionaries.txt` file is the backbone to this tool. By running the `update_dictionaries.py` file, it will look for spAll-lite-v6_1_0.fits on your local machine and update said dictionary file. The file provided here is up-to-date for BHM targets ***for GOOD fields ONLY*** as of 2023-07-14. Runtime was ~~\~1 hour on a 2.6 GHz Intel Core i7 MacBook Pro~~, ~29min with 4 threads on AMD Zen 1, or ~12min with 8 threads on AMD Zen 3, FWIW.
 
+Also, try out the new `update_dictionaries.jl` (re)written in Julia. Runtime with 1 thread was only ~2min on AMD Zen 1, or ~1min on AMD Zen 3, FWIW. After installing [latest Julia](https://julialang.org/downloads/), you may run:
+```shell
+julia --startup-file=no -t auto update_dictionaries.jl
+```
+You can safely ignore `--startup-file` argument if you do not have it anyways. And I highly recommend setting environment variable `JULIA_NUM_THREADS=auto` instead of specifing `-t`. Then, simply run:
+```shell
+julia update_dictionaries.jl
+```
+
 
 ## Features to be added
 - include previous spectra from SDSS I-IV, provide downloadable links to all data

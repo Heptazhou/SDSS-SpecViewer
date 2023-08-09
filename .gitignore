@@ -2,3 +2,5 @@
 *.7z
 *.fits
 authentication.txt
+dictionaries.txt.*
+Manifest.toml
