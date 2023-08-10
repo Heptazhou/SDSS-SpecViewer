@@ -38,13 +38,16 @@ Base.vec(df::AbstractDataFrame)            = Matrix(df) |> vec
 @info "Finding local copy of `spAll-*.fits` file"
 
 const cols = [:CATALOGID :FIELD :FIELDQUALITY :MJD :MJD_FINAL :OBJTYPE :PROGRAMNAME :SPEC1_G :SURVEY]
-const fits = let v = filter!(endswith(r"\.fits"i), readdir())
-	v |> isempty && throw(SystemError(s"*.fits", 2)) # ENOENT 2 No such file or directory
-	v[1]
+const fits = try
+	(f = mapreduce(x -> filter!(endswith(x), readdir()), vcat, [r"\.fits(\.tmp)?", r"\.fits\.gz"]))
+	(f = [f; filter!(endswith(".7z"), readdir() |> reverse!)][1]) # must be single file archive
+	(endswith(f, r"7z|gz") && (run(`7z x $f`); f = readlines(`7z l -ba -slt $f`)[1][8:end]))
+	(endswith(f, r"\.tmp") && ((t, f) = (f, replace(f, r"\.tmp$" => "")); mv(t, f)); f)
+catch
+	throw(SystemError("*.fits", 2)) # ENOENT 2 No such file or directory
 end
 
 const df = @time @sync let
-	# df = DataFrame(FITS(fits)[2]) #~ too slow (up to 300s)
 	s_info("Reading ", length(cols), " columns from ", fits)
 	@threads for col ∈ cols
 		@eval $col = read(FITS(fits)[2], $(String(col)))
@@ -83,7 +86,7 @@ const programs_cats = @time @sync let
 		"bhm_spiders"  => :(_.SURVEY ≡ "BHM" && _.OBJTYPE ≡ "science" && _.PROGRAMNAME ≡ "bhm_spiders"),
 		"open_fiber"   => :(_.SURVEY ≡ "open_fiber" && _.OBJTYPE ≡ "science" && _.PROGRAMNAME ≡ "open_fiber"),
 	)
-	foreach(u_sort!, programs.vals) #~ sort as Int32OrStr (unnecessary but good to have)
+	foreach(u_sort!, programs.vals)
 	all_prog = @eval @filter([$(f_programs_dict.vals...)] |> any)
 	all_cats = @spawn DataFrame(df |> all_prog |> @select(:CATALOGID)) |> u_sort! |> Tuple
 	for (k, v) ∈ f_programs_dict
@@ -109,9 +112,9 @@ const fieldIDs = @time @sync let
 		for (k, v) ∈ data
 			haskey(d, k) ? append!(d[k], v) |> u_sort! : d[k] = v
 		end
-		d["$prog-all"] = mapreduce(p -> p.second, vcat, data) |> u_sort!
+		d["$prog-all"] = mapreduce(p -> p.second, vcat, data, init = valtype(d)()) |> u_sort!
 	end
-	sort!(d) #~ sort as String (necessary)
+	sort!(d)
 end
 
 @info "Building dictionaries from spAll file (can take a while with AQMES or open fiber targets)"
@@ -120,12 +123,13 @@ const get_data_of(ids::Tuple{Vararg{Int64}}) = # Int64 => :CATALOGID
 	df |> @select(:CATALOGID, :FIELD, :MJD, :SPEC1_G, :MJD_FINAL) |>
 	@filter(R -> R.CATALOGID ∈ ids) |>
 	@unique() |> @groupby(R -> R.CATALOGID) |>
-	@map(G -> string(key(G)) => map(values, @select(-1)(G) |> Tuple)) |> Tuple
+	@map(G -> string(key(G)) => map(values, @select(-1)(G) |> collect)) |> Tuple
 
 const catalogIDs = @time @sync let
 	s_info("Processing ", length(programs_cats), " entries")
-	d = OrderedDict{String, Tuple{Vararg{NTuple{4, Int32OrFlt}}}}(get_data_of(programs_cats))
-	sort!(d, by = s -> parse(Int64, s)) #~ sort as Int64 (necessary)
+	d = OrderedDict{String, Vector{NTuple{4, Int32OrFlt}}}(get_data_of(programs_cats))
+	@spawn foreach(u_sort!, d.vals)
+	sort!(d, by = s -> parse(Int64, s))
 end
 
 @info "Dumping dictionaries to file"
