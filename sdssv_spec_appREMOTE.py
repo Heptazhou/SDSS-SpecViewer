@@ -177,7 +177,7 @@ except:
 ### spectral lines to label in plot
 # https://classic.sdss.org/dr6/algorithms/linestable.html
 # the first column means whether to show this line or not by default
-spec_line_emi = numpy.asarray([ 
+spec_line_emi = numpy.asarray([
 	[1, 6564.61, "H α"    ],
 	[1, 5008.24, "[O III]"],
 	[1, 4960.30, "[O III]"],
@@ -201,7 +201,7 @@ spec_line_emi = numpy.asarray([
 ])
 # custom absorption line list for quasars
 # the second column is the multiplicity of the line, and gives the number of lines that will share a single label
-spec_line_abs = numpy.asarray([	
+spec_line_abs = numpy.asarray([
 	[1, 2, "Ca II", "3969.591 3934.777" ],
 	[0, 3, "Fe II UV2+3", "2382.7652 2374.4612 2344.2139" ],
 	[0, 1, "Mg I",  "2852.96"   ],
@@ -641,7 +641,7 @@ def make_multiepoch_spectra(selected_fieldid, selected_catalogid, redshift,
 
 	for i in spec_line_abs:
 		j, n, xs, yn = i[2], i[1], i[3], i[0] # j = label, n = multiplicity, xs = wavelength string, yn = 0/1
-		labeled=0 # reset labeling flag 
+		labeled=0 # reset labeling flag
 		if j not in list_abs: continue # skip absorption transition names not in the active plotting dictionary
 		for k in xs.split(): # for each wavelength in the wavelength string
 			x = float(k)
@@ -653,7 +653,7 @@ def make_multiepoch_spectra(selected_fieldid, selected_catalogid, redshift,
 
 	fig.update_layout( # Rest wavelengths on top axis; observed wavelengths on bottom axis
 		xaxis1={'side': 'top', 'title_text': 'Rest-Frame Wavelength (Å)'},
-		xaxis2={'anchor': 'y', 'overlaying': 'x', 'title_text': 'Observed Wavelength (Å)'}, 
+		xaxis2={'anchor': 'y', 'overlaying': 'x', 'title_text': 'Observed Wavelength (Å)'},
 	)
 
 	fig.update_layout(xaxis2_range=[x_min,x_max]) # this line is necessary for some reason

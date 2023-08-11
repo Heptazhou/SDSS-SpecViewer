@@ -1,5 +1,5 @@
-# SDSS_SpecViewer
-authors: Dr. Jennifer Li (UIUC) and Meg Davis (UConn, <megan.c.davis@uconn.edu>), 2021
+# SDSS SpecViewer
+authors: Dr. Jennifer Li (UIUC) and Meg Davis (UConn, <megan.c.davis@uconn.edu>), 2021 <br />
 authors: Pat Hall, Zezhou Zhu, and Kevin Welch (YorkU, <phall@yorku.ca>, <zzz@my.yorku.ca>), 2023
 
 This is a demo for a multi-epoch spectral viewer for SDSSV-BHM using plotly/dash (<https://dash.plotly.com/>). The ultimate goal is to build a web application that allows quick spectral visualization for SDSSV BHM data. The current version will access the data via url and it takes 1-2 seconds to load each spectra.
@@ -11,7 +11,7 @@ This is a demo for a multi-epoch spectral viewer for SDSSV-BHM using plotly/dash
 
 ### Authentication
 
-You **must** edit the `authentication.txt` before running with the proper SDSS-V Proprietary Data username and password before running the tool. Please ensure that there are NO extra spaces after the username or password and that the username and password are on separate lines (i.e. just hit enter after the last character you type for the username and then type the password). The code will immediately check the authentication upon start up.
+You **must** have the proper SDSS-V Proprietary Data username and password in the `authentication.txt` (created upon first run) to use this tool, the program will prompt you to input required authentication if the file does not exist yet. The code will immediately check the authentication upon start up.
 
 ### Dependencies
 Please install the following Python packages to use this tool. The provided "dependencies.sh" shell script will pip install these for you, if you run it with: `./dependencies.sh`.
@@ -42,7 +42,7 @@ julia update_dictionaries.jl
 
 ### User's guide
 - To change the x-axis and/or y-axis range and keep it changed as you adjust the smoothing or redshift, use the Y-axis range and X-axis range buttons below the plot.
-- You can also select the x-axis and/or y-axis range by clicking and dragging; HOWEVER, this method does not update the Y-axis range or X-axis range buttons and your selection will be reset if the smoothing or redshift is changed. 
+- You can also select the x-axis and/or y-axis range by clicking and dragging; HOWEVER, this method does not update the Y-axis range or X-axis range buttons and your selection will be reset if the smoothing or redshift is changed.
 - Rest-frame wavelengths appear along the top of the plot and observed-frame wavelengths along the bottom of the plot.
 - Emission-line labels appear above the top of the plot, and their wavelengths are shown with solid vertical lines. Absorption-line labels appear at the bottom of the plot, and their wavelengths are shown with dotted vertical lines. In both cases, the wavelength(s) of the line(s) associated with that label are shown when the cursor hovers over the label.
 
