@@ -177,7 +177,7 @@ except:
 ### spectral lines to label in plot
 # https://classic.sdss.org/dr6/algorithms/linestable.html
 # the first column means whether to show this line or not by default
-spec_line_emi = numpy.asarray([
+spec_line_emi = numpy.asarray([ 
 	[1, 6564.61, "H α"    ],
 	[1, 5008.24, "[O III]"],
 	[1, 4960.30, "[O III]"],
@@ -185,7 +185,7 @@ spec_line_emi = numpy.asarray([
 	[1, 4341.68, "H γ"    ],
 	[1, 4102.89, "H δ"    ],
 	[0, 3889.00, "He I"   ],
-	[1, 3727.09, "O II"   ],
+	[1, 3727.09, "[O II]" ],
 	[1, 2798.75, "Mg II"  ],
 	[1, 2326.00, "C II"   ],
 	[1, 1908.73, "C III]" ],
@@ -199,33 +199,24 @@ spec_line_emi = numpy.asarray([
 	[1, 1034.00, "O VI"   ],
 	[1, 1025.72, "Ly β"   ],
 ])
-spec_line_abs = numpy.asarray([
-	[1, 5891.58, "Na I"   ],
-	[0, 4227.92, "Ca I"   ],
-	[0, 3934.78, "Ca II"  ],
-	[1, 2852.96, "Mg I"   ],
-	[0, 2796.35, "Mg II"  ],
-	[0, 2586.65, "Fe II"  ],
-	[0, 2344.21, "Fe II"  ],
-	[1, 2062.26, "Cr II"  ],
-	[1, 1854.72, "Al III" ],
-	[1, 1670.79, "Al III" ],
-	[0, 1608.45, "Fe II"  ],
-	[0, 1548.20, "C IV"   ],
-	[1, 1526.71, "Si IV"  ],
-	[0, 1393.76, "Si IV"  ],
-	[0, 1334.53, "C II"   ],
-	[0, 1302.17, "O I"    ],
-	[0, 1260.42, "Si II"  ],
-	[0, 1238.82, "N V"    ],
-	[0, 1206.50, "Si III" ],
-	[0, 1199.55, "N I"    ],
-	[0, 1190.42, "Si II"  ],
+# custom absorption line list for quasars
+# the second column is the multiplicity of the line, and gives the number of lines that will share a single label
+spec_line_abs = numpy.asarray([	
+	[1, 2, "Ca II", "3969.591 3934.777" ],
+	[0, 3, "Fe II UV2+3", "2382.7652 2374.4612 2344.2139" ],
+	[0, 1, "Mg I",  "2852.96"   ],
+	[0, 1, "Al II", "1670.79"  ],
 ])
+
+#print(list(spec_line_emi[numpy.bool_(spec_line_emi[:, 0]), 1]))
+#print(list(spec_line_abs[numpy.bool_(spec_line_abs[:, 0]), 2]))
 
 ### wavelength plotting range
 wave_max = 10500.
 wave_min = 3500.
+# x_max & x_min are only reset to wave_max & wave_min for new objects
+x_max = wave_max
+x_min = wave_min
 
 ### starting the dash app
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets,
@@ -348,7 +339,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 			id="spectra_plot",
 			style={
 				"position": "relative", "overflow": "hidden",
-				"height": "max(450px, min(64vw, 80vh))", "width": "108%", "left": "-4%"},
+				"height": "max(450px, min(64vw, 80vh))", "width": "100%", "left": "0%"},
 		),
 	]),
 
@@ -374,14 +365,14 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 			## x-axis range
 			html.Div(className="row", children=[
 				html.Label(
-					html.H4("X-axis range"),
+					html.H4("X-axis observed λ range (Å)"),
 				),
 				dcc.Input(
-					id="axis_x_max", type="number", step=1, value=int(wave_max), placeholder="Max",
+					id="axis_x_max", type="number", step=1, value=int(x_max), placeholder="Max", # was wave_max
 					style={"height": "36px", "width": "100%"},
 				),
 				dcc.Input(
-					id="axis_x_min", type="number", step=1, value=int(wave_min), placeholder="Min",
+					id="axis_x_min", type="number", step=1, value=int(x_min), placeholder="Min", # was wave_min
 					style={"height": "36px", "width": "100%"},
 				)]),
 
@@ -410,9 +401,10 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 				html.H4("Emission lines"),
 			),
 			dcc.Checklist(id="line_list_emi", options=[
+				# Set up emission-line active plotting dictionary with values set to the transition wavelengths
 				{"label": "{: <12}\t({}Å)".format(i[2], int(float(i[1]))), "value": i[1]} for i in spec_line_emi
 			],
-				value=list(spec_line_emi[numpy.bool_(spec_line_emi[:, 0]), 1]),
+				value=list(spec_line_emi[numpy.bool_(spec_line_emi[:, 0]), 1]), # values are wavelengths
 				style={"columnCount": "2"},
 				inputStyle={"marginRight": "5px"},
 				labelStyle={"whiteSpace": "pre-wrap"},
@@ -425,9 +417,10 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 				html.H4("Absorption lines"),
 			),
 			dcc.Checklist(id="line_list_abs", options=[
-				{"label": "{: <12}\t({}Å)".format(i[2], int(float(i[1]))), "value": i[1]} for i in spec_line_abs
+				# Set up absorption-line active plotting dictionary with values set to the transition names
+				{"label": "{: <12}\t({}Å)".format(i[2], int(float(i[3].split()[0]))), "value": i[2]} for i in spec_line_abs
 			],
-				value=list(spec_line_abs[numpy.bool_(spec_line_abs[:, 0]), 1]),
+				value=list(spec_line_abs[numpy.bool_(spec_line_abs[:, 0]), 2]), # values are transition names
 				style={"columnCount": "2"},
 				inputStyle={"marginRight": "5px"},
 				labelStyle={"whiteSpace": "pre-wrap"},
@@ -618,36 +611,54 @@ def make_multiepoch_spectra(selected_fieldid, selected_catalogid, redshift,
 	x_min, x_max = int(x_min or 0), int(x_max or 0)
 	if y_max < y_min: y_min, y_max = y_max, y_min
 	if x_max < x_min: x_min, x_max = x_max, x_min
-	x_max = math.ceil(x_max / (1 + redshift))
-	x_min = math.floor(x_min / (1 + redshift))
+	# changed following to explicitly be in rest frame (bottom x axis)
+	rest_x_max = math.ceil(x_max / (1 + redshift))
+	rest_x_min = math.floor(x_min / (1 + redshift))
 
 	fig = go.Figure()
 	fig.layout.yaxis.range = [y_min, y_max]
-	fig.layout.xaxis.range = [x_min, x_max]
+	fig.layout.xaxis.range = [rest_x_min, rest_x_max]
 
-	# print(f"redshift: {redshift}")
+	# For each spectrum 'i' in the list
 	for i in range(0, len(waves)):
-		# fig.add_trace(go.Scatter(x=waves[i] / (1 + redshift), y=fluxes[i],
+		# create trace of smoothed spectra
 		fig.add_trace(go.Scatter(
 			x=waves[i] / (1 + redshift),
 			y=convolve(fluxes[i], Box1DKernel(smooth)),
 			name=names[i], opacity=1 / 2, mode="lines"))
+		# create 'ghost trace' spanning the displayed observed wavelength range:
+		fig.add_trace(go.Scatter(
+			x=[x_min, x_max], y=[numpy.nan, numpy.nan], showlegend=False))
+	fig.data[1].xaxis = 'x2' # assign the 'ghost trace' to a new axis object
 
 	for i in spec_line_emi:
-		j, x = i[2], i[1]
-		if x not in list_emi: continue
+		j, x = i[2], i[1] # j is the label, x is the wavelength
+		if x not in list_emi: continue # skip emission wavelengths not in the active plotting dictionary
 		x = float(x)
-		if (x_min <= x and x <= x_max):
-			fig.add_vline(x=x, line_dash="solid", opacity=1 / 3)
+		if (rest_x_min <= x and x <= rest_x_max):
+			fig.add_vline(x=x, line_dash="solid", opacity=1 / 4)
 			fig.add_annotation(x=x, y=y_max, text=j, hovertext=f" {j} ({x} Å)", textangle=70)
 
 	for i in spec_line_abs:
-		j, x = i[2], i[1]
-		if x not in list_abs: continue
-		x = float(x)
-		if (x_min <= x and x <= x_max):
-			fig.add_vline(x=x, line_dash="dot", opacity=1 / 2)
-			fig.add_annotation(x=x, y=y_min, text=j, hovertext=f" {j} ({x} Å)", textangle=70)
+		j, n, xs, yn = i[2], i[1], i[3], i[0] # j = label, n = multiplicity, xs = wavelength string, yn = 0/1
+		labeled=0 # reset labeling flag 
+		if j not in list_abs: continue # skip absorption transition names not in the active plotting dictionary
+		for k in xs.split(): # for each wavelength in the wavelength string
+			x = float(k)
+			if (rest_x_min <= x and x <= rest_x_max):
+				fig.add_vline(x=x, line_dash="dot", opacity=1 / 2)
+				if labeled==0: # label the first entry in the list of wavelengths
+					fig.add_annotation(x=x, y=y_min, text=j, hovertext=f" {j} ({xs} Å)", textangle=70)
+					labeled=1
+
+	fig.update_layout( # Rest wavelengths on top axis; observed wavelengths on bottom axis
+		xaxis1={'side': 'top', 'title_text': 'Rest-Frame Wavelength (Å)'},
+		xaxis2={'anchor': 'y', 'overlaying': 'x', 'title_text': 'Observed Wavelength (Å)'}, 
+	)
+
+	fig.update_layout(xaxis2_range=[x_min,x_max]) # this line is necessary for some reason
+
+	#fig.update_layout(title_text="Add Info for Plot Title Here")
 
 	return fig
 
