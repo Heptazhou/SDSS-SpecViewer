@@ -128,7 +128,7 @@ def fetch_catID(field, catID, redshift=0):
 	else:
 		for i in catalogIDs[str(catID)]:
 			if field == "all" or field == i[0]:
-				# print("all", i[0], i[1], catID) # for testing
+				# print("all", i[0], i[1], catID, str(catID)) # for testing
 				dat = SDSSV_fetch(username, password, i[0], i[1], catID)
 				fluxes.append(dat[1])
 				waves.append(dat[0])
@@ -497,11 +497,11 @@ def set_fieldid_options(selected_program):
 def set_catalogid_options(selected_fieldid, selected_program):
 	if not selected_program or selected_program == "(other)": return []
 	if not selected_fieldid: return []
-	# the following lines are where field numbers are obtained, use strings not numbers
+	# the following lines are where field numbers are obtained, use strings not numbers for both labels and values
 	if selected_fieldid != "all":
-		return [{"label": i, "value": str(i)} for i in fieldIDs[str(selected_fieldid)]]
+		return [{"label": str(i), "value": str(i)} for i in fieldIDs[str(selected_fieldid)]]
 	else:
-		return [{"label": i, "value": str(i)} for i in fieldIDs[str(selected_program) + "-" + str(selected_fieldid)]]
+		return [{"label": str(i), "value": str(i)} for i in fieldIDs[str(selected_program) + "-" + str(selected_fieldid)]]
 
 # set_fieldid_value is only run when program is switched
 @app.callback(
