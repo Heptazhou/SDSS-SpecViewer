@@ -128,7 +128,7 @@ def fetch_catID(field, catID, redshift=0):
 	else:
 		for i in catalogIDs[str(catID)]:
 			if field == "all" or field == i[0]:
-				# print("all", i[0], i[1], catID) # for testing
+				# print("all", i[0], i[1], catID, str(catID)) # for testing
 				dat = SDSSV_fetch(username, password, i[0], i[1], catID)
 				fluxes.append(dat[1])
 				waves.append(dat[0])
@@ -177,7 +177,7 @@ except:
 ### spectral lines to label in plot
 # https://classic.sdss.org/dr6/algorithms/linestable.html
 # the first column means whether to show this line or not by default
-spec_line_emi = numpy.asarray([ 
+spec_line_emi = numpy.asarray([
 	[1, 6564.61, "H α"    ],
 	[1, 5008.24, "[O III]"],
 	[1, 4960.30, "[O III]"],
@@ -201,7 +201,7 @@ spec_line_emi = numpy.asarray([
 ])
 # custom absorption line list for quasars
 # the second column is the multiplicity of the line, and gives the number of lines that will share a single label
-spec_line_abs = numpy.asarray([	
+spec_line_abs = numpy.asarray([
 	[1, 2, "Ca II", "3969.591 3934.777" ],
 	[0, 3, "Fe II UV2+3", "2382.7652 2374.4612 2344.2139" ],
 	[0, 1, "Mg I",  "2852.96"   ],
@@ -497,11 +497,11 @@ def set_fieldid_options(selected_program):
 def set_catalogid_options(selected_fieldid, selected_program):
 	if not selected_program or selected_program == "(other)": return []
 	if not selected_fieldid: return []
-	# the following lines are where field numbers are obtained, use strings not numbers
+	# the following lines are where field numbers are obtained, use strings not numbers for both labels and values
 	if selected_fieldid != "all":
-		return [{"label": i, "value": str(i)} for i in fieldIDs[str(selected_fieldid)]]
+		return [{"label": str(i), "value": str(i)} for i in fieldIDs[str(selected_fieldid)]]
 	else:
-		return [{"label": i, "value": str(i)} for i in fieldIDs[str(selected_program) + "-" + str(selected_fieldid)]]
+		return [{"label": str(i), "value": str(i)} for i in fieldIDs[str(selected_program) + "-" + str(selected_fieldid)]]
 
 # set_fieldid_value is only run when program is switched
 @app.callback(
@@ -641,7 +641,7 @@ def make_multiepoch_spectra(selected_fieldid, selected_catalogid, redshift,
 
 	for i in spec_line_abs:
 		j, n, xs, yn = i[2], i[1], i[3], i[0] # j = label, n = multiplicity, xs = wavelength string, yn = 0/1
-		labeled=0 # reset labeling flag 
+		labeled=0 # reset labeling flag
 		if j not in list_abs: continue # skip absorption transition names not in the active plotting dictionary
 		for k in xs.split(): # for each wavelength in the wavelength string
 			x = float(k)
@@ -653,7 +653,7 @@ def make_multiepoch_spectra(selected_fieldid, selected_catalogid, redshift,
 
 	fig.update_layout( # Rest wavelengths on top axis; observed wavelengths on bottom axis
 		xaxis1={'side': 'top', 'title_text': 'Rest-Frame Wavelength (Å)'},
-		xaxis2={'anchor': 'y', 'overlaying': 'x', 'title_text': 'Observed Wavelength (Å)'}, 
+		xaxis2={'anchor': 'y', 'overlaying': 'x', 'title_text': 'Observed Wavelength (Å)'},
 	)
 
 	fig.update_layout(xaxis2_range=[x_min,x_max]) # this line is necessary for some reason
