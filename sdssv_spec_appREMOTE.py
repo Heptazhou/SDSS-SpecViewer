@@ -24,8 +24,11 @@ from dash.dependencies import Input, Output, State
 ###
 
 # NOTE TO CODER: JSON LIKES STRING KEYS FOR DICTIONARIES!!!!!!
-programs, fieldIDs, catalogIDs = json.load(open("dictionaries.txt"))
+dictionaries = json.load(open("dictionaries.txt"))
 authentication = "authentication.txt"
+programs: dict = dictionaries[0]
+fieldIDs: dict = dictionaries[1]
+catalogIDs: dict = dictionaries[2]
 
 # for testing
 # print(programs)
@@ -126,7 +129,7 @@ def fetch_catID(field, catID, redshift=0):
 		waves.append(dat[0])
 		names.append(mjd)
 	else:
-		for i in catalogIDs[str(catID)]:
+		for i in catalogIDs.get(str(catID), []):
 			if field == "all" or field == i[0]:
 				# print("all", i[0], i[1], catID, str(catID)) # for testing
 				dat = SDSSV_fetch(username, password, i[0], i[1], catID)
@@ -488,7 +491,7 @@ def set_input_or_dropdown(query, hash, program):
 def set_fieldid_options(selected_program):
 	if not selected_program or selected_program == "(other)": return []
 	# print(selected_program) # for testing
-	return [{"label": i, "value": i} for i in programs[selected_program]]
+	return [{"label": i, "value": i} for i in programs.get(selected_program, [])]
 
 @app.callback(
 	Output("catalogid_dropdown", "options"),
@@ -499,9 +502,9 @@ def set_catalogid_options(selected_fieldid, selected_program):
 	if not selected_fieldid: return []
 	# the following lines are where field numbers are obtained, use strings not numbers for both labels and values
 	if selected_fieldid != "all":
-		return [{"label": str(i), "value": str(i)} for i in fieldIDs[str(selected_fieldid)]]
+		return [{"label": str(i), "value": str(i)} for i in fieldIDs.get(str(selected_fieldid), [])]
 	else:
-		return [{"label": str(i), "value": str(i)} for i in fieldIDs[str(selected_program) + "-" + str(selected_fieldid)]]
+		return [{"label": str(i), "value": str(i)} for i in fieldIDs.get(str(selected_program) + "-" + str(selected_fieldid), [])]
 
 # set_fieldid_value is only run when program is switched
 @app.callback(
