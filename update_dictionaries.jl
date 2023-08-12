@@ -16,7 +16,7 @@
 using Pkg: Pkg
 cd(@__DIR__)
 Pkg.activate(".")
-Pkg.instantiate()
+Pkg.Types.EnvCache().manifest.julia_version ≡ VERSION ? Pkg.instantiate() : Pkg.update()
 
 using Base.Threads: @spawn, @threads, nthreads
 using DataFrames: AbstractDataFrame, DataFrame
