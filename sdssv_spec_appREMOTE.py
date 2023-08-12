@@ -180,6 +180,7 @@ except:
 ### spectral lines to label in plot
 # https://classic.sdss.org/dr6/algorithms/linestable.html
 # the first column means whether to show this line or not by default
+# the second column is the wavelength, which must be unique
 spec_line_emi = numpy.asarray([
 	[1, 6564.61, "H α"    ],
 	[1, 5008.24, "[O III]"],
@@ -204,15 +205,37 @@ spec_line_emi = numpy.asarray([
 ])
 # custom absorption line list for quasars
 # the second column is the multiplicity of the line, and gives the number of lines that will share a single label
+# the third column is the wavelength list, in which the first one must be unique
 spec_line_abs = numpy.asarray([
-	[1, 2, "Ca II", "3969.591 3934.777" ],
-	[0, 3, "Fe II UV2+3", "2382.7652 2374.4612 2344.2139" ],
-	[0, 1, "Mg I",  "2852.96"   ],
-	[0, 1, "Al II", "1670.79"  ],
+	[1, 2, "5897.5581 5891.5833          ", "Na I"       ],
+	[1, 2, "3969.591  3934.777           ", "Ca II"      ],
+	[0, 1, "2852.9642                    ", "Mg I"       ],
+	[1, 2, "2803.531  2796.352           ", "Mg II"      ],
+	[0, 2, "2600.1729 2586.6500          ", "Fe II UV1"  ],
+	[0, 3, "2382.7652 2374.4612 2344.2139", "Fe II UV2+3"],
+	[1, 2, "1862.7895 1854.7164          ", "Al III"     ],
+	[0, 1, "1670.7874                    ", "Al II"      ],
+	[0, 1, "1608.4511                    ", "Fe II 1608" ],
+	[1, 2, "1550.774  1548.202           ", "C IV"       ],
+	[0, 1, "1526.7071                    ", "Si II 1526" ],
+	[1, 2, "1402.770  1393.755           ", "Si IV"      ],
+	[1, 1, "1334.5323                    ", "C II"       ],
+	[0, 1, "1304.3711                    ", "Si II 1304" ],
+	[0, 1, "1302.1685                    ", "O I"        ],
+	[0, 1, "1260.4223                    ", "Si II 1260" ],
+	[1, 2, "1242.804  1238.821           ", "N V"        ],
+	[1, 1, "1215.6701                    ", "Ly α"       ],
+	[0, 2, "1128.008  1117.977           ", "P V"        ],
+	[1, 2, "1037.6155 1031.9265          ", "O VI"       ],
+	[1, 1, "1025.7223                    ", "Ly β"       ],
+	[0, 1, "0972.5368                    ", "Ly γ"       ],
+	[0, 1, "0949.7430                    ", "Ly δ"       ],
+	[0, 1, "0937.8035                    ", "Ly ε"       ],
+	[1, 1, "0911.76                      ", "Lyman limit"],
 ])
 
-#print(list(spec_line_emi[numpy.bool_(spec_line_emi[:, 0]), 1]))
-#print(list(spec_line_abs[numpy.bool_(spec_line_abs[:, 0]), 2]))
+# print(spec_line_emi[numpy.bool_(spec_line_emi[:, 0]), 2].tolist())
+# print(spec_line_abs[numpy.bool_(spec_line_abs[:, 0]), 3].tolist())
 
 ### wavelength plotting range
 wave_max = 10500.
@@ -244,7 +267,9 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 	dcc.Location(id="window_location", refresh=False),
 
 	html.Div(className="row", children=[
-		html.H2("SDSSV-BHM Spectra Viewer (remote version)"),
+		html.Div(className="col-xs-12", children=[
+			html.H2("SDSSV-BHM Spectra Viewer (remote version)"),
+		]),
 	]),
 
 	html.Div(className="row", children=[
@@ -338,12 +363,14 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 	# ),
 
 	html.Div(className="row", children=[
-		dcc.Graph(
-			id="spectra_plot",
-			style={
-				"position": "relative", "overflow": "hidden",
-				"height": "max(450px, min(64vw, 80vh))", "width": "100%", "left": "0%"},
-		),
+		html.Div(className="col-xs-12", children=[
+			dcc.Graph(
+				id="spectra_plot",
+				style={
+					"position": "relative", "overflow": "hidden",
+					"height": "max(450px, min(64vw, 80vh))", "width": "100%"},
+			),
+		]),
 	]),
 
 	html.Div(className="row", children=[
@@ -353,31 +380,35 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 
 			## y-axis range
 			html.Div(className="row", children=[
-				html.Label(
-					html.H4("Y-axis range"),
-				),
-				dcc.Input(
-					id="axis_y_max", type="number", step=1, value=y_max_default, placeholder="Max",
-					style={"height": "36px", "width": "100%"},
-				),
-				dcc.Input(
-					id="axis_y_min", type="number", step=1, value=y_min_default, placeholder="Min",
-					style={"height": "36px", "width": "100%"},
-				)]),
+				html.Div(className="col-xs-12", children=[
+					html.Label(
+						html.H4("Y-axis range"),
+					),
+					dcc.Input(
+						id="axis_y_max", type="number", step=1, value=y_max_default, placeholder="Max",
+						style={"height": "36px", "width": "100%"},
+					),
+					dcc.Input(
+						id="axis_y_min", type="number", step=1, value=y_min_default, placeholder="Min",
+						style={"height": "36px", "width": "100%"},
+					)]),
+			]),
 
 			## x-axis range
 			html.Div(className="row", children=[
-				html.Label(
-					html.H4("X-axis observed λ range (Å)"),
-				),
-				dcc.Input(
-					id="axis_x_max", type="number", step=1, value=int(x_max), placeholder="Max", # was wave_max
-					style={"height": "36px", "width": "100%"},
-				),
-				dcc.Input(
-					id="axis_x_min", type="number", step=1, value=int(x_min), placeholder="Min", # was wave_min
-					style={"height": "36px", "width": "100%"},
-				)]),
+				html.Div(className="col-xs-12", children=[
+					html.Label(
+						html.H4("X-axis observed λ range (Å)"),
+					),
+					dcc.Input(
+						id="axis_x_max", type="number", step=1, value=int(x_max), placeholder="Max", # was wave_max
+						style={"height": "36px", "width": "100%"},
+					),
+					dcc.Input(
+						id="axis_x_min", type="number", step=1, value=int(x_min), placeholder="Min", # was wave_min
+						style={"height": "36px", "width": "100%"},
+					)]),
+			]),
 
 		]),
 
@@ -405,9 +436,9 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 			),
 			dcc.Checklist(id="line_list_emi", options=[
 				# Set up emission-line active plotting dictionary with values set to the transition wavelengths
-				{"label": "{: <12}\t({}Å)".format(i[2], int(float(i[1]))), "value": i[1]} for i in spec_line_emi
-			],
-				value=list(spec_line_emi[numpy.bool_(spec_line_emi[:, 0]), 1]), # values are wavelengths
+				{"label": "{: <12}\t({}Å)".format(i[2], int(float(i[1]))),
+				 "value": i[1]} for i in spec_line_emi],
+				value=spec_line_emi[numpy.bool_(spec_line_emi[:, 0]), 1].tolist(), # values are wavelengths
 				style={"columnCount": "2"},
 				inputStyle={"marginRight": "5px"},
 				labelStyle={"whiteSpace": "pre-wrap"},
@@ -421,9 +452,9 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 			),
 			dcc.Checklist(id="line_list_abs", options=[
 				# Set up absorption-line active plotting dictionary with values set to the transition names
-				{"label": "{: <12}\t({}Å)".format(i[2], int(float(i[3].split()[0]))), "value": i[2]} for i in spec_line_abs
-			],
-				value=list(spec_line_abs[numpy.bool_(spec_line_abs[:, 0]), 2]), # values are transition names
+				{"label": "{: <18}\t({}Å)".format(i[3], int(float(i[2].split()[0]))),
+				 "value": i[2].split()[0]} for i in spec_line_abs],
+				value=[s.split()[0] for s in spec_line_abs[numpy.bool_(spec_line_abs[:, 0]), 2]], # wavelengths
 				style={"columnCount": "2"},
 				inputStyle={"marginRight": "5px"},
 				labelStyle={"whiteSpace": "pre-wrap"},
@@ -622,46 +653,46 @@ def make_multiepoch_spectra(selected_fieldid, selected_catalogid, redshift,
 	fig.layout.yaxis.range = [y_min, y_max]
 	fig.layout.xaxis.range = [rest_x_min, rest_x_max]
 
-	# For each spectrum 'i' in the list
+	# For each spectrum "i" in the list
 	for i in range(0, len(waves)):
 		# create trace of smoothed spectra
 		fig.add_trace(go.Scatter(
 			x=waves[i] / (1 + redshift),
 			y=convolve(fluxes[i], Box1DKernel(smooth)),
 			name=names[i], opacity=1 / 2, mode="lines"))
-		# create 'ghost trace' spanning the displayed observed wavelength range:
+		# create "ghost trace" spanning the displayed observed wavelength range:
 		fig.add_trace(go.Scatter(
 			x=[x_min, x_max], y=[numpy.nan, numpy.nan], showlegend=False))
-	fig.data[1].xaxis = 'x2' # assign the 'ghost trace' to a new axis object
+	fig.data[1].xaxis = "x2" # assign the "ghost trace" to a new axis object
 
-	for i in spec_line_emi:
+	for i in spec_line_emi: # emission
 		j, x = i[2], i[1] # j is the label, x is the wavelength
-		if x not in list_emi: continue # skip emission wavelengths not in the active plotting dictionary
+		if x not in list_emi: continue # skip if the wavelength is not in the active plotting dictionary
 		x = float(x)
 		if (rest_x_min <= x and x <= rest_x_max):
 			fig.add_vline(x=x, line_dash="solid", opacity=1 / 4)
 			fig.add_annotation(x=x, y=y_max, text=j, hovertext=f" {j} ({x} Å)", textangle=70)
 
-	for i in spec_line_abs:
-		j, n, xs, yn = i[2], i[1], i[3], i[0] # j = label, n = multiplicity, xs = wavelength string, yn = 0/1
-		labeled=0 # reset labeling flag
-		if j not in list_abs: continue # skip absorption transition names not in the active plotting dictionary
-		for k in xs.split(): # for each wavelength in the wavelength string
-			x = float(k)
+	for i in spec_line_abs: # absorption
+		j, xs = i[3], i[2].split() # j is the label, xs is the wavelength list
+		# j, xs, n, b = i[3], i[2].split(), i[1], bool(i[0]) # j = label, xs = wavelength list, n = multiplicity, b = 0/1
+		labeled = False # reset labeling flag
+		if xs[0] not in list_abs: continue # skip if the transition is not in the active plotting dictionary
+		for x in map(float, xs): # for each wavelength in the wavelength list
 			if (rest_x_min <= x and x <= rest_x_max):
 				fig.add_vline(x=x, line_dash="dot", opacity=1 / 2)
-				if labeled==0: # label the first entry in the list of wavelengths
-					fig.add_annotation(x=x, y=y_min, text=j, hovertext=f" {j} ({xs} Å)", textangle=70)
-					labeled=1
+				# label the first entry in the list of wavelengths
+				labeled or fig.add_annotation(x=x, y=y_min, text=j, hovertext=f" {j} ({xs} Å)", textangle=70)
+				labeled = True
 
 	fig.update_layout( # Rest wavelengths on top axis; observed wavelengths on bottom axis
-		xaxis1={'side': 'top', 'title_text': 'Rest-Frame Wavelength (Å)'},
-		xaxis2={'anchor': 'y', 'overlaying': 'x', 'title_text': 'Observed Wavelength (Å)'},
+		xaxis1={"side": "top", "title_text": "Rest-Frame Wavelength (Å)"},
+		xaxis2={"anchor": "y", "overlaying": "x", "title_text": "Observed Wavelength (Å)"},
 	)
 
-	fig.update_layout(xaxis2_range=[x_min,x_max]) # this line is necessary for some reason
+	fig.update_layout(xaxis2_range=[x_min, x_max]) # this line is necessary for some reason
 
-	#fig.update_layout(title_text="Add Info for Plot Title Here")
+	# fig.update_layout(title_text="Add Info for Plot Title Here")
 
 	return fig
 
