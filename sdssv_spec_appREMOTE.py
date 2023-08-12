@@ -102,44 +102,40 @@ def SDSSV_fetch(username, password, fieldID, MJD, objID, branch="v6_1_0"):
 	# print(flux) # for testing
 	return wave, flux
 
-def fetch_catID(field, catID, redshift=0):
-	# if (redshift > 0):
-	# 	print("fetch_catID", field, catID) # for testing
-	# 	print(waves)
-	# 	return waves, fluxes, names
+def fetch_catID(field, catID):
 	# print("fetch_catID", field, catID) # for testing
 	if not (field and catID):
 		raise Exception((field, catID))
 	if (field, catID) in cache:
 		return cache[(field, catID)]
-	fluxes = []
-	waves = []
-	names = []
+	wave, flux, name = [], [], []
 	# print(str(catID))
 	# # print("catalogIDs[str(catID)]")
 	# testval = catalogIDs[str(catID)]
 	# print(testval)
+	data: list = catalogIDs.get(str(catID), [(None, None, None)])
+	meta: list = data[0] # (ZWARNING, Z, RCHI2)
 	if fullmatch("\d+-\d+", str(field).strip()):
 		fld, mjd = str(field).strip().split("-", 1)
 		try:
 			dat = SDSSV_fetch(username, password, fld, mjd, str(catID).strip(), "master")
 		except:
 			dat = SDSSV_fetch(username, password, fld, mjd, str(catID).strip())
-		fluxes.append(dat[1])
-		waves.append(dat[0])
-		names.append(mjd)
+		wave.append(dat[0])
+		flux.append(dat[1])
+		name.append(mjd)
 	else:
-		for i in catalogIDs.get(str(catID), []):
+		for i in data[1:]:
 			if field == "all" or field == i[0]:
 				# print("all", i[0], i[1], catID, str(catID)) # for testing
 				dat = SDSSV_fetch(username, password, i[0], i[1], catID)
-				fluxes.append(dat[1])
-				waves.append(dat[0])
-				names.append(i[3])
-	# print(fluxes) # for testing
-	if not (waves and fluxes and names):
+				wave.append(dat[0])
+				flux.append(dat[1])
+				name.append(i[2])
+	# print(flux) # for testing
+	if not (meta and wave and flux and name):
 		raise Exception((field, catID))
-	cache[(field, catID)] = waves, fluxes, names
+	cache[(field, catID)] = meta, wave, flux, name
 	return cache[(field, catID)]
 
 
@@ -339,7 +335,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 			),
 			dcc.Input( # do not use type="number"! it is automatically updated when the next field changes
 				id="redshift_input", # redshift_dropdown
-				type="text", step="any", pattern="\d+(\.\d*)?|\.\d+",
+				type="text", step="any", pattern="-?\d+(\.\d*)?|-?\.\d+",
 				value=redshift or "", placeholder=redshift_default, min=0,
 				style={"height": "36px", "width": "100%"}, inputMode="numeric",
 			)]),
@@ -573,7 +569,7 @@ def set_catalogid_value(available_catalogid_options, input, program):
 
 # enable/disable stepping for the redshift input (see comment in the beginning of the file)
 @app.callback(
-	Output("redshift_input", "value"),
+	Output("redshift_input", "value", allow_duplicate=True),
 	Output("redshift_input", "type"),
 	Output("redshift_input", "step"),
 	State("redshift_input", "value"),
@@ -589,39 +585,50 @@ def set_redshift_stepping(z, step):
 		z = f"%0.{-int(math.log10(step))}f" % float(z)
 	return z, type, step
 
-# reset the axes range and smooth width whenever any of program/fieldid/catid changes
+# reset axes range, smooth width, and redshift when any of program/fieldid/catid changes
 @app.callback(
 	Output("axis_y_max", "value"),
 	Output("axis_y_min", "value"),
 	Output("axis_x_max", "value"),
 	Output("axis_x_min", "value"),
+	Output("redshift_input", "value", allow_duplicate=True),
+	Output("redshift_step", "value"),
 	Output("smooth_input", "value"),
+	State("axis_y_max", "value"),
+	State("axis_y_min", "value"),
+	State("axis_x_max", "value"),
+	State("axis_x_min", "value"),
+	State("redshift_step", "value"),
+	State("redshift_input", "value"),
 	Input("window_location", "hash"),
 	Input("program_dropdown", "value"),
 	Input("fieldid_dropdown", "value"),
 	Input("catalogid_dropdown", "value"),
 	prevent_initial_call=True)
-def reset_axis_range(hash, program, *_):
+def reset_on_obj_change(y_max, y_min, x_max, x_min, redshift, redshift_step, hash, program, *_):
 	smooth = smooth_default
-	y_min, y_max = y_min_default, y_max_default
-	x_min, x_max = int(wave_min), int(wave_max)
-	hash = str(hash).lstrip("#").split("&") if hash else []
-	if program and program == "(other)":
-		for x in hash:
+	if program != "(other)":
+		redshift_step, redshift = "", ""
+		y_min, y_max = y_min_default, y_max_default
+		x_min, x_max = int(wave_min), int(wave_max)
+	if program == "(other)":
+		for x in (hash := str(hash).lstrip("#").split("&") if hash else []):
 			if not fullmatch("[^=]+=[^=]+", x): continue
 			k, v = x.split("=", 1)
 			if k == "m": smooth = v
 			if k == "y" and fullmatch("[^,]+,[^,]+", v): y_min, y_max = v.split(",", 1)
 			if k == "x" and fullmatch("[^,]+,[^,]+", v): x_min, x_max = v.split(",", 1)
-	return y_max, y_min, x_max, x_min, smooth
+	return y_max, y_min, x_max, x_min, redshift_step, redshift, smooth
 
 
 ## plotting the spectra
 @app.callback(
 	Output("spectra_plot", "figure"),
+	Output("redshift_input", "value"),
 	Input("fieldid_dropdown", "value"),
 	Input("catalogid_dropdown", "value"),
 	Input("redshift_input", "value"), # redshift_dropdown
+	Input("redshift_input", "step"),
 	Input("axis_y_max", "value"),
 	Input("axis_y_min", "value"),
 	Input("axis_x_max", "value"),
@@ -629,15 +636,16 @@ def reset_axis_range(hash, program, *_):
 	Input("line_list_emi", "value"),
 	Input("line_list_abs", "value"),
 	Input("smooth_input", "value"))
-def make_multiepoch_spectra(selected_fieldid, selected_catalogid, redshift,
+def make_multiepoch_spectra(selected_fieldid, selected_catalogid, redshift, redshift_step,
                             y_max, y_min, x_max, x_min, list_emi, list_abs, smooth):
 	try:
-		smooth, redshift = int(smooth or smooth_default), float(redshift or redshift_default)
-		waves, fluxes, names = fetch_catID(selected_fieldid, selected_catalogid)
+		meta, waves, fluxes, names = fetch_catID(selected_fieldid, selected_catalogid)
+		if meta[1] and not redshift and redshift_step == "any": redshift = meta[1]
+		smooth, z = int(smooth or smooth_default), float(redshift or redshift_default)
 		# print("make_multiepoch_spectra try") # for testing
 	except:
 		# print("make_multiepoch_spectra except") # for testing
-		return go.Figure()
+		return go.Figure(), redshift
 
 	if not y_min and not y_max: y_min, y_max = y_min_default, y_max_default
 	if not x_min and not x_max: x_min, x_max = int(wave_max), int(wave_min)
@@ -646,8 +654,8 @@ def make_multiepoch_spectra(selected_fieldid, selected_catalogid, redshift,
 	if y_max < y_min: y_min, y_max = y_max, y_min
 	if x_max < x_min: x_min, x_max = x_max, x_min
 	# changed following to explicitly be in rest frame (bottom x axis)
-	rest_x_max = math.ceil(x_max / (1 + redshift))
-	rest_x_min = math.floor(x_min / (1 + redshift))
+	rest_x_max = math.ceil(x_max / (z + 1))
+	rest_x_min = math.floor(x_min / (z + 1))
 
 	fig = go.Figure()
 	fig.layout.yaxis.range = [y_min, y_max]
@@ -657,7 +665,7 @@ def make_multiepoch_spectra(selected_fieldid, selected_catalogid, redshift,
 	for i in range(0, len(waves)):
 		# create trace of smoothed spectra
 		fig.add_trace(go.Scatter(
-			x=waves[i] / (1 + redshift),
+			x=waves[i] / (z + 1),
 			y=convolve(fluxes[i], Box1DKernel(smooth)),
 			name=names[i], opacity=1 / 2, mode="lines"))
 		# create "ghost trace" spanning the displayed observed wavelength range:
@@ -678,7 +686,7 @@ def make_multiepoch_spectra(selected_fieldid, selected_catalogid, redshift,
 		# j, xs, n, b = i[3], i[2].split(), i[1], bool(i[0]) # j = label, xs = wavelength list, n = multiplicity, b = 0/1
 		labeled = False # reset labeling flag
 		if xs[0] not in list_abs: continue # skip if the transition is not in the active plotting dictionary
-		for x in map(float, xs): # for each wavelength in the wavelength list
+		for x in (xs := list(map(float, xs))): # for each wavelength in the wavelength list
 			if (rest_x_min <= x and x <= rest_x_max):
 				fig.add_vline(x=x, line_dash="dot", opacity=1 / 2)
 				# label the first entry in the list of wavelengths
@@ -694,7 +702,7 @@ def make_multiepoch_spectra(selected_fieldid, selected_catalogid, redshift,
 
 	# fig.update_layout(title_text="Add Info for Plot Title Here")
 
-	return fig
+	return fig, redshift
 
 
 

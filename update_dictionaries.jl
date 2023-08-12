@@ -20,24 +20,40 @@ Pkg.Types.EnvCache().manifest.julia_version ≡ VERSION ? Pkg.instantiate() : Pk
 
 using Base.Threads: @spawn, @threads, nthreads
 using DataFrames: AbstractDataFrame, DataFrame
-using FITSIO: FITS
+using FITSIO: FITS, Tables.columnnames
 using JSON: json
-using OrderedCollections: OrderedDict
-using Query: @filter, @groupby, @map, @select, @unique, key
+using OrderedCollections: LittleDict, OrderedDict
+using Query: @filter, @groupby, @map, @orderby, @select, @take, @thenby, @unique, key
 
 const Int32OrFlt = Union{Int32, Float32, Float64}
 const Int32OrStr = Union{Int32, String}
 const s_info(xs...) = @static nthreads() > 1 ? @spawn(@info(string(xs...))) : @info(string(xs...))
-const u_sort!(v::AbstractVector; kw...) = unique!(sort!(v; kw...))
-const u_sort!(v::Any; kw...) = u_sort!(vec(v); kw...)
+const u_sort!(v::AbstractDataFrame; kw...) = unique!(sort!(vec(v); kw...))
+const u_sort!(v::AbstractVector; kw...) = unique!(sort!(v::Vector; kw...))
 
 Base.convert(::Type{Int32OrStr}, x::Int64) = Int32(x)
-Base.isless(::String, ::Int32)             = Bool((0))
-Base.vec(df::AbstractDataFrame)            = Matrix(df) |> vec
+Base.isless(::Any, ::Number)               = Bool((0))
+Base.isless(::Number, ::Any)               = Bool((1))
+Base.vec(v::AbstractDataFrame)             = Matrix(v) |> vec
 
-@info "Finding local copy of `spAll-*.fits` file"
+@info "Looking for spAll file (*.fits|*.fits.tmp|*.fits.gz|*.7z)"
 
-const cols = [:CATALOGID :FIELD :FIELDQUALITY :MJD :MJD_FINAL :OBJTYPE :PROGRAMNAME :SPEC1_G :SURVEY]
+# https://data.sdss.org/datamodel/files/BOSS_SPECTRO_REDUX/RUN2D/spAll.html
+# https://github.com/sciserver/sqlloader/blob/master/schema/sql/SpectroTables.sql
+# https://www.sdss.org/dr18/data_access/bitmasks/
+const cols = [
+	:CATALOGID    # Int64    # SDSS-V CatalogID
+	:FIELD        # Int32    # Field number
+	:FIELDQUALITY # String   # Quality of field ("good" | "bad")
+	:MJD          # Int32    # Modified Julian date of observation
+	:MJD_FINAL    # Float64  # Mean MJD of the Coadded Spectra
+	:OBJTYPE      # String   # Why this object was targetted; see spZbest
+	:PROGRAMNAME  # String   # Program name within a given survey
+	:RCHI2        # Float32  # Reduced χ² for best fit
+	:SURVEY       # String   # Survey that plate is part of
+	:Z            # Float32  # Redshift; assume that this redshift is incorrect if the ZWARNING flag is nonzero
+	:ZWARNING     # Int32    # A flag set for bad redshift fits in place of calling CLASS=UNKNOWN; see bitmasks
+]
 const fits = try
 	(f = mapreduce(x -> filter!(endswith(x), readdir()), vcat, [r"\.fits(\.tmp)?", r"\.fits\.gz"]))
 	(f = [f; filter!(endswith(".7z"), readdir() |> reverse!)][1]) # must be single file archive
@@ -46,16 +62,19 @@ const fits = try
 catch
 	throw(SystemError("*.fits", 2)) # ENOENT 2 No such file or directory
 end
+# FITS(fits)[2]
 
 const df = @time @sync let
-	s_info("Reading ", length(cols), " columns from ", fits)
+	# cols = columnnames(FITS(fits)[2]) # uncomment to read all the columns
+	s_info("Reading ", length(cols), " columns from `$fits` (t = $(nthreads()))")
 	@threads for col ∈ cols
 		@eval $col = read(FITS(fits)[2], $(String(col)))
+		@eval $col isa Vector || ($col = collect(Vector{eltype($col)}, eachcol($col)))
 	end
 	df = DataFrame(@eval (; $(cols...)))
-	df = DataFrame(@filter(R -> R.FIELDQUALITY == "good")(df) |> @unique())
+	df = DataFrame(@filter(R -> R.FIELDQUALITY ≡ "good")(df) |> @select(-:FIELDQUALITY) |> @unique())
 end
-# FITS(fits)[2]
+# LittleDict(map(eltype, eachcol(df)), propertynames(df))
 
 @info "Setting up dictionaries of fieldIDs for each RM_field"
 
@@ -98,13 +117,12 @@ end
 
 @info "Filling fieldIDs and catalogIDs with only science targets and completed epochs"
 
-const get_data_of(ids::Tuple{Vararg{Int32}}) = # Int32 => :FIELD
-	df |> @select(:CATALOGID, :FIELD, :SURVEY, :OBJTYPE) |>
-	@filter(R -> R.FIELD ∈ ids && R.SURVEY ≡ "BHM" && R.OBJTYPE ∈ ("QSO", "science")) |>
-	@unique() |> @groupby(R -> R.FIELD) |>
-	@map(G -> string(key(G)) => G.CATALOGID |> Vector |> u_sort!) |> Tuple
-
 const fieldIDs = @time @sync let
+	get_data_of(ids::Tuple{Vararg{Int32}}) = # Int32 => :FIELD
+		@select(:CATALOGID, :FIELD, :SURVEY, :OBJTYPE)(df) |>
+		@filter(R -> R.FIELD ∈ ids && R.SURVEY ≡ "BHM" && R.OBJTYPE ∈ ("QSO", "science")) |>
+		@unique() |> @groupby(R -> R.FIELD) |>
+		@map(G -> string(key(G)) => u_sort!(G.CATALOGID |> Vector)) |> Tuple
 	d = OrderedDict{String, Vector{Int64}}()
 	s_info("Processing ", sum(length, programs.vals), " entries of ", length(programs), " programs")
 	for (prog, opts) ∈ programs
@@ -114,21 +132,23 @@ const fieldIDs = @time @sync let
 		end
 		d["$prog-all"] = mapreduce(p -> p.second, vcat, data, init = valtype(d)()) |> u_sort!
 	end
-	sort!(d)
+	sort!(d, by = s -> something(tryparse(Int32, s), s))
 end
 
-@info "Building dictionaries from spAll file (can take a while with AQMES or open fiber targets)"
-
-const get_data_of(ids::Tuple{Vararg{Int64}}) = # Int64 => :CATALOGID
-	df |> @select(:CATALOGID, :FIELD, :MJD, :SPEC1_G, :MJD_FINAL) |>
-	@filter(R -> R.CATALOGID ∈ ids) |>
-	@unique() |> @groupby(R -> R.CATALOGID) |>
-	@map(G -> string(key(G)) => map(values, @select(-1)(G) |> collect)) |> Tuple
+@info "Building dictionaries (can take a while with AQMES or open fiber targets)"
 
 const catalogIDs = @time @sync let
+	z_best_of(G) = @select(:ZWARNING, :Z, :RCHI2)(G) |>
+				   @orderby(R -> R.ZWARNING > (0)) |> @thenby(R -> R.RCHI2) |>
+				   @take(1) |> x -> collect(x)[1]
+	get_data_of(ids::Tuple{Vararg{Int64}}) = # Int64 => :CATALOGID
+		@select(:CATALOGID, :FIELD, :MJD, :MJD_FINAL, :RCHI2, :Z, :ZWARNING)(df) |>
+		@filter(R -> R.CATALOGID ∈ ids) |>
+		@unique() |> @groupby(R -> R.CATALOGID) |>
+		@map(G -> string(key(G)) => NTuple{3, Int32OrFlt}[z_best_of(G) |> values
+			map(values, @select(:FIELD, :MJD, :MJD_FINAL)(G) |> collect) |> u_sort!]) |> Tuple
 	s_info("Processing ", length(programs_cats), " entries")
-	d = OrderedDict{String, Vector{NTuple{4, Int32OrFlt}}}(get_data_of(programs_cats))
-	@spawn foreach(u_sort!, d.vals)
+	d = OrderedDict{String, Vector{NTuple{3, Int32OrFlt}}}(get_data_of(programs_cats))
 	sort!(d, by = s -> parse(Int64, s))
 end
 
