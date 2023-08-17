@@ -16,25 +16,31 @@
 using Pkg: Pkg
 cd(@__DIR__)
 Pkg.activate(".")
-Pkg.Types.EnvCache().manifest.julia_version ≡ VERSION ? Pkg.instantiate() : Pkg.update()
+Pkg.Types.EnvCache().manifest.julia_version ≠ VERSION ?
+Pkg.update() : (Pkg.resolve(); Pkg.instantiate())
 
 using Base.Threads: @spawn, @threads, nthreads
-using DataFrames: AbstractDataFrame, DataFrame
+using DataFrames: DataFrame
+using DataFramesMeta
 using FITSIO: FITS, Tables.columnnames
 using JSON: json
-using OrderedCollections: LittleDict, OrderedDict
-using Query: @filter, @groupby, @map, @orderby, @select, @take, @thenby, @unique, key
+using OrderedCollections
 
 const Int32OrFlt = Union{Int32, Float32, Float64}
 const Int32OrStr = Union{Int32, String}
 const s_info(xs...) = @static nthreads() > 1 ? @spawn(@info(string(xs...))) : @info(string(xs...))
-const u_sort!(v::AbstractDataFrame; kw...) = unique!(sort!(vec(v); kw...))
-const u_sort!(v::AbstractVector; kw...) = unique!(sort!(v::Vector; kw...))
+const u_sort! = unique! ∘ sort!
 
+Base.convert(::Type{AS}, v::Vector) where AS <: AbstractSet{T} where T = AS(T[v;])
 Base.convert(::Type{Int32OrStr}, x::Int64) = Int32(x)
-Base.isless(::Any, ::Number)               = Bool((0))
-Base.isless(::Number, ::Any)               = Bool((1))
-Base.vec(v::AbstractDataFrame)             = Matrix(v) |> vec
+Base.isless(::Any, ::Number) = Bool(0)
+Base.isless(::Number, ::Any) = Bool(1)
+
+@static if VERSION < v"1.7"
+	macro something(xs...)
+		:(something($(esc.(xs)...)))
+	end
+end
 
 @info "Looking for spAll file (*.fits|*.fits.tmp|*.fits.gz|*.7z)"
 
@@ -71,15 +77,17 @@ const df = @time @sync let
 		@eval $col = read(FITS(fits)[2], $(String(col)))
 		@eval $col isa Vector || ($col = collect(Vector{eltype($col)}, eachcol($col)))
 	end
-	df = DataFrame(@eval (; $(cols...)))
-	df = DataFrame(@filter(R -> R.FIELDQUALITY ≡ "good")(df) |> @select(-:FIELDQUALITY) |> @unique())
+	@chain DataFrame(@eval (; $(cols...))) begin
+		@rsubset! :FIELDQUALITY ≡ "good"
+		@select! $(Not(:FIELDQUALITY))
+	end
 end
 # LittleDict(map(eltype, eachcol(df)), propertynames(df))
 
-@info "Setting up dictionaries of fieldIDs for each RM_field"
+@info "Setting up dictionary for fieldIDs with each RM_field"
 
 const programs =
-	OrderedDict{String, Vector{Int32OrStr}}(
+	OrderedDict{String, OrderedSet{Int32OrStr}}(
 		"SDSS-RM"   => [15171, 15172, 15173, 15290, 16169, 20867, 112359, "all"],
 		"XMMLSS-RM" => [15000, 15002, 23175, 112361, "all"],
 		"COSMOS-RM" => [15038, 15070, 15071, 15252, 15253, 16163, 16164, 16165, 20868, 23288, 112360, "all"],
@@ -89,67 +97,70 @@ const programs =
 
 const programs_cats = @time @sync let
 	f_programs_dict = OrderedDict{String, Expr}(
-		"eFEDS1"       => :(_.SURVEY ≡ "BHM" && _.OBJTYPE ≡ "QSO" && _.PROGRAMNAME ≡ "eFEDS1"),
-		"eFEDS2"       => :(_.SURVEY ≡ "BHM" && _.OBJTYPE ≡ "QSO" && _.PROGRAMNAME ≡ "eFEDS2"),
-		"eFEDS3"       => :(_.SURVEY ≡ "BHM" && _.OBJTYPE ≡ "QSO" && _.PROGRAMNAME ≡ "eFEDS3"),
-		"MWM3"         => :(_.SURVEY ≡ "BHM" && _.OBJTYPE ≡ "QSO" && _.PROGRAMNAME ≡ "MWM3"),
-		"MWM4"         => :(_.SURVEY ≡ "BHM" && _.OBJTYPE ≡ "QSO" && _.PROGRAMNAME ≡ "MWM4"),
-		"AQMES-Bonus"  => :(_.SURVEY ≡ "BHM" && _.OBJTYPE ≡ "QSO" && _.PROGRAMNAME ≡ "AQMES-Bonus"),
-		"AQMES-Wide"   => :(_.SURVEY ≡ "BHM" && _.OBJTYPE ≡ "QSO" && _.PROGRAMNAME ≡ "AQMES-Wide"),
-		"AQMES-Medium" => :(_.SURVEY ≡ "BHM" && _.OBJTYPE ≡ "QSO" && _.PROGRAMNAME ≡ "AQMES-Medium"),
-		"RM-Plates"    => :(_.SURVEY ≡ "BHM" && _.OBJTYPE ≡ "QSO" && _.PROGRAMNAME ∈ ("RM", "RMv2", "RMv2-fewMWM")),
-		"RM-Fibers"    => :(_.SURVEY ≡ "BHM" && _.OBJTYPE ≡ "science" && _.PROGRAMNAME ≡ "bhm_rm"),
-		"bhm_aqmes"    => :(_.SURVEY ≡ "BHM" && _.OBJTYPE ≡ "science" && _.PROGRAMNAME ≡ "bhm_aqmes"),
-		"bhm_csc"      => :(_.SURVEY ≡ "BHM" && _.OBJTYPE ≡ "science" && _.PROGRAMNAME ≡ "bhm_csc"),
-		"bhm_filler"   => :(_.SURVEY ≡ "BHM" && _.OBJTYPE ≡ "science" && _.PROGRAMNAME ≡ "bhm_filler"),
-		"bhm_spiders"  => :(_.SURVEY ≡ "BHM" && _.OBJTYPE ≡ "science" && _.PROGRAMNAME ≡ "bhm_spiders"),
-		"open_fiber"   => :(_.SURVEY ≡ "open_fiber" && _.OBJTYPE ≡ "science" && _.PROGRAMNAME ≡ "open_fiber"),
+		"eFEDS1"       => :(:SURVEY ≡ "BHM" && :OBJTYPE ≡ "QSO" && :PROGRAMNAME ≡ "eFEDS1"),
+		"eFEDS2"       => :(:SURVEY ≡ "BHM" && :OBJTYPE ≡ "QSO" && :PROGRAMNAME ≡ "eFEDS2"),
+		"eFEDS3"       => :(:SURVEY ≡ "BHM" && :OBJTYPE ≡ "QSO" && :PROGRAMNAME ≡ "eFEDS3"),
+		"MWM3"         => :(:SURVEY ≡ "BHM" && :OBJTYPE ≡ "QSO" && :PROGRAMNAME ≡ "MWM3"),
+		"MWM4"         => :(:SURVEY ≡ "BHM" && :OBJTYPE ≡ "QSO" && :PROGRAMNAME ≡ "MWM4"),
+		"AQMES-Bonus"  => :(:SURVEY ≡ "BHM" && :OBJTYPE ≡ "QSO" && :PROGRAMNAME ≡ "AQMES-Bonus"),
+		"AQMES-Wide"   => :(:SURVEY ≡ "BHM" && :OBJTYPE ≡ "QSO" && :PROGRAMNAME ≡ "AQMES-Wide"),
+		"AQMES-Medium" => :(:SURVEY ≡ "BHM" && :OBJTYPE ≡ "QSO" && :PROGRAMNAME ≡ "AQMES-Medium"),
+		"RM-Plates"    => :(:SURVEY ≡ "BHM" && :OBJTYPE ≡ "QSO" && :PROGRAMNAME ∈ ("RM", "RMv2", "RMv2-fewMWM")),
+		"RM-Fibers"    => :(:SURVEY ≡ "BHM" && :OBJTYPE ≡ "science" && :PROGRAMNAME ≡ "bhm_rm"),
+		"bhm_aqmes"    => :(:SURVEY ≡ "BHM" && :OBJTYPE ≡ "science" && :PROGRAMNAME ≡ "bhm_aqmes"),
+		"bhm_csc"      => :(:SURVEY ≡ "BHM" && :OBJTYPE ≡ "science" && :PROGRAMNAME ≡ "bhm_csc"),
+		"bhm_filler"   => :(:SURVEY ≡ "BHM" && :OBJTYPE ≡ "science" && :PROGRAMNAME ≡ "bhm_filler"),
+		"bhm_spiders"  => :(:SURVEY ≡ "BHM" && :OBJTYPE ≡ "science" && :PROGRAMNAME ≡ "bhm_spiders"),
+		"open_fiber"   => :(:SURVEY ≡ "open_fiber" && :OBJTYPE ≡ "science" && :PROGRAMNAME ≡ "open_fiber"),
 	)
-	foreach(u_sort!, programs.vals)
-	all_prog = @eval @filter([$(f_programs_dict.vals...)] |> any)
-	all_cats = @spawn DataFrame(df |> all_prog |> @select(:CATALOGID)) |> u_sort! |> Tuple
+	foreach(sort!, programs.vals)
+	all_program(df) = @eval @rsubset df any([$(f_programs_dict.vals...)])
+	all_catalogs    = @spawn @chain df all_program @select!(:CATALOGID) _[!, 1] sort! OrderedSet
 	for (k, v) ∈ f_programs_dict
-		program = @eval @filter($v)
-		programs[k] = Int32OrStr[DataFrame(df |> program |> @select(:FIELD)) |> u_sort!; "all"]
+		program(df) = @eval @rsubset df $v
+		programs[k] = Int32OrStr[@chain df program @select!(:FIELD) _[!, 1] u_sort!; "all"]
 	end
-	all_cats |> fetch
+	all_catalogs |> fetch
 end
 
 @info "Filling fieldIDs and catalogIDs with only science targets and completed epochs"
 
 const fieldIDs = @time @sync let
-	get_data_of(ids::Tuple{Vararg{Int32}}) = # Int32 => :FIELD
-		@select(:CATALOGID, :FIELD, :SURVEY, :OBJTYPE)(df) |>
-		@filter(R -> R.FIELD ∈ ids && R.SURVEY ≡ "BHM" && R.OBJTYPE ∈ ("QSO", "science")) |>
-		@unique() |> @groupby(R -> R.FIELD) |>
-		@map(G -> string(key(G)) => u_sort!(G.CATALOGID |> Vector)) |> Tuple
+	get_data_of(ids::OrderedSet{Int32}) = @chain df begin # Int32 => :FIELD
+		@select :CATALOGID :FIELD :SURVEY :OBJTYPE
+		@rsubset! :FIELD ∈ ids && :SURVEY ≡ "BHM" && :OBJTYPE ∈ ("QSO", "science")
+		@by :FIELD :CATALOGID = [:CATALOGID]
+		eachrow
+	end
 	d = OrderedDict{String, Vector{Int64}}()
 	s_info("Processing ", sum(length, programs.vals), " entries of ", length(programs), " programs")
 	for (prog, opts) ∈ programs
-		data = get_data_of(filter(≠("all"), opts) |> Tuple)
+		data = get_data_of(filter(≠("all"), opts) |> OrderedSet{Int32})
 		for (k, v) ∈ data
-			haskey(d, k) ? append!(d[k], v) |> u_sort! : d[k] = v
+			(k, v) = string(k), copy(v)
+			(haskey(d, k) ? append!(d[k], v) : d[k] = v) |> u_sort!
 		end
-		d["$prog-all"] = mapreduce(p -> p.second, vcat, data, init = valtype(d)()) |> u_sort!
+		d["$prog-all"] = mapreduce(p -> p[:CATALOGID], vcat, data, init = valtype(d)()) |> u_sort!
 	end
-	sort!(d, by = s -> something(tryparse(Int32, s), s))
+	sort!(d, by = s -> @something tryparse(Int32, s) s)
 end
 
-@info "Building dictionaries (can take a while with AQMES or open fiber targets)"
+@info "Building dictionary for catalogIDs"
 
 const catalogIDs = @time @sync let
-	z_best_of(G) = @select(:ZWARNING, :Z, :RCHI2)(G) |>
-				   @orderby(R -> R.ZWARNING > (0)) |> @thenby(R -> R.RCHI2) |>
-				   @take(1) |> x -> collect(x)[1]
-	get_data_of(ids::Tuple{Vararg{Int64}}) = # Int64 => :CATALOGID
-		@select(:CATALOGID, :FIELD, :MJD, :MJD_FINAL, :RCHI2, :Z, :ZWARNING)(df) |>
-		@filter(R -> R.CATALOGID ∈ ids) |>
-		@unique() |> @groupby(R -> R.CATALOGID) |>
-		@map(G -> string(key(G)) => NTuple{3, Int32OrFlt}[z_best_of(G) |> values
-			map(values, @select(:FIELD, :MJD, :MJD_FINAL)(G) |> collect) |> u_sort!]) |> Tuple
+	get_data_of(ids::OrderedSet{Int64}) = @chain df begin # Int64 => :CATALOGID
+		@select :CATALOGID :FIELD :MJD :MJD_FINAL :RCHI2 :Z :ZWARNING
+		@rsubset! :CATALOGID ∈ ids
+		@orderby :CATALOGID 0 .< :ZWARNING :RCHI2
+		@by :CATALOGID begin
+			:META = [(collect ∘ eachrow)(Int32OrFlt[:ZWARNING :Z :RCHI2])[1:1]]
+			:DATA = [(collect ∘ eachrow)(Int32OrFlt[:FIELD :MJD :MJD_FINAL])]
+		end
+		@rselect! :ks = string(:CATALOGID) :vs = sort!(Vector{Int32OrFlt}[:META; :DATA])
+		_[!, 1], _[!, 2]
+	end
 	s_info("Processing ", length(programs_cats), " entries")
-	d = OrderedDict{String, Vector{NTuple{3, Int32OrFlt}}}(get_data_of(programs_cats))
-	sort!(d, by = s -> parse(Int64, s))
+	d = LittleDict(get_data_of(programs_cats |> OrderedSet{Int64})...)
 end
 
 @info "Dumping dictionaries to file"
