@@ -125,7 +125,7 @@ def fetch_catID(field, catID):
 		flux.append(dat[1])
 		name.append(mjd)
 	else:
-		for i in data[1:]:
+		for i in data[1:]: # (FIELD, MJD, MJD_FINAL)
 			if field == "all" or field == i[0]:
 				# print("all", i[0], i[1], catID, str(catID)) # for testing
 				dat = SDSSV_fetch(username, password, i[0], i[1], catID)
@@ -204,30 +204,30 @@ spec_line_emi = numpy.asarray([
 # the third column is the wavelength list, in which the first one must be unique
 spec_line_abs = numpy.asarray([
 	[1, 2, "5897.5581 5891.5833          ", "Na I"       ],
-	[1, 2, "3969.591  3934.777           ", "Ca II"      ],
+	[1, 2, "3969.5910 3934.7770          ", "Ca II"      ],
 	[0, 1, "2852.9642                    ", "Mg I"       ],
-	[1, 2, "2803.531  2796.352           ", "Mg II"      ],
+	[1, 2, "2803.5310 2796.3520          ", "Mg II"      ],
 	[0, 2, "2600.1729 2586.6500          ", "Fe II UV1"  ],
 	[0, 3, "2382.7652 2374.4612 2344.2139", "Fe II UV2+3"],
 	[1, 2, "1862.7895 1854.7164          ", "Al III"     ],
 	[0, 1, "1670.7874                    ", "Al II"      ],
 	[0, 1, "1608.4511                    ", "Fe II 1608" ],
-	[1, 2, "1550.774  1548.202           ", "C IV"       ],
+	[1, 2, "1550.7740 1548.2020          ", "C IV"       ],
 	[0, 1, "1526.7071                    ", "Si II 1526" ],
-	[1, 2, "1402.770  1393.755           ", "Si IV"      ],
+	[1, 2, "1402.7700 1393.7550          ", "Si IV"      ],
 	[1, 1, "1334.5323                    ", "C II"       ],
 	[0, 1, "1304.3711                    ", "Si II 1304" ],
 	[0, 1, "1302.1685                    ", "O I"        ],
 	[0, 1, "1260.4223                    ", "Si II 1260" ],
-	[1, 2, "1242.804  1238.821           ", "N V"        ],
+	[1, 2, "1242.8040 1238.8210          ", "N V"        ],
 	[1, 1, "1215.6701                    ", "Ly α"       ],
-	[0, 2, "1128.008  1117.977           ", "P V"        ],
+	[0, 2, "1128.0080 1117.9770          ", "P V"        ],
 	[1, 2, "1037.6155 1031.9265          ", "O VI"       ],
 	[1, 1, "1025.7223                    ", "Ly β"       ],
 	[0, 1, "0972.5368                    ", "Ly γ"       ],
 	[0, 1, "0949.7430                    ", "Ly δ"       ],
 	[0, 1, "0937.8035                    ", "Ly ε"       ],
-	[1, 1, "0911.76                      ", "Lyman limit"],
+	[1, 1, "0911.7600                    ", "Lyman limit"],
 ])
 
 # print(spec_line_emi[numpy.bool_(spec_line_emi[:, 0]), 2].tolist())
@@ -263,91 +263,138 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 	dcc.Location(id="window_location", refresh=False),
 
 	html.Div(className="row", children=[
-		html.Div(className="col-xs-12", children=[
+
+		html.Div(className="col-sm-8 col-xs-12", children=[
 			html.H2("SDSSV-BHM Spectra Viewer (remote version)"),
 		]),
+
+		html.Div(className="col-sm-4 col-xs-12", children=[
+			dcc.Checklist(id="extra_info_list", options={
+				"z": "detailed pipeline redshift",
+			},
+				value=["z"], inline=True,
+				style={"marginTop": "20px", "float": "right"},
+				inputStyle={"marginRight": "5px"},
+			),
+		]),
+
 	]),
 
 	html.Div(className="row", children=[
+		html.Div(className="col-lg-8 col-xs-12", style={"padding": "0"}, children=[
 
-		## dropdown menu for program/fieldid/catalogid
+			## dropdown menu for program/fieldid/catalogid
+			html.Div(className="col-lg-3 col-md-3 col-sm-4 col-xs-6", children=[
+				html.Label(
+					html.H4("Program"),
+				),
+				dcc.Dropdown(
+					id="program_dropdown",
+					options=[
+						{"label": i, "value": i} for i in [*programs.keys(), "(other)"]],
+					placeholder="Program",
+				)]),
+
+			## setting an empty value beforehand for next four fields is to suppress the warning from React.js
+
+			## Field ID input (w/ MJD)
+			html.Div(className="col-lg-3 col-md-3 col-sm-4 col-xs-6", children=[
+				html.Label(
+					html.H4("Field & MJD"),
+				),
+				dcc.Input(
+					id="fieldid_input", type="text",
+					placeholder="FieldID-MJD", value="", style={"height": "36px", "width": "100%"},
+				)], id="fieldid_input_div", hidden=True),
+
+			## Field ID dropdown
+			html.Div(className="col-lg-3 col-md-3 col-sm-4 col-xs-6", children=[
+				html.Label(
+					html.H4("Field ID"),
+				),
+				dcc.Dropdown(
+					id="fieldid_dropdown",
+					placeholder="FieldID", value="",
+				)], id="fieldid_dropdown_div", hidden=False),
+
+			## catalog ID input
+			html.Div(className="col-lg-6 col-md-6 col-sm-8 col-xs-12", children=[
+				html.Label(
+					html.H4("Catalog ID"),
+				),
+				dcc.Input(
+					id="catalogid_input", type="text",
+					placeholder="CatalogID", value="", style={"height": "36px", "width": "100%"},
+				)], id="catalogid_input_div", hidden=True),
+
+			## catalog ID dropdown
+			html.Div(className="col-lg-6 col-md-6 col-sm-8 col-xs-12", children=[
+				html.Label(
+					html.H4("Catalog ID"),
+				),
+				dcc.Dropdown(
+					id="catalogid_dropdown",
+					placeholder="CatalogID", value="",
+				)], id="catalogid_dropdown_div", hidden=False),
+
+		]),
+		html.Div(className="col-lg-4 col-xs-12", style={"padding": "0"}, children=[
+
+			## redshift input
+			html.Div(className="col-lg-6 col-md-3 col-sm-4 col-xs-6", children=[
+				html.Label(
+					html.H4("Redshift (z)"),
+				),
+				dcc.Input( # do not use type="number"! it is automatically updated when the next field changes
+					id="redshift_input", # redshift_dropdown
+					type="text", step="any", pattern="-?\d+(\.\d*)?|-?\.\d+",
+					value=redshift or "", placeholder=redshift_default, min=0,
+					style={"height": "36px", "width": "100%"}, inputMode="numeric",
+				)]),
+
+			## redshift stepping dropdown
+			html.Div(className="col-lg-6 col-md-3 col-sm-4 col-xs-6", children=[
+				html.Label(
+					html.H4("z stepping"),
+				),
+				dcc.Dropdown(
+					id="redshift_step", options=["any", 0.1, 0.01, 0.001, 0.0001],
+					value=stepping, placeholder="Any",
+				)]),
+
+		]),
+	]),
+
+	html.Div(className="row", id="pipeline_redshift", children=[
+
+		## pipeline info - redshift
 		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
 			html.Label(
-				html.H4("Program"),
-			),
-			dcc.Dropdown(
-				id="program_dropdown",
-				options=[
-					{"label": i, "value": i} for i in [*programs.keys(), "(other)"]],
-				placeholder="Program",
-			)]),
-
-		## setting an empty value beforehand for next four fields is to suppress the warning from React.js
-
-		## Field ID input (w/ MJD)
-		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
-			html.Label(
-				html.H4("Field & MJD"),
+				html.H4("Z", style={"color": "grey"}),
 			),
 			dcc.Input(
-				id="fieldid_input", type="text",
-				placeholder="FieldID-MJD", value="", style={"height": "36px", "width": "100%"},
-			)], id="fieldid_input_div", hidden=True),
-
-		## Field ID dropdown
-		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
-			html.Label(
-				html.H4("Field ID"),
-			),
-			dcc.Dropdown(
-				id="fieldid_dropdown",
-				placeholder="FieldID", value="",
-			)], id="fieldid_dropdown_div", hidden=False),
-
-		## catalog ID input
-		html.Div(className="col-lg-4 col-md-6 col-sm-8 col-xs-12", children=[
-			html.Label(
-				html.H4("Catalog ID"),
-			),
-			dcc.Input(
-				id="catalogid_input", type="text",
-				placeholder="CatalogID", value="", style={"height": "36px", "width": "100%"},
-			)], id="catalogid_input_div", hidden=True),
-
-		## catalog ID dropdown
-		html.Div(className="col-lg-4 col-md-6 col-sm-8 col-xs-12", children=[
-			html.Label(
-				html.H4("Catalog ID"),
-			),
-			dcc.Dropdown(
-				id="catalogid_dropdown",
-				placeholder="CatalogID", value="",
-			)], id="catalogid_dropdown_div", hidden=False),
-
-		## whitespace (not a field)
-		html.Div(className="col-sm-4 visible-sm-block", style={"visibility": "hidden"},
-                    children=[html.Label(html.H4("-")), dcc.Dropdown()]),
-
-		## redshift input
-		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
-			html.Label(
-				html.H4("Redshift (z)"),
-			),
-			dcc.Input( # do not use type="number"! it is automatically updated when the next field changes
-				id="redshift_input", # redshift_dropdown
-				type="text", step="any", pattern="-?\d+(\.\d*)?|-?\.\d+",
-				value=redshift or "", placeholder=redshift_default, min=0,
+				id="redshift_sdss_z", placeholder="N/A", readOnly=True,
 				style={"height": "36px", "width": "100%"}, inputMode="numeric",
 			)]),
 
-		## redshift stepping dropdown
+		## pipeline info - reduced χ²
 		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
 			html.Label(
-				html.H4("z stepping"),
+				html.H4("RCHI2", style={"color": "grey"}),
 			),
-			dcc.Dropdown(
-				id="redshift_step", options=["any", 0.1, 0.01, 0.001, 0.0001],
-				value=stepping, placeholder="Any",
+			dcc.Input(
+				id="redshift_sdss_rchi2", placeholder="N/A", readOnly=True,
+				style={"height": "36px", "width": "100%"}, inputMode="numeric",
+			)]),
+
+		## pipeline info - bad redshift fits
+		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
+			html.Label(
+				html.H4("ZWARNING", style={"color": "grey"}),
+			),
+			dcc.Input(
+				id="redshift_sdss_zwarning", placeholder="N/A", readOnly=True,
+				style={"height": "36px", "width": "100%"}, inputMode="numeric",
 			)]),
 
 	]),
@@ -370,93 +417,92 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 	]),
 
 	html.Div(className="row", children=[
+		html.Div(className="col-lg-4 col-xs-12", style={"padding": "0"}, children=[
 
-		## axis range (note: these settings are volatile/auto-resetted)
-		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
+			## axis range (note: these settings are volatile/auto-resetted)
+			html.Div(className="col-lg-6 col-md-3 col-sm-4 col-xs-6", children=[
 
-			## y-axis range
-			html.Div(className="row", children=[
-				html.Div(className="col-xs-12", children=[
-					html.Label(
-						html.H4("Y-axis range"),
-					),
-					dcc.Input(
-						id="axis_y_max", type="number", step=1, value=y_max_default, placeholder="Max",
-						style={"height": "36px", "width": "100%"},
-					),
-					dcc.Input(
-						id="axis_y_min", type="number", step=1, value=y_min_default, placeholder="Min",
-						style={"height": "36px", "width": "100%"},
-					)]),
+				## y-axis range
+				html.Div(className="row", children=[
+					html.Div(className="col-xs-12", children=[
+						html.Label(
+							html.H4("Y-axis range"),
+						),
+						dcc.Input(
+							id="axis_y_max", type="number", step=1, value=y_max_default, placeholder="Max",
+							style={"height": "36px", "width": "100%"},
+						),
+						dcc.Input(
+							id="axis_y_min", type="number", step=1, value=y_min_default, placeholder="Min",
+							style={"height": "36px", "width": "100%"},
+						)]),
+				]),
+
+				## x-axis range
+				html.Div(className="row", children=[
+					html.Div(className="col-xs-12", children=[
+						html.Label(
+							html.H4("X-axis observed λ range (Å)"),
+						),
+						dcc.Input(
+							id="axis_x_max", type="number", step=1, value=int(x_max), placeholder="Max", # was wave_max
+							style={"height": "36px", "width": "100%"},
+						),
+						dcc.Input(
+							id="axis_x_min", type="number", step=1, value=int(x_min), placeholder="Min", # was wave_min
+							style={"height": "36px", "width": "100%"},
+						)]),
+				]),
+
 			]),
 
-			## x-axis range
-			html.Div(className="row", children=[
-				html.Div(className="col-xs-12", children=[
-					html.Label(
-						html.H4("X-axis observed λ range (Å)"),
-					),
-					dcc.Input(
-						id="axis_x_max", type="number", step=1, value=int(x_max), placeholder="Max", # was wave_max
-						style={"height": "36px", "width": "100%"},
-					),
-					dcc.Input(
-						id="axis_x_min", type="number", step=1, value=int(x_min), placeholder="Min", # was wave_min
-						style={"height": "36px", "width": "100%"},
-					)]),
+			## spectral smoothing
+			html.Div(className="col-lg-6 col-md-3 col-sm-4 col-xs-6", children=[
+				html.Label(
+					html.H4("Smoothing"),
+				),
+				dcc.Input(
+					id="smooth_input", type="number", step=2, min=1, value=smooth_default, placeholder="SmoothWidth",
+					style={"height": "36px", "width": "100%"}, max=smooth_max,
+				),
 			]),
 
 		]),
+		html.Div(className="col-lg-8 col-xs-12", style={"padding": "0"}, children=[
 
-		## spectral smoothing
-		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
-			html.Label(
-				html.H4("Smoothing"),
-			),
-			dcc.Input(
-				id="smooth_input", type="number", step=2, min=1, value=smooth_default, placeholder="SmoothWidth",
-				style={"height": "36px", "width": "100%"}, max=smooth_max,
-			),
+			## label spectral lines (emission) (2 columns)
+			html.Div(className="col-md-6 col-sm-9 col-xs-12", children=[
+				html.Label(
+					html.H4("Emission lines"),
+				),
+				dcc.Checklist(id="line_list_emi", options=[
+					# Set up emission-line active plotting dictionary with values set to the transition wavelengths
+					{"label": "{: <10}\t({}Å)".format(i[2], int(float(i[1]))),
+					 "value": i[1]} for i in spec_line_emi],
+					value=spec_line_emi[numpy.bool_(spec_line_emi[:, 0]), 1].tolist(), # values are wavelengths
+					style={"columnCount": "2"},
+					inputStyle={"marginRight": "5px"},
+					labelStyle={"whiteSpace": "pre-wrap"},
+				),
+			]),
+
+			## label spectral lines (absorption) (2 columns)
+			html.Div(className="col-md-6 col-sm-9 col-xs-12", children=[
+				html.Label(
+					html.H4("Absorption lines"),
+				),
+				dcc.Checklist(id="line_list_abs", options=[
+					# Set up absorption-line active plotting dictionary with values set to the transition names
+					{"label": "{: <10}\t({}Å)".format(i[3], int(float(i[2].split()[0]))),
+					 "value": i[2].split()[0]} for i in spec_line_abs],
+					value=[s.split()[0] for s in spec_line_abs[numpy.bool_(spec_line_abs[:, 0]), 2]], # wavelengths
+					style={"columnCount": "2"},
+					inputStyle={"marginRight": "5px"},
+					labelStyle={"whiteSpace": "pre-wrap"},
+				),
+			]),
+
 		]),
-
-		## whitespace (not a field)
-		html.Div(className="col-sm-8 visible-sm-block", style={"visibility": "hidden"},
-                    children=[html.Label(html.H4("-")), dcc.Dropdown()]),
-		html.Div(className="col-sm-8 visible-sm-block", style={"visibility": "hidden"},
-                    children=[html.Label(html.H4("-")), dcc.Dropdown()]),
-
-		## label spectral lines (emission) (2 columns)
-		html.Div(className="col-lg-4 col-md-6 col-sm-8 col-xs-12", children=[
-			html.Label(
-				html.H4("Emission lines"),
-			),
-			dcc.Checklist(id="line_list_emi", options=[
-				# Set up emission-line active plotting dictionary with values set to the transition wavelengths
-				{"label": "{: <12}\t({}Å)".format(i[2], int(float(i[1]))),
-				 "value": i[1]} for i in spec_line_emi],
-				value=spec_line_emi[numpy.bool_(spec_line_emi[:, 0]), 1].tolist(), # values are wavelengths
-				style={"columnCount": "2"},
-				inputStyle={"marginRight": "5px"},
-				labelStyle={"whiteSpace": "pre-wrap"},
-			),
-		]),
-
-		## label spectral lines (absorption) (2 columns)
-		html.Div(className="col-lg-4 col-md-6 col-sm-8 col-xs-12", children=[
-			html.Label(
-				html.H4("Absorption lines"),
-			),
-			dcc.Checklist(id="line_list_abs", options=[
-				# Set up absorption-line active plotting dictionary with values set to the transition names
-				{"label": "{: <18}\t({}Å)".format(i[3], int(float(i[2].split()[0]))),
-				 "value": i[2].split()[0]} for i in spec_line_abs],
-				value=[s.split()[0] for s in spec_line_abs[numpy.bool_(spec_line_abs[:, 0]), 2]], # wavelengths
-				style={"columnCount": "2"},
-				inputStyle={"marginRight": "5px"},
-				labelStyle={"whiteSpace": "pre-wrap"},
-			),
-		]),
-
 	]),
 
 	## TODO: print source information (ra, dec, z, etc...) from some catalog
@@ -620,8 +666,26 @@ def reset_on_obj_change(y_max, y_min, x_max, x_min, redshift, redshift_step, has
 			if k == "x" and fullmatch("[^,]+,[^,]+", v): x_min, x_max = v.split(",", 1)
 	return y_max, y_min, x_max, x_min, redshift_step, redshift, smooth
 
+## hide/show pipeline redshift info
+@app.callback(
+	Output("pipeline_redshift", "hidden"),
+	Input("extra_info_list", "value"))
+def hide_pipeline_redshift(checklist):
+	return "z" not in checklist
+@app.callback(
+	Output("redshift_sdss_zwarning", "value"),
+	Output("redshift_sdss_z", "value"),
+	Output("redshift_sdss_rchi2", "value"),
+	Input("fieldid_dropdown", "value"),
+	Input("catalogid_dropdown", "value"))
+def show_pipeline_redshift(selected_fieldid, selected_catalogid):
+	try:
+		meta = fetch_catID(selected_fieldid, selected_catalogid)[0]
+		return meta[0], meta[1], meta[2]
+	except:
+		return None, None, None
 
-## plotting the spectra
+## plot the spectra
 @app.callback(
 	Output("spectra_plot", "figure"),
 	Output("redshift_input", "value"),

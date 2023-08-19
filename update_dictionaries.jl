@@ -16,7 +16,7 @@
 using Pkg: Pkg
 cd(@__DIR__)
 Pkg.activate(".")
-Pkg.Types.EnvCache().manifest.julia_version ≠ VERSION ?
+Pkg.Types.EnvCache().manifest.julia_version ≢ VERSION ?
 Pkg.update() : (Pkg.resolve(); Pkg.instantiate())
 
 using Base.Threads: @spawn, @threads, nthreads
@@ -115,10 +115,10 @@ const programs_cats = @time @sync let
 	)
 	foreach(sort!, programs.vals)
 	all_program(df) = @eval @rsubset df any([$(f_programs_dict.vals...)])
-	all_catalogs    = @spawn @chain df all_program @select!(:CATALOGID) _[!, 1] sort! OrderedSet
+	all_catalogs    = @spawn @chain all_program(df) @select!(:CATALOGID) _[!, 1] sort! OrderedSet
 	for (k, v) ∈ f_programs_dict
 		program(df) = @eval @rsubset df $v
-		programs[k] = Int32OrStr[@chain df program @select!(:FIELD) _[!, 1] u_sort!; "all"]
+		programs[k] = Int32OrStr[@chain program(df) @select!(:FIELD) _[!, 1] u_sort!; "all"]
 	end
 	all_catalogs |> fetch
 end
@@ -156,7 +156,7 @@ const catalogIDs = @time @sync let
 			:META = [(collect ∘ eachrow)(Int32OrFlt[:ZWARNING :Z :RCHI2])[1:1]]
 			:DATA = [(collect ∘ eachrow)(Int32OrFlt[:FIELD :MJD :MJD_FINAL])]
 		end
-		@rselect! :ks = string(:CATALOGID) :vs = sort!(Vector{Int32OrFlt}[:META; :DATA])
+		@rselect! :ks = string(:CATALOGID) :vs = [:META; sort!(:DATA)]
 		_[!, 1], _[!, 2]
 	end
 	s_info("Processing ", length(programs_cats), " entries")

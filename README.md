@@ -2,7 +2,7 @@
 authors: Dr. Jennifer Li (UIUC) and Meg Davis (UConn, <megan.c.davis@uconn.edu>), 2021 <br />
 authors: Pat Hall, Zezhou Zhu, and Kevin Welch (YorkU, <phall@yorku.ca>, <zzz@my.yorku.ca>), 2023
 
-This is a demo for a multi-epoch spectral viewer for SDSSV-BHM using plotly/dash (<https://dash.plotly.com/>). The ultimate goal is to build a web application that allows quick spectral visualization for SDSSV BHM data. The current version will access the data via url and it takes 1-2 seconds to load each spectra.
+This is a demo for a multi-epoch spectral viewer for SDSSV-BHM using [plotly/dash](https://dash.plotly.com/). The ultimate goal is to build a web application that allows quick spectral visualization for SDSSV BHM data. The current version will access the data via url and it takes 1-2 seconds to load each spectra.
 
 **Usage**: Please see the Getting Started section, below, before launching the tool. To launch the web app, you run the script `sdssv_spec_appREMOTE.py` as a regular python file. The web app will be at <http://127.0.0.1:8050/>, which you can open with any web browser.
 
@@ -28,9 +28,9 @@ conda install astropy dash numpy plotly requests
 
 ### Keeping up-to-date
 
-The `dictionaries.txt` file is the backbone to this tool. By running the `update_dictionaries.py` file, it will look for spAll-lite-v6_1_0.fits on your local machine and update said dictionary file. The file provided here is up-to-date for BHM targets ***for GOOD fields ONLY*** as of 2023-08-16. Runtime was ~~\~1 hour on a 2.6 GHz Intel Core i7 MacBook Pro~~, ~29min with 4 threads on AMD Zen 1, or ~12min with 8 threads on AMD Zen 3, FWIW.
+The `dictionaries.txt` file is the backbone to this tool. By running the `update_dictionaries.py` file (obsoleted, please use `update_dictionaries.jl` instead), it will look for spAll-lite-v6_1_0.fits on your local machine and update said dictionary file. The file provided here is up-to-date for BHM targets ***for GOOD fields ONLY*** as of 2023-09-04. Runtime was ~~\~1 hour on a 2.6 GHz Intel Core i7 MacBook Pro~~, ~29min with 4 threads on AMD Zen 1, or ~12min with 8 threads on AMD Zen 3, FWIW.
 
-Also, try out the new `update_dictionaries.jl` (re)written in Julia. Runtime with 1 thread was only ~1min on AMD Zen 1, or ~40s on AMD Zen 3, FWIW. After installing [latest Julia](https://julialang.org/downloads/) (require v1.6.2+), you may run:
+Also, try out the new `update_dictionaries.jl` (re)written in [Julia](https://julialang.org/). Runtime with 1 thread was only ~1min on AMD Zen 1, or ~40s on AMD Zen 3, FWIW. After installing latest Julia (require v1.6.2+; either [official binary](https://julialang.org/downloads/) or with your package manager), you may run:
 ```shell
 julia --startup-file=no -t auto update_dictionaries.jl
 ```
