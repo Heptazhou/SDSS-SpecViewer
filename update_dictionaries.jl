@@ -28,7 +28,7 @@ using OrderedCollections
 
 const Int32OrFlt = Union{Int32, Float32, Float64}
 const Int32OrStr = Union{Int32, String}
-const s_info(xs...) = @static nthreads() > 1 ? @spawn(@info(string(xs...))) : @info(string(xs...))
+const s_info(xs...) = @static nthreads() > 1 ? @spawn(@info string(xs...)) : @info string(xs...)
 const u_sort! = unique! ∘ sort!
 
 Base.convert(::Type{AS}, v::Vector) where AS <: AbstractSet{T} where T = AS(T[v;])
@@ -153,10 +153,10 @@ const catalogIDs = @time @sync let
 		@rsubset! :CATALOGID ∈ ids
 		@orderby :CATALOGID 0 .< :ZWARNING :RCHI2
 		@by :CATALOGID begin
-			:META = [(collect ∘ eachrow)(Int32OrFlt[:ZWARNING :Z :RCHI2])[1:1]]
+			:META = [(collect ∘ eachrow)(Int32OrFlt[:ZWARNING :Z :RCHI2])[1]]
 			:DATA = [(collect ∘ eachrow)(Int32OrFlt[:FIELD :MJD :MJD_FINAL])]
 		end
-		@rselect! :ks = string(:CATALOGID) :vs = [:META; sort!(:DATA)]
+		@rselect! :ks = string(:CATALOGID) :vs = [:META, sort!(:DATA)...]
 		_[!, 1], _[!, 2]
 	end
 	s_info("Processing ", length(programs_cats), " entries")
