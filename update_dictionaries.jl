@@ -26,13 +26,12 @@ using FITSIO: FITS, Tables.columnnames
 using JSON: json
 using OrderedCollections
 
-const Int32OrFlt = Union{Int32, Float32, Float64}
-const Int32OrStr = Union{Int32, String}
+const IntOrFlt = Union{Int32, Int64, Float32, Float64}
+const IntOrStr = Union{Int32, Int64, String}
 const s_info(xs...) = @static nthreads() > 1 ? @spawn(@info string(xs...)) : @info string(xs...)
 const u_sort! = unique! ∘ sort!
 
 Base.convert(::Type{AS}, v::Vector) where AS <: AbstractSet{T} where T = AS(T[v;])
-Base.convert(::Type{Int32OrStr}, x::Int64) = Int32(x)
 Base.isless(::Any, ::Number) = Bool(0)
 Base.isless(::Number, ::Any) = Bool(1)
 
@@ -49,16 +48,16 @@ end
 # https://www.sdss.org/dr18/data_access/bitmasks/
 const cols = [
 	:CATALOGID    # Int64    # SDSS-V CatalogID
-	:FIELD        # Int32    # Field number
+	:FIELD        # Int64    # Field number
 	:FIELDQUALITY # String   # Quality of field ("good" | "bad")
-	:MJD          # Int32    # Modified Julian date of observation
+	:MJD          # Int64    # Modified Julian date of observation
 	:MJD_FINAL    # Float64  # Mean MJD of the Coadded Spectra
 	:OBJTYPE      # String   # Why this object was targetted; see spZbest
 	:PROGRAMNAME  # String   # Program name within a given survey
 	:RCHI2        # Float32  # Reduced χ² for best fit
 	:SURVEY       # String   # Survey that plate is part of
 	:Z            # Float32  # Redshift; assume that this redshift is incorrect if the ZWARNING flag is nonzero
-	:ZWARNING     # Int32    # A flag set for bad redshift fits in place of calling CLASS=UNKNOWN; see bitmasks
+	:ZWARNING     # Int64    # A flag set for bad redshift fits in place of calling CLASS=UNKNOWN; see bitmasks
 ]
 const fits = try
 	(f = mapreduce(x -> filter!(endswith(x), readdir()), vcat, [r"\.fits(\.tmp)?", r"\.fits\.gz"]))
@@ -87,7 +86,7 @@ end
 @info "Setting up dictionary for fieldIDs with each RM_field"
 
 const programs =
-	OrderedDict{String, OrderedSet{Int32OrStr}}(
+	OrderedDict{String, OrderedSet{IntOrStr}}(
 		"SDSS-RM"   => [15171, 15172, 15173, 15290, 16169, 20867, 112359, "all"],
 		"XMMLSS-RM" => [15000, 15002, 23175, 112361, "all"],
 		"COSMOS-RM" => [15038, 15070, 15071, 15252, 15253, 16163, 16164, 16165, 20868, 23288, 112360, "all"],
@@ -118,7 +117,7 @@ const programs_cats = @time @sync let
 	all_catalogs    = @spawn @chain all_program(df) @select!(:CATALOGID) _[!, 1] sort! OrderedSet
 	for (k, v) ∈ f_programs_dict
 		program(df) = @eval @rsubset df $v
-		programs[k] = Int32OrStr[@chain program(df) @select!(:FIELD) _[!, 1] u_sort!; "all"]
+		programs[k] = IntOrStr[@chain program(df) @select!(:FIELD) _[!, 1] u_sort!; "all"]
 	end
 	all_catalogs |> fetch
 end
@@ -126,7 +125,7 @@ end
 @info "Filling fieldIDs and catalogIDs with only science targets and completed epochs"
 
 const fieldIDs = @time @sync let
-	get_data_of(ids::OrderedSet{Int32}) = @chain df begin # Int32 => :FIELD
+	get_data_of(ids::OrderedSet{Integer}) = @chain df begin # :FIELD
 		@select :CATALOGID :FIELD :SURVEY :OBJTYPE
 		@rsubset! :FIELD ∈ ids && :SURVEY ≡ "BHM" && :OBJTYPE ∈ ("QSO", "science")
 		@by :FIELD :CATALOGID = [:CATALOGID]
@@ -135,32 +134,32 @@ const fieldIDs = @time @sync let
 	d = OrderedDict{String, Vector{Int64}}()
 	s_info("Processing ", sum(length, programs.vals), " entries of ", length(programs), " programs")
 	for (prog, opts) ∈ programs
-		data = get_data_of(filter(≠("all"), opts) |> OrderedSet{Int32})
+		data = get_data_of(filter(≠("all"), opts) |> OrderedSet{Integer})
 		for (k, v) ∈ data
 			(k, v) = string(k), copy(v)
 			(haskey(d, k) ? append!(d[k], v) : d[k] = v) |> u_sort!
 		end
 		d["$prog-all"] = mapreduce(p -> p[:CATALOGID], vcat, data, init = valtype(d)()) |> u_sort!
 	end
-	sort!(d, by = s -> @something tryparse(Int32, s) s)
+	sort!(d, by = s -> @something tryparse(Int64, s) s)
 end
 
 @info "Building dictionary for catalogIDs"
 
 const catalogIDs = @time @sync let
-	get_data_of(ids::OrderedSet{Int64}) = @chain df begin # Int64 => :CATALOGID
+	get_data_of(ids::OrderedSet{Integer}) = @chain df begin # :CATALOGID
 		@select :CATALOGID :FIELD :MJD :MJD_FINAL :RCHI2 :Z :ZWARNING
 		@rsubset! :CATALOGID ∈ ids
 		@orderby :CATALOGID 0 .< :ZWARNING :RCHI2
 		@by :CATALOGID begin
-			:META = [(collect ∘ eachrow)(Int32OrFlt[:ZWARNING :Z :RCHI2])[1]]
-			:DATA = [(collect ∘ eachrow)(Int32OrFlt[:FIELD :MJD :MJD_FINAL])]
+			:META = [(collect ∘ eachrow)(IntOrFlt[:ZWARNING :Z :RCHI2])[1]]
+			:DATA = [(collect ∘ eachrow)(IntOrFlt[:FIELD :MJD :MJD_FINAL])]
 		end
 		@rselect! :ks = string(:CATALOGID) :vs = [:META, sort!(:DATA)...]
 		_[!, 1], _[!, 2]
 	end
 	s_info("Processing ", length(programs_cats), " entries")
-	d = LittleDict(get_data_of(programs_cats |> OrderedSet{Int64})...)
+	d = LittleDict(get_data_of(programs_cats |> OrderedSet{Integer})...)
 end
 
 @info "Dumping dictionaries to file"

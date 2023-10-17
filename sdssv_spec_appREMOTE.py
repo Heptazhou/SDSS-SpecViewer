@@ -84,7 +84,7 @@ def SDSSV_buildURL(fieldID, MJD, objID, branch):
 
 	return url
 
-def SDSSV_fetch(username, password, fieldID, MJD, objID, branch="v6_1_0"):
+def SDSSV_fetch(username, password, fieldID, MJD, objID, branch="v6_1_1"):
 	"""
 	Fetches spectral data for a SDSS-RM object on a
 		specific field on a specific MJD. Uses the user

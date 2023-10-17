@@ -12,7 +12,10 @@ print("Loading local copy of spAll-lite-*.fits")
 try:
 	spAll = fits.open("spAll-lite-master.fits")
 except:
-	spAll = fits.open("spAll-lite-v6_1_0.fits")
+	try:
+		spAll = fits.open("spAll-lite-v6_1_1.fits")
+	except:
+		spAll = fits.open("spAll-lite-v6_1_0.fits")
 
 CATALOGID = spAll[1].data["CATALOGID"]
 FIELD = spAll[1].data["FIELD"]
