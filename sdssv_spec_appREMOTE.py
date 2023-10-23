@@ -115,7 +115,7 @@ def fetch_catID(field, catID):
 	# print(testval)
 	data: list = catalogIDs.get(str(catID), [(None, None, None)])
 	meta: list = data[0] # (ZWARNING, Z, RCHI2)
-	if fullmatch("\d+-\d+", str(field).strip()):
+	if fullmatch(r"\d+-\d+", str(field).strip()):
 		fld, mjd = str(field).strip().split("-", 1)
 		try:
 			dat = SDSSV_fetch(username, password, fld, mjd, str(catID).strip(), "master")
@@ -347,7 +347,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 				),
 				dcc.Input( # do not use type="number"! it is automatically updated when the next field changes
 					id="redshift_input", # redshift_dropdown
-					type="text", step="any", pattern="-?\d+(\.\d*)?|-?\.\d+",
+					type="text", step="any", pattern=r"-?\d+(\.\d*)?|-?\.\d+",
 					value=redshift or "", placeholder=redshift_default, min=0,
 					style={"height": "36px", "width": "100%"}, inputMode="numeric",
 				)]),
@@ -541,9 +541,9 @@ def set_input_or_dropdown(query, hash, program):
 	if program and program != "(other)": query, hash = "", ""
 	fld_mjd, catalog, redshift = "", "", ""
 	hash = str(hash).lstrip("#").split("&") if hash else []
-	if query and fullmatch("\d+-\d+-[^-].+[^-]", query):
+	if query and fullmatch(r"\d+-\d+-[^-].+[^-]", query):
 		for x in hash:
-			if not fullmatch("[^=]+=[^=]+", x): continue
+			if not fullmatch(r"[^=]+=[^=]+", x): continue
 			k, v = x.split("=", 1)
 			if k == "z": redshift = v
 		program = "(other)"
@@ -659,11 +659,11 @@ def reset_on_obj_change(y_max, y_min, x_max, x_min, redshift, redshift_step, has
 		x_min, x_max = int(wave_min), int(wave_max)
 	if program == "(other)":
 		for x in (hash := str(hash).lstrip("#").split("&") if hash else []):
-			if not fullmatch("[^=]+=[^=]+", x): continue
+			if not fullmatch(r"[^=]+=[^=]+", x): continue
 			k, v = x.split("=", 1)
 			if k == "m": smooth = v
-			if k == "y" and fullmatch("[^,]+,[^,]+", v): y_min, y_max = v.split(",", 1)
-			if k == "x" and fullmatch("[^,]+,[^,]+", v): x_min, x_max = v.split(",", 1)
+			if k == "y" and fullmatch(r"[^,]+,[^,]+", v): y_min, y_max = v.split(",", 1)
+			if k == "x" and fullmatch(r"[^,]+,[^,]+", v): x_min, x_max = v.split(",", 1)
 	return y_max, y_min, x_max, x_min, redshift_step, redshift, smooth
 
 ## hide/show pipeline redshift info

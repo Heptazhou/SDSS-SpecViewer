@@ -14,27 +14,32 @@ This is a demo for a multi-epoch spectral viewer for SDSSV-BHM using [plotly/das
 You **must** have the proper SDSS-V Proprietary Data username and password in the `authentication.txt` (created upon first run) to use this tool, the program will prompt you to input required authentication if the file does not exist yet. The code will immediately check the authentication upon start up.
 
 ### Dependencies
-Please install the following Python packages to use this tool. The provided "dependencies.sh" shell script will pip install these for you, if you run it with: `./dependencies.sh`.
+Please install the following Python packages to use this tool.
 - dash
 - plotly
 - astropy
 - requests
 - numpy
 
-Or better, if you are using Conda (e.g. Miniconda/Anaconda), you may run (within some [environment](https://conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html)):
+If you use [conda](https://conda.io/), you may run (preferably, within some [environment](https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html)):
 ```shell
 conda install astropy dash numpy plotly requests
 ```
 
+If you use [pip](https://pip.pypa.io/), you may run (preferably, within some [environment](https://packaging.python.org/en/latest/tutorials/installing-packages/#creating-and-using-virtual-environments)):
+```shell
+pip install astropy dash numpy plotly requests
+```
+
 ### Keeping up-to-date
 
-The `dictionaries.txt` file is the backbone to this tool. By running the `update_dictionaries.py` file (obsoleted, please use `update_dictionaries.jl` instead), it will look for spAll-lite-v6_1_1.fits on your local machine and update said dictionary file. The file provided here is up-to-date for BHM targets ***for GOOD fields ONLY*** as of 2023-10-16. Runtime was ~~\~1 hour on a 2.6 GHz Intel Core i7 MacBook Pro~~, ~29min with 4 threads on AMD Zen 1, or ~12min with 8 threads on AMD Zen 3, FWIW.
+The `dictionaries.txt` file is the backbone to this tool. By running the `update_dictionaries.jl` file, it will look for a FITS file (e.g., `spAll-lite-v6_1_1.fits`) on your local machine and update said dictionary file. The file provided here is up-to-date for BHM targets ***for GOOD fields ONLY*** as of 2023-10-16.
 
-Also, try out the new `update_dictionaries.jl` (re)written in [Julia](https://julialang.org/). Runtime with 1 thread was only ~1min on AMD Zen 1, or ~40s on AMD Zen 3, FWIW. After installing latest Julia (require v1.6.2+; either [official binary](https://julialang.org/downloads/) or with your package manager), you may run:
+Please install [Julia](https://julialang.org/) to run `update_dictionaries.jl`. Runtime with 1 thread was ~1min on AMD Zen 1, or ~40s on AMD Zen 3, FWIW. With latest Julia installed (v1.6.2+ is required; you could either install the [official binary](https://julialang.org/downloads/) or install it with your package manager of choice), you may run:
 ```shell
 julia --startup-file=no -t auto update_dictionaries.jl
 ```
-You can safely ignore `--startup-file` argument if you do not have it anyways. And with Julia v1.7+, I highly recommend setting environment variable `JULIA_NUM_THREADS=auto` instead of specifing `-t`. Then, simply run:
+You can safely ignore `--startup-file` argument if you do not have a startup file. And with Julia v1.7+, I highly recommend setting environment variable `JULIA_NUM_THREADS=auto` instead of specifing `-t`, then simply:
 ```shell
 julia update_dictionaries.jl
 ```
