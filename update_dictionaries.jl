@@ -87,9 +87,9 @@ end
 
 const programs =
 	OrderedDict{String, OrderedSet{IntOrStr}}(
-		"SDSS-RM"   => [15171, 15172, 15173, 15290, 16169, 20867, 112359, "all"],
-		"XMMLSS-RM" => [15000, 15002, 23175, 112361, "all"],
-		"COSMOS-RM" => [15038, 15070, 15071, 15252, 15253, 16163, 16164, 16165, 20868, 23288, 112360, "all"],
+		"SDSS-RM"   => [15171, 15172, 15173, 15290, 16169, 20867, 112359],
+		"XMMLSS-RM" => [15000, 15002, 23175, 112361],
+		"COSMOS-RM" => [15038, 15070, 15071, 15252, 15253, 16163, 16164, 16165, 20868, 23288, 112360],
 	)
 
 @info "Sorting out the fields (including the `all` option if instructed to do so)"
@@ -113,13 +113,12 @@ const programs_cats = @time @sync let
 		"open_fiber"   => :(:SURVEY ≡ "open_fiber" && :OBJTYPE ≡ "science" && :PROGRAMNAME ≡ "open_fiber"),
 	)
 	foreach(sort!, programs.vals)
-	all_program(df) = @eval @rsubset df any([$(f_programs_dict.vals...)])
-	all_catalogs    = @spawn @chain all_program(df) @select!(:CATALOGID) _[!, 1] sort! OrderedSet
-	for (k, v) ∈ f_programs_dict
-		program(df) = @eval @rsubset df $v
-		programs[k] = IntOrStr[@chain program(df) @select!(:FIELD) _[!, 1] u_sort!; "all"]
+	x = :(any([$(f_programs_dict.vals...)]))
+	all_cats = @spawn @eval @chain df @rsubset($x) @select!(:CATALOGID) _[!, 1] sort! OrderedSet
+	for (p, x) ∈ f_programs_dict
+		programs[p] = @eval @chain df @rsubset($x) @select!(:FIELD) _[!, 1] sort! OrderedSet
 	end
-	all_catalogs |> fetch
+	all_cats |> fetch
 end
 
 @info "Filling fieldIDs and catalogIDs with only science targets and completed epochs"
@@ -134,7 +133,8 @@ const fieldIDs = @time @sync let
 	d = OrderedDict{String, Vector{Int64}}()
 	s_info("Processing ", sum(length, programs.vals), " entries of ", length(programs), " programs")
 	for (prog, opts) ∈ programs
-		data = get_data_of(filter(≠("all"), opts) |> OrderedSet{Integer})
+		data = get_data_of(opts |> OrderedSet{Integer})
+		@spawn push!(opts, "all")
 		for (k, v) ∈ data
 			(k, v) = string(k), copy(v)
 			(haskey(d, k) ? append!(d[k], v) : d[k] = v) |> u_sort!
@@ -147,7 +147,7 @@ end
 @info "Building dictionary for catalogIDs"
 
 const catalogIDs = @time @sync let
-	get_data_of(ids::OrderedSet{Integer}) = @chain df begin # :CATALOGID
+	get_dict_of(ids::OrderedSet{Integer}) = @chain df begin # :CATALOGID
 		@select :CATALOGID :FIELD :MJD :MJD_FINAL :RCHI2 :Z :ZWARNING
 		@rsubset! :CATALOGID ∈ ids
 		@orderby :CATALOGID 0 .< :ZWARNING :RCHI2
@@ -156,10 +156,10 @@ const catalogIDs = @time @sync let
 			:DATA = [(collect ∘ eachrow)(IntOrFlt[:FIELD :MJD :MJD_FINAL])]
 		end
 		@rselect! :ks = string(:CATALOGID) :vs = [:META, sort!(:DATA)...]
-		_[!, 1], _[!, 2]
+		LittleDict(_[!, :ks], _[!, :vs])
 	end
 	s_info("Processing ", length(programs_cats), " entries")
-	d = LittleDict(get_data_of(programs_cats |> OrderedSet{Integer})...)
+	get_dict_of(programs_cats |> OrderedSet{Integer})
 end
 
 @info "Dumping dictionaries to file"

@@ -21,12 +21,12 @@ Please install the following Python packages to use this tool.
 - requests
 - numpy
 
-If you use [conda](https://conda.io/), you may run (preferably, within some [environment](https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html)):
+If you use [conda](https://conda.io/), you may run (preferably, within a separate [environment](https://docs.conda.io/projects/conda/en/latest/user-guide/getting-started.html#managing-envs)):
 ```shell
 conda install astropy dash numpy plotly requests
 ```
 
-If you use [pip](https://pip.pypa.io/), you may run (preferably, within some [environment](https://packaging.python.org/en/latest/tutorials/installing-packages/#creating-and-using-virtual-environments)):
+If you use [pip](https://pip.pypa.io/), you may run (preferably, within a separate [environment](https://packaging.python.org/en/latest/tutorials/installing-packages/#creating-and-using-virtual-environments)):
 ```shell
 pip install astropy dash numpy plotly requests
 ```
