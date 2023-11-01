@@ -26,9 +26,9 @@ from dash.dependencies import Input, Output, State
 # NOTE TO CODER: JSON LIKES STRING KEYS FOR DICTIONARIES!!!!!!
 dictionaries = json.load(open("dictionaries.txt"))
 authentication = "authentication.txt"
-programs: dict = dictionaries[0]
-fieldIDs: dict = dictionaries[1]
-catalogIDs: dict = dictionaries[2]
+programs: dict[str, list[int]] = dictionaries[0]
+fieldIDs: dict[str, list[int]] = dictionaries[1]
+catalogIDs: dict[str, list[list]] = dictionaries[2]
 
 # for testing
 # print(programs)
@@ -71,70 +71,110 @@ external_stylesheets = [ "https://codepen.io/chriddyp/pen/bWLwgP.css",
 ### Any necessary functions
 ###
 
-def SDSSV_buildURL(fieldID, MJD, objID, branch):
+def SDSSV_buildURL(field, MJD, objID, branch: str):
 	"""
 	A function to build the url that will be used to fetch the data.
 
 	Field IDs don't start with zero but the URLs need leading zeroes;
 	using zfill(6) fixes this.
 	"""
-	url = "https://data.sdss5.org/sas/sdsswork/bhm/boss/spectro/redux/{}/spectra/lite/".format(branch) \
-		+ "{}/{}/spec-{}-{}-{}.fits".format(str(fieldID).zfill(6), MJD, str(fieldID).zfill(6), MJD, objID)
-	print(url) # for testing
-
+	if type(field) == int:
+		field = str(field).zfill(6)
+	url = f"https://data.sdss5.org/sas/sdsswork/bhm/boss/spectro/redux/{branch}/spectra/lite/" \
+		+ f"{field}/{MJD}/spec-{field}-{MJD}-{objID}.fits"
+	# print(url) # for testing
 	return url
 
-def SDSSV_fetch(username, password, fieldID, MJD, objID, branch="v6_1_1"):
+def SDSSV_fetch(username: str, password: str, field, MJD, objID, branch="v6_1_1"):
 	"""
 	Fetches spectral data for a SDSS-RM object on a
 		specific field on a specific MJD. Uses the user
 		supplied authentication.
 	"""
-	if not (fieldID and MJD and objID):
-		raise Exception((fieldID, MJD, objID))
-	url = SDSSV_buildURL(fieldID, MJD, objID, branch)
+	if not (field and MJD and objID):
+		raise Exception((field, MJD, objID, "Error in SDSSV_fetch"))
+	url = SDSSV_buildURL(field, MJD, objID, branch)
 	# print(url) # for testing
 	r = requests.get(url, auth=(username, password))
 	r.raise_for_status()
-	data_test = fits.open(BytesIO(r.content))
-	flux = data_test[1].data["FLUX"]
-	wave = 10**data_test[1].data["loglam"]
+	print(url)
+	HDUs = fits.open(BytesIO(r.content))
+	meta = None # HDUs[2].data
+	wave = 10**HDUs[1].data["LOGLAM"]
+	flux = HDUs[1].data["FLUX"]
 	# print(flux) # for testing
-	return wave, flux
+	return meta, wave, flux
 
 def fetch_catID(field, catID):
 	# print("fetch_catID", field, catID) # for testing
 	if not (field and catID):
+		raise Exception()
 		raise Exception((field, catID))
+	field = str(field).strip()
+	catID = str(catID).strip()
 	if (field, catID) in cache:
 		return cache[(field, catID)]
 	wave, flux, name = [], [], []
-	# print(str(catID))
-	# # print("catalogIDs[str(catID)]")
-	# testval = catalogIDs[str(catID)]
+	# print(catID)
+	# # print("catalogIDs[catID]")
+	# testval = catalogIDs[catID]
 	# print(testval)
-	data: list = catalogIDs.get(str(catID), [(None, None, None)])
-	meta: list = data[0] # (ZWARNING, Z, RCHI2)
-	if fullmatch(r"\d+-\d+", str(field).strip()):
-		fld, mjd = str(field).strip().split("-", 1)
+	data = catalogIDs.get(catID, [[None, None, None]]) # [(ZWARNING, Z, RCHI2), (FIELD, MJD, MJD_FINAL)...]
+	meta = data[0] # (ZWARNING, Z, RCHI2)
+	if fullmatch(r"\d+-\d+", field):
+		fid, mjd = field.split("-", 1)
+		fid, mjd = int(fid), int(mjd)
 		try:
-			dat = SDSSV_fetch(username, password, fld, mjd, str(catID).strip(), "master")
+			dat = SDSSV_fetch(username, password, fid, mjd, catID, "master")
 		except:
-			dat = SDSSV_fetch(username, password, fld, mjd, str(catID).strip())
-		wave.append(dat[0])
-		flux.append(dat[1])
+			dat = SDSSV_fetch(username, password, fid, mjd, catID)
+		wave.append(dat[1])
+		flux.append(dat[2])
 		name.append(mjd)
+		mjd_list = [mjd]
 	else:
+		mjd_list = []
 		for i in data[1:]: # (FIELD, MJD, MJD_FINAL)
-			if field == "all" or field == i[0]:
-				# print("all", i[0], i[1], catID, str(catID)) # for testing
-				dat = SDSSV_fetch(username, password, i[0], i[1], catID)
-				wave.append(dat[0])
-				flux.append(dat[1])
-				name.append(i[2])
+			fid, mjd, mjd_final = i
+			fid, mjd, mjd_final = int(fid), int(mjd), float(mjd_final)
+			if field == "all" or int(field) == fid:
+				# print("all", fid, i[1], catID) # for testing
+				dat = SDSSV_fetch(username, password, fid, mjd, catID)
+				wave.append(dat[1])
+				flux.append(dat[2])
+				name.append(mjd_final)
+				if mjd not in mjd_list: mjd_list.append(mjd)
+	mjd_list.sort(reverse=True)
+	# print(mjd_list)
+	# allplate
+	for mjd in mjd_list:
+		if mjd <= 59392:
+			try:
+				dat = SDSSV_fetch(username, password, "allepoch", mjd, catID)
+			except Exception as e:
+				# if str(e): print(e)
+				continue
+			wave.append(dat[1])
+			flux.append(dat[2])
+			name.append(f"allplate-{mjd}")
+			# print(f"Found allplate-{mjd} for {catID}")
+			break
+	# allFPS
+	for mjd in mjd_list:
+		if mjd >= 59393:
+			try:
+				dat = SDSSV_fetch(username, password, "allepoch", mjd, catID)
+			except Exception as e:
+				# if str(e): print(e)
+				continue
+			wave.append(dat[1])
+			flux.append(dat[2])
+			name.append(f"allFPS-{mjd}")
+			# print(f"Found allFPS-{mjd} for {catID}")
+			break
 	# print(flux) # for testing
 	if not (meta and wave and flux and name):
-		raise Exception((field, catID))
+		raise Exception((field, catID, "Error in fetch_catID"))
 	cache[(field, catID)] = meta, wave, flux, name
 	return cache[(field, catID)]
 
@@ -564,7 +604,8 @@ def set_input_or_dropdown(query, hash, program):
 def set_fieldid_options(selected_program):
 	if not selected_program or selected_program == "(other)": return []
 	# print(selected_program) # for testing
-	return [{"label": i, "value": i} for i in programs.get(selected_program, [])]
+	xs = programs.get(selected_program, []) + ["all"]
+	return [{"label": str(x), "value": str(x)} for x in xs]
 
 @app.callback(
 	Output("catalogid_dropdown", "options"),
@@ -574,10 +615,11 @@ def set_catalogid_options(selected_fieldid, selected_program):
 	if not selected_program or selected_program == "(other)": return []
 	if not selected_fieldid: return []
 	# the following lines are where field numbers are obtained, use strings not numbers for both labels and values
-	if selected_fieldid != "all":
-		return [{"label": str(i), "value": str(i)} for i in fieldIDs.get(str(selected_fieldid), [])]
+	if selected_fieldid == "all":
+		xs = fieldIDs.get(f"{selected_program}-{selected_fieldid}", [])
 	else:
-		return [{"label": str(i), "value": str(i)} for i in fieldIDs.get(str(selected_program) + "-" + str(selected_fieldid), [])]
+		xs = fieldIDs.get(f"{selected_fieldid}", [])
+	return [{"label": str(x), "value": str(x)} for x in xs]
 
 # set_fieldid_value is only run when program is switched
 @app.callback(
@@ -592,7 +634,8 @@ def set_fieldid_value(available_fieldid_options, input, program):
 		# uncomment the following line if you prefer to automatically choose the first field in the program
 		# return available_fieldid_options[0]["value"]
 		return ""
-	except:
+	except Exception as e:
+		if str(e): print(e)
 		# print("set_fieldid_value except", available_fieldid_options) # for testing
 		# print("set_fieldid_value except") # for testing
 		return ""
@@ -609,7 +652,8 @@ def set_catalogid_value(available_catalogid_options, input, program):
 		# uncomment the following line if you prefer to automatically choose the first catid in the field
 		# return available_catalogid_options[0]["value"]
 		return ""
-	except:
+	except Exception as e:
+		if str(e): print(e)
 		# print("set_catalogid_value except", catalogid_dropdown) # for testing
 		return ""
 
@@ -682,7 +726,8 @@ def show_pipeline_redshift(selected_fieldid, selected_catalogid):
 	try:
 		meta = fetch_catID(selected_fieldid, selected_catalogid)[0]
 		return meta[0], meta[1], meta[2]
-	except:
+	except Exception as e:
+		if str(e): print(e)
 		return None, None, None
 
 ## plot the spectra
@@ -707,7 +752,8 @@ def make_multiepoch_spectra(selected_fieldid, selected_catalogid, redshift, reds
 		if meta[1] and not redshift and redshift_step == "any": redshift = meta[1]
 		smooth, z = int(smooth or smooth_default), float(redshift or redshift_default)
 		# print("make_multiepoch_spectra try") # for testing
-	except:
+	except Exception as e:
+		if str(e): print(e)
 		# print("make_multiepoch_spectra except") # for testing
 		return go.Figure(), redshift
 

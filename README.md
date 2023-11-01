@@ -31,18 +31,33 @@ If you use [pip](https://pip.pypa.io/), you may run (preferably, within a separa
 pip install astropy dash numpy plotly requests
 ```
 
+Then, run this to start the tool:
+```shell
+python sdssv_spec_appREMOTE.py
+```
+
+
 ### Keeping up-to-date
 
-The `dictionaries.txt` file is the backbone to this tool. By running the `update_dictionaries.jl` file, it will look for a FITS file (e.g., `spAll-lite-v6_1_1.fits`) on your local machine and update said dictionary file. The file provided here is up-to-date for BHM targets ***for GOOD fields ONLY*** as of 2023-10-16.
+The `dictionaries.txt` file is the backbone to this tool. By running the `update_dictionaries.jl` file, it will look for a FITS file (e.g., `spAll-lite-v6_1_1.fits`) on your local machine and update said dictionary file. Runtime was ~50s on AMD Zen 1, or ~30s on AMD Zen 3, FWIW. The file provided here is up-to-date for BHM targets ***for GOOD fields ONLY*** as of 2023-10-16.
 
-Please install [Julia](https://julialang.org/) to run `update_dictionaries.jl`. Runtime with 1 thread was ~1min on AMD Zen 1, or ~40s on AMD Zen 3, FWIW. With latest Julia installed (v1.6.2+ is required; you could either install the [official binary](https://julialang.org/downloads/) or install it with your package manager of choice), you may run:
-```shell
-julia --startup-file=no -t auto update_dictionaries.jl
-```
-You can safely ignore `--startup-file` argument if you do not have a startup file. And with Julia v1.7+, I highly recommend setting environment variable `JULIA_NUM_THREADS=auto` instead of specifing `-t`, then simply:
-```shell
-julia update_dictionaries.jl
-```
+To update `dictionaries.txt`, please have the FITS file ready, and do:
+1.	Install latest version of [Julia](https://julialang.org/) (you could either install the [official binary](https://julialang.org/downloads/) or install it with your package manager of choice).
+2.	Install/update the needed packages by:
+
+	```shell
+	julia update.jl
+	```
+3.	Build the dictionary file by:
+
+	```shell
+	julia --startup-file=no -t auto update_dictionaries.jl
+	```
+	Note: you could ignore the `--startup-file` argument if you do not have a startup file; and with Julia v1.7+, I highly recommend setting environment variable `JULIA_NUM_THREADS=auto` instead of specifing `-t`, then simply:
+
+	```shell
+	julia update_dictionaries.jl
+	```
 
 
 ### User's guide
