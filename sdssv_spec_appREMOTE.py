@@ -8,7 +8,7 @@ import json
 import math
 import sys
 from io import BytesIO
-from re import fullmatch
+from re import IGNORECASE, fullmatch
 
 import dash
 import numpy
@@ -99,7 +99,7 @@ def SDSSV_fetch(username: str, password: str, field, MJD, objID, branch="v6_1_1"
 	r.raise_for_status()
 	print(url)
 	HDUs = fits.open(BytesIO(r.content))
-	meta = None # HDUs[2].data
+	meta = HDUs[2].data
 	wave = 10**HDUs[1].data["LOGLAM"]
 	flux = HDUs[1].data["FLUX"]
 	# print(flux) # for testing
@@ -128,6 +128,9 @@ def fetch_catID(field, catID):
 			dat = SDSSV_fetch(username, password, fid, mjd, catID, "master")
 		except:
 			dat = SDSSV_fetch(username, password, fid, mjd, catID)
+		if not meta[0]: meta[0] = dat[0]["ZWARNING"][0]
+		if not meta[1]: meta[1] = dat[0]["Z"][0]
+		if not meta[2]: meta[2] = dat[0]["RCHI2"][0]
 		wave.append(dat[1])
 		flux.append(dat[2])
 		name.append(mjd)
@@ -773,11 +776,16 @@ def make_multiepoch_spectra(selected_fieldid, selected_catalogid, redshift, reds
 
 	# For each spectrum "i" in the list
 	for i in range(0, len(waves)):
+		kws = dict()
+		if fullmatch(r"allplate-\d+.*", str(names[i]), IGNORECASE):
+			kws = dict(line_color="#606060")
+		if fullmatch(r"allFPS-\d+.*", str(names[i]), IGNORECASE):
+			kws = dict(line_color="#000000")
 		# create trace of smoothed spectra
 		fig.add_trace(go.Scatter(
 			x=waves[i] / (z + 1),
 			y=convolve(fluxes[i], Box1DKernel(smooth)),
-			name=names[i], opacity=1 / 2, mode="lines"))
+			name=names[i], opacity=1 / 2, mode="lines", **kws))
 		# create "ghost trace" spanning the displayed observed wavelength range:
 		fig.add_trace(go.Scatter(
 			x=[x_min, x_max], y=[numpy.nan, numpy.nan], showlegend=False))
