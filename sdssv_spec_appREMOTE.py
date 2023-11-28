@@ -9,6 +9,7 @@ import math
 import sys
 from io import BytesIO
 from re import IGNORECASE, fullmatch
+from urllib.parse import urlsplit
 
 import dash
 import numpy
@@ -71,49 +72,83 @@ external_stylesheets = [ "https://codepen.io/chriddyp/pen/bWLwgP.css",
 ### Any necessary functions
 ###
 
-def SDSSV_buildURL(field, MJD, objID, branch: str):
+def SDSSV_buildURL(field: str, MJD: int, objID: str, branch: str):
 	"""
 	A function to build the url that will be used to fetch the data.
 
 	Field IDs don't start with zero but the URLs need leading zeroes;
 	using zfill(6) fixes this.
 	"""
-	if type(field) == int:
-		field = str(field).zfill(6)
-	url = f"https://data.sdss5.org/sas/sdsswork/bhm/boss/spectro/redux/{branch}/spectra/lite/" \
-		+ f"{field}/{MJD}/spec-{field}-{MJD}-{objID}.fits"
+	path = ""
+	file = f"spec-{field.rstrip("p")}-{MJD}-{objID}.fits"
+
+	if branch == "v5_4_45":
+		path = "https://data.sdss.org/sas/dr9/sdss/spectro/redux"
+	if branch == "v5_5_12":
+		path = "https://data.sdss.org/sas/dr10/sdss/spectro/redux"
+	if branch == "v5_6_5":
+		path = "https://data.sdss.org/sas/dr11/sdss/spectro/redux"
+	if branch == "v5_7_0" or branch == "v5_7_2":
+		path = "https://data.sdss.org/sas/dr12/sdss/spectro/redux"
+	if branch == "v5_9_0":
+		path = "https://data.sdss.org/sas/dr13/sdss/spectro/redux"
+	if branch == "v5_10_0":
+		path = "https://data.sdss.org/sas/dr15/sdss/spectro/redux"
+	if branch == "v5_13_0":
+		path = "https://data.sdss.org/sas/dr16/sdss/spectro/redux"
+	if branch == "v5_13_2":
+		path = "https://data.sdss.org/sas/dr18/spectro/sdss/redux"
+	if not path:
+		path = "https://data.sdss5.org/sas/sdsswork/bhm/boss/spectro/redux"
+		file = f"{MJD}/{file}"
+
+	url = f"{path}/{branch}/spectra/lite/{field}/{file}"
 	# print(url) # for testing
 	return url
 
-def SDSSV_fetch(username: str, password: str, field, MJD, objID, branch="v6_1_1"):
+def SDSSV_fetch(username: str, password: str, field, MJD: int, objID, branch=""):
 	"""
 	Fetches spectral data for a SDSS-RM object on a
 		specific field on a specific MJD. Uses the user
 		supplied authentication.
 	"""
-	if not (field and MJD and objID):
-		raise Exception((field, MJD, objID, "Error in SDSSV_fetch"))
+	if type(field) == str:
+		if fullmatch(r"\d+p", field):
+			branch = branch or "v6_0_4"
+	try:
+		if (field := int(field)) < 15000:
+			branch = branch or "v5_13_2"
+		else:
+			field = str(field).zfill(6)
+	except: None
+	field, objID = str(field), str(objID) # ensure type
+	branch = branch or "v6_1_1"
+	if (field, MJD, objID, branch) in cache:
+		return cache[(field, MJD, objID, branch)]
+	if not (field and MJD and objID and branch):
+		raise Exception((field, MJD, objID, branch, "Error in SDSSV_fetch"))
 	url = SDSSV_buildURL(field, MJD, objID, branch)
 	# print(url) # for testing
-	r = requests.get(url, auth=(username, password))
+	r = requests.get(url, auth=(username, password) if "/sdsswork/" in url else None)
 	r.raise_for_status()
-	print(url)
+	print(r.status_code, url)
 	HDUs = fits.open(BytesIO(r.content))
-	meta = HDUs[2].data
-	wave = 10**HDUs[1].data["LOGLAM"]
-	flux = HDUs[1].data["FLUX"]
+	meta = HDUs["SPALL"].data
+	wave = 10**HDUs["COADD"].data["LOGLAM"]
+	flux = HDUs["COADD"].data["FLUX"]
 	# print(flux) # for testing
-	return meta, wave, flux
+	cache[(field, MJD, objID, branch)] = meta, wave, flux
+	return cache[(field, MJD, objID, branch)]
 
-def fetch_catID(field, catID):
+def fetch_catID(field, catID, extra=""):
 	# print("fetch_catID", field, catID) # for testing
-	if not (field and catID):
+	if not (field and catID or extra):
 		raise Exception()
-		raise Exception((field, catID))
-	field = str(field).strip()
-	catID = str(catID).strip()
-	if (field, catID) in cache:
-		return cache[(field, catID)]
+	field = str(field).replace(" ", "")
+	catID = str(catID).replace(" ", "")
+	extra = str(extra).replace(" ", "")
+	if (field, catID, extra) in cache:
+		return cache[(field, catID, extra)]
 	wave, flux, name = [], [], []
 	# print(catID)
 	# # print("catalogIDs[catID]")
@@ -121,25 +156,46 @@ def fetch_catID(field, catID):
 	# print(testval)
 	data = catalogIDs.get(catID, [[None, None, None]]) # [(ZWARNING, Z, RCHI2), (FIELD, MJD, MJD_FINAL)...]
 	meta = data[0] # (ZWARNING, Z, RCHI2)
-	if fullmatch(r"\d+-\d+", field):
-		fid, mjd = field.split("-", 1)
-		fid, mjd = int(fid), int(mjd)
+	for x in extra.split(","):
+		x, branch = [*x.split("@", 1), ""][:2]
+		if not fullmatch(r"\d+p?-\d+-[^-](.*[^-])?", x): continue
+		fid, mjd, objID = x.split("-", 2)
+		mjd = int(mjd)
 		try:
-			dat = SDSSV_fetch(username, password, fid, mjd, catID, "master")
+			dat = SDSSV_fetch(username, password, fid, mjd, objID, branch)
+		except Exception as e:
+			if str(e): print(e)
+			continue
+		try:
+			mjd_f = dat[0]["MJD_FINAL"][0]
+		except:
+			mjd_f = dat[0]["MJD"][0]
+		wave.append(dat[1])
+		flux.append(dat[2])
+		name.append(mjd_f)
+	if fullmatch(r"\d+p?-\d+", field):
+		catID, branch = [*catID.split("@", 1), "master"][:2]
+		fid, mjd = field.split("-", 1)
+		mjd = int(mjd)
+		try:
+			dat = SDSSV_fetch(username, password, fid, mjd, catID, branch)
 		except:
 			dat = SDSSV_fetch(username, password, fid, mjd, catID)
 		if not meta[0]: meta[0] = dat[0]["ZWARNING"][0]
 		if not meta[1]: meta[1] = dat[0]["Z"][0]
 		if not meta[2]: meta[2] = dat[0]["RCHI2"][0]
+		try:
+			mjd_f = dat[0]["MJD_FINAL"][0]
+		except:
+			mjd_f = dat[0]["MJD"][0]
 		wave.append(dat[1])
 		flux.append(dat[2])
-		name.append(mjd)
+		name.append(mjd_f)
 		mjd_list = [mjd]
 	else:
 		mjd_list = []
-		for i in data[1:]: # (FIELD, MJD, MJD_FINAL)
-			fid, mjd, mjd_final = i
-			fid, mjd, mjd_final = int(fid), int(mjd), float(mjd_final)
+		for x in data[1:]: # (FIELD, MJD, MJD_FINAL)
+			fid, mjd, mjd_final = int(x[0]), int(x[1]), float(x[2])
 			if field == "all" or int(field) == fid:
 				# print("all", fid, i[1], catID) # for testing
 				dat = SDSSV_fetch(username, password, fid, mjd, catID)
@@ -177,9 +233,9 @@ def fetch_catID(field, catID):
 			break
 	# print(flux) # for testing
 	if not (meta and wave and flux and name):
-		raise Exception((field, catID, "Error in fetch_catID"))
-	cache[(field, catID)] = meta, wave, flux, name
-	return cache[(field, catID)]
+		raise Exception((field, catID, extra, "Error in fetch_catID"))
+	cache[(field, catID, extra)] = meta, wave, flux, name
+	return cache[(field, catID, extra)]
 
 
 
@@ -380,6 +436,14 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 					placeholder="CatalogID", value="",
 				)], id="catalogid_dropdown_div", hidden=False),
 
+			## extra object(s) list input (hidden, but can be used directly otherwise)
+			html.Div(className="col-xs-12", title="comma-seperated list", children=[
+				html.Label(
+					html.H4("Extra Object(s)"),
+				),
+				dcc.Input(
+					id="extra_obj_input", type="text", style={"height": "36px", "width": "100%"},
+				)], id="extra_obj_input_div", hidden=True),
 		]),
 		html.Div(className="col-lg-4 col-xs-12", style={"padding": "0"}, children=[
 
@@ -563,42 +627,40 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 ## switch between known program(s) or manual input
 # use values specified through `search` and `hash` if applicable
 # see https://developer.mozilla.org/docs/Web/API/Location for definition
-# ps: `search` and `hash` are cleared when program is no longer "(other)"
 @app.callback(
 	Output("fieldid_input_div", "hidden"),
 	Output("catalogid_input_div", "hidden"),
 	Output("fieldid_dropdown_div", "hidden"),
 	Output("catalogid_dropdown_div", "hidden"),
-	Output("window_location", "search"),
-	Output("window_location", "hash"),
+	Output("window_location", "href"),
 	Output("program_dropdown", "value"),
 	Output("fieldid_input", "value"),
 	Output("catalogid_input", "value"),
 	Output("redshift_input", "value", allow_duplicate=True),
-	Input("window_location", "search"),
-	Input("window_location", "hash"),
+	Input("window_location", "href"),
 	Input("program_dropdown", "value"),
 	prevent_initial_call="initial_duplicate")
-def set_input_or_dropdown(query, hash, program):
-	if query: query = str(query).lstrip("?")
-	if program and program != "(other)": query, hash = "", ""
-	fld_mjd, catalog, redshift = "", "", ""
-	hash = str(hash).lstrip("#").split("&") if hash else []
-	if query and fullmatch(r"\d+-\d+-[^-].+[^-]", query):
-		for x in hash:
-			if not fullmatch(r"[^=]+=[^=]+", x): continue
-			k, v = x.split("=", 1)
-			if k == "z": redshift = v
+def set_input_or_dropdown(location: str, program: str):
+	url = urlsplit(location) # <scheme>://<netloc>/<path>?<query>#<fragment>
+	search = url.query.lstrip("?")
+	hash = url.fragment.lstrip("#")
+	fid_mjd, catalog, redshift = "", "", ""
+	for x in search.split("&"):
+		if program: break
+		if not fullmatch(r"\d+p?-\d+-[^-](.*[^-])?", x): continue
 		program = "(other)"
-		fld_mjd = "-".join(query.split("-", 2)[:2])
-		catalog = "-".join(query.split("-", 2)[2:])
-	query = "?" + query if query else ""
-	hash = "#" + "&".join(hash) if hash else ""
-	ret = query, hash, program, fld_mjd, catalog, redshift
-	if program and program == "(other)":
-		return False, False, True, True, *ret
+		fid_mjd = "-".join(x.split("-", 2)[:2])
+		catalog = "-".join(x.split("-", 2)[2:])
+	for x in hash.split("&"):
+		if not fullmatch(r"[^=]+=[^=]+", x): continue
+		k, v = x.split("=", 1)
+		if k == "z": redshift = v
+	tt, ff = (True, True), (False, False)
+	ret = location, program, fid_mjd, catalog, redshift
+	if program == "(other)":
+		return *ff, *tt, *ret
 	else:
-		return True, True, False, False, *ret
+		return *tt, *ff, *ret
 
 ## dropdown menu
 @app.callback(
@@ -678,6 +740,18 @@ def set_redshift_stepping(z, step):
 		z = f"%0.{-int(math.log10(step))}f" % float(z)
 	return z, type, step
 
+# set extra object(s) list to plot for comparison
+@app.callback(
+	Output("extra_obj_input", "value"),
+	Input("window_location", "search"))
+def set_fieldid_options(search: str):
+	extra_obj = ""
+	for x in search.lstrip("?").split("&"):
+		if not fullmatch(r"[^=]+=[^=]+", x): continue
+		k, v = x.split("=", 1)
+		if k in ["ext", "extra", "prev", "previous"]: extra_obj = v
+	return extra_obj
+
 # reset axes range, smooth width, and redshift when any of program/fieldid/catid changes
 @app.callback(
 	Output("axis_y_max", "value"),
@@ -725,9 +799,9 @@ def hide_pipeline_redshift(checklist):
 	Output("redshift_sdss_rchi2", "value"),
 	Input("fieldid_dropdown", "value"),
 	Input("catalogid_dropdown", "value"))
-def show_pipeline_redshift(selected_fieldid, selected_catalogid):
+def show_pipeline_redshift(fieldid, catalogid):
 	try:
-		meta = fetch_catID(selected_fieldid, selected_catalogid)[0]
+		meta = fetch_catID(fieldid, catalogid)[0]
 		return meta[0], meta[1], meta[2]
 	except Exception as e:
 		if str(e): print(e)
@@ -739,6 +813,7 @@ def show_pipeline_redshift(selected_fieldid, selected_catalogid):
 	Output("redshift_input", "value"),
 	Input("fieldid_dropdown", "value"),
 	Input("catalogid_dropdown", "value"),
+	Input("extra_obj_input", "value"),
 	Input("redshift_input", "value"), # redshift_dropdown
 	Input("redshift_input", "step"),
 	Input("axis_y_max", "value"),
@@ -748,10 +823,10 @@ def show_pipeline_redshift(selected_fieldid, selected_catalogid):
 	Input("line_list_emi", "value"),
 	Input("line_list_abs", "value"),
 	Input("smooth_input", "value"))
-def make_multiepoch_spectra(selected_fieldid, selected_catalogid, redshift, redshift_step,
+def make_multiepoch_spectra(fieldid, catalogid, extra_obj, redshift, redshift_step,
                             y_max, y_min, x_max, x_min, list_emi, list_abs, smooth):
 	try:
-		meta, waves, fluxes, names = fetch_catID(selected_fieldid, selected_catalogid)
+		meta, waves, fluxes, names = fetch_catID(fieldid, catalogid, extra_obj)
 		if meta[1] and not redshift and redshift_step == "any": redshift = meta[1]
 		smooth, z = int(smooth or smooth_default), float(redshift or redshift_default)
 		# print("make_multiepoch_spectra try") # for testing
@@ -785,7 +860,7 @@ def make_multiepoch_spectra(selected_fieldid, selected_catalogid, redshift, reds
 		fig.add_trace(go.Scatter(
 			x=waves[i] / (z + 1),
 			y=convolve(fluxes[i], Box1DKernel(smooth)),
-			name=names[i], opacity=1 / 2, mode="lines", **kws))
+			name=str(names[i]), opacity=1 / 2, mode="lines", **kws))
 		# create "ghost trace" spanning the displayed observed wavelength range:
 		fig.add_trace(go.Scatter(
 			x=[x_min, x_max], y=[numpy.nan, numpy.nan], showlegend=False))

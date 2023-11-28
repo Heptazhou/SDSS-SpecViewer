@@ -63,16 +63,14 @@ const fits = try
 catch
 	throw(SystemError("*.fits", 2)) # ENOENT 2 No such file or directory
 end
-# FITS(fits)[2]
+# FITS(fits)["SPALL"]
 
-# const is_allepoch = endswith(splitext(fits)[1], "-allepoch")
-
-const df = @time @sync let cols = cols.keys
-	# cols = columnnames(FITS(fits)[2]) # uncomment this to read all columns
+const df = @time @sync let cols = cols.keys, n = "SPALL"
+	# cols = columnnames(FITS(fits)[n]) # uncomment this to read all columns
 	s_info("Reading ", length(cols), " column(s) from `$fits` (t = $(nthreads()))")
 	@threads for col ∈ cols
-		@eval $col = read(FITS($fits)[2], $(String(col)))
-		@eval $col isa Vector || ($col = collect(Vector{eltype($col)}, eachcol($col)))
+		@eval $col = read(FITS($fits)[$n], $(String(col)))
+		@eval $col isa Vector || ($col = eachslice($col, dims = ndims($col)))
 	end
 	@chain DataFrame(@eval (; $(cols...))) begin
 		@rsubset! :FIELDQUALITY ≡ "good"
