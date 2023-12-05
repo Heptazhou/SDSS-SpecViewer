@@ -80,7 +80,7 @@ def SDSSV_buildURL(field: str, MJD: int, objID: str, branch: str):
 	using zfill(6) fixes this.
 	"""
 	path = ""
-	file = f"spec-{field.rstrip("p")}-{MJD}-{objID}.fits"
+	file = f"spec-{field.rstrip('p')}-{MJD}-{objID}.fits"
 
 	if branch == "v5_4_45":
 		path = "https://data.sdss.org/sas/dr9/sdss/spectro/redux"
