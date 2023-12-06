@@ -7,8 +7,12 @@ Excelsior!
 import json
 import math
 import sys
+from base64 import b64decode
 from io import BytesIO
+from pathlib import Path
 from re import IGNORECASE, fullmatch
+from tempfile import TemporaryDirectory
+from traceback import print_exc
 from urllib.parse import urlsplit
 
 import dash
@@ -210,8 +214,8 @@ def fetch_catID(field, catID, extra=""):
 		if mjd <= 59392:
 			try:
 				dat = SDSSV_fetch(username, password, "allepoch", mjd, catID)
-			except Exception as e:
-				# if str(e): print(e)
+			except:
+				# print_exc()
 				continue
 			wave.append(dat[1])
 			flux.append(dat[2])
@@ -223,8 +227,8 @@ def fetch_catID(field, catID, extra=""):
 		if mjd >= 59393:
 			try:
 				dat = SDSSV_fetch(username, password, "allepoch", mjd, catID)
-			except Exception as e:
-				# if str(e): print(e)
+			except:
+				# print_exc()
 				continue
 			wave.append(dat[1])
 			flux.append(dat[2])
@@ -361,6 +365,9 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 	# https://dash.plotly.com/dash-core-components/location
 	dcc.Location(id="window_location", refresh=False),
 
+	# https://dash.plotly.com/dash-core-components/store
+	dcc.Store(id="dash-user-upload", storage_type="session"),
+
 	html.Div(className="row", children=[
 
 		html.Div(className="col-sm-8 col-xs-12", children=[
@@ -368,15 +375,22 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 		]),
 
 		html.Div(className="col-sm-4 col-xs-12", children=[
-			dcc.Checklist(id="extra_info_list", options={
-				"z": "detailed pipeline redshift",
+			dcc.Checklist(id="extra_func_list", options={
+				"z": "pipeline redshift",
+				"u": "file uploader",
 			},
-				value=["z"], inline=True,
-				style={"marginTop": "20px", "float": "right"},
+				value=["z"], inline=True, persistence=True, persistence_type="session",
+				style={"marginTop": "20px", "display": "flex", "flexFlow": "wrap"},
 				inputStyle={"marginRight": "5px"},
+				labelStyle={"marginRight": "55px", "whiteSpace": "nowrap"},
 			),
-		]),
 
+			html.Div(dcc.Upload(html.Div([
+				html.Br(), html.H4("Drag and drop / select file(s)"), html.Br(),
+			], style={"margin": "0 20px", "textAlign": "center"}),
+				id="file_ul", multiple=True, style={"border": "1px dashed", "borderRadius": "5px"},
+			), id="file_ul_div", hidden=True, style={"margin": "20px 0", "width": "100%"}),
+		]),
 	]),
 
 	html.Div(className="row", children=[
@@ -442,7 +456,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 					html.H4("Extra Object(s)"),
 				),
 				dcc.Input(
-					id="extra_obj_input", type="text", style={"height": "36px", "width": "100%"},
+					id="extra_obj_input", type="text", value="", style={"height": "36px", "width": "100%"},
 				)], id="extra_obj_input_div", hidden=True),
 		]),
 		html.Div(className="col-lg-4 col-xs-12", style={"padding": "0"}, children=[
@@ -480,7 +494,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 				html.H4("Z", style={"color": "grey"}),
 			),
 			dcc.Input(
-				id="redshift_sdss_z", placeholder="N/A", readOnly=True,
+				id="redshift_sdss_z", placeholder="N/A", value="", readOnly=True,
 				style={"height": "36px", "width": "100%"}, inputMode="numeric",
 			)]),
 
@@ -490,7 +504,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 				html.H4("RCHI2", style={"color": "grey"}),
 			),
 			dcc.Input(
-				id="redshift_sdss_rchi2", placeholder="N/A", readOnly=True,
+				id="redshift_sdss_rchi2", placeholder="N/A", value="", readOnly=True,
 				style={"height": "36px", "width": "100%"}, inputMode="numeric",
 			)]),
 
@@ -500,7 +514,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 				html.H4("ZWARNING", style={"color": "grey"}),
 			),
 			dcc.Input(
-				id="redshift_sdss_zwarning", placeholder="N/A", readOnly=True,
+				id="redshift_sdss_zwarning", placeholder="N/A", value="", readOnly=True,
 				style={"height": "36px", "width": "100%"}, inputMode="numeric",
 			)]),
 
@@ -787,10 +801,40 @@ def reset_on_obj_change(y_max, y_min, x_max, x_min, redshift, redshift_step, has
 			if k == "x" and fullmatch(r"[^,]+,[^,]+", v): x_min, x_max = v.split(",", 1)
 	return y_max, y_min, x_max, x_min, redshift_step, redshift, smooth
 
+## show/hide file upload div
+@app.callback(
+	Output("file_ul_div", "hidden"),
+	Input("extra_func_list", "value"))
+def hide_file_upload(checklist):
+	return "u" not in checklist
+@app.callback(
+	Output("dash-user-upload", "data"),
+	State("dash-user-upload", "data"),
+	Input("file_ul", "contents"),
+	Input("file_ul", "filename"),
+	Input("file_ul", "last_modified"))
+def process_upload(sto: dict, contents: list[str], filename: list[str], timestamp: list[float]):
+	if not contents: return sto
+	if not sto: sto = dict()
+	with TemporaryDirectory(prefix="py_", ignore_cleanup_errors=True) as tmpdir:
+		tmpdir = Path(tmpdir)
+		# print(tmpdir)
+		for s, f, t in zip(contents, filename, timestamp):
+			try:
+				# print((s[:100], f, t))
+				mime, data = s.split(",", 1)
+				f = tmpdir / f
+				with open(f, mode="w+") as io:
+					io.write(b64decode(data).decode())
+				a = numpy.genfromtxt(f).transpose()
+				sto[f.stem] = a
+			except: print_exc()
+	return sto
+
 ## hide/show pipeline redshift info
 @app.callback(
 	Output("pipeline_redshift", "hidden"),
-	Input("extra_info_list", "value"))
+	Input("extra_func_list", "value"))
 def hide_pipeline_redshift(checklist):
 	return "z" not in checklist
 @app.callback(
@@ -803,8 +847,8 @@ def show_pipeline_redshift(fieldid, catalogid):
 	try:
 		meta = fetch_catID(fieldid, catalogid)[0]
 		return meta[0], meta[1], meta[2]
-	except Exception as e:
-		if str(e): print(e)
+	except:
+		print_exc()
 		return None, None, None
 
 ## plot the spectra
@@ -822,86 +866,100 @@ def show_pipeline_redshift(fieldid, catalogid):
 	Input("axis_x_min", "value"),
 	Input("line_list_emi", "value"),
 	Input("line_list_abs", "value"),
-	Input("smooth_input", "value"))
+	Input("smooth_input", "value"),
+	Input("dash-user-upload", "data"))
 def make_multiepoch_spectra(fieldid, catalogid, extra_obj, redshift, redshift_step,
-                            y_max, y_min, x_max, x_min, list_emi, list_abs, smooth):
+                            y_max, y_min, x_max, x_min, list_emi, list_abs, smooth,
+                            user_data: dict):
+	waves, fluxes, names = list(), list(), list()
+	if user_data:
+		for k, v in user_data.items():
+			try: #
+				wave, flux, name = numpy.asarray(v[0]), numpy.asarray(v[1]), str(k)
+				# print((wave, flux, name))
+				waves.append(wave), fluxes.append(flux), names.append(name)
+			except: print_exc()
+	noop_size = len(waves)
 	try:
-		meta, waves, fluxes, names = fetch_catID(fieldid, catalogid, extra_obj)
+		meta, _waves, _fluxes, _names = fetch_catID(fieldid, catalogid, extra_obj)
+		waves.extend(_waves), fluxes.extend(_fluxes), names.extend(_names)
 		if meta[1] and not redshift and redshift_step == "any": redshift = meta[1]
 		smooth, z = int(smooth or smooth_default), float(redshift or redshift_default)
-		# print("make_multiepoch_spectra try") # for testing
-	except Exception as e:
-		if str(e): print(e)
-		# print("make_multiepoch_spectra except") # for testing
+	except:
+		print_exc()
 		return go.Figure(), redshift
 
-	if not y_min and not y_max: y_min, y_max = y_min_default, y_max_default
-	if not x_min and not x_max: x_min, x_max = int(wave_max), int(wave_min)
-	y_min, y_max = int(y_min or 0), int(y_max or 0)
-	x_min, x_max = int(x_min or 0), int(x_max or 0)
-	if y_max < y_min: y_min, y_max = y_max, y_min
-	if x_max < x_min: x_min, x_max = x_max, x_min
-	# changed following to explicitly be in rest frame (bottom x axis)
-	rest_x_max = math.ceil(x_max / (z + 1))
-	rest_x_min = math.floor(x_min / (z + 1))
+	try:
 
-	fig = go.Figure()
-	fig.layout.yaxis.range = [y_min, y_max]
-	fig.layout.xaxis.range = [rest_x_min, rest_x_max]
+		if not y_min and not y_max: y_min, y_max = y_min_default, y_max_default
+		if not x_min and not x_max: x_min, x_max = int(wave_max), int(wave_min)
+		y_min, y_max = int(y_min or 0), int(y_max or 0)
+		x_min, x_max = int(x_min or 0), int(x_max or 0)
+		if y_max < y_min: y_min, y_max = y_max, y_min
+		if x_max < x_min: x_min, x_max = x_max, x_min
+		# changed following to explicitly be in rest frame (bottom x axis)
+		rest_x_max = math.ceil(x_max / (z + 1))
+		rest_x_min = math.floor(x_min / (z + 1))
 
-	# For each spectrum "i" in the list
-	for i in range(0, len(waves)):
-		kws = dict()
-		if fullmatch(r"allplate-\d+.*", str(names[i]), IGNORECASE):
-			kws = dict(line_color="#606060")
-		if fullmatch(r"allFPS-\d+.*", str(names[i]), IGNORECASE):
-			kws = dict(line_color="#000000")
-		# create trace of smoothed spectra
-		fig.add_trace(go.Scatter(
-			x=waves[i] / (z + 1),
-			y=convolve(fluxes[i], Box1DKernel(smooth)),
-			name=str(names[i]), opacity=1 / 2, mode="lines", **kws))
-		# create "ghost trace" spanning the displayed observed wavelength range:
-		fig.add_trace(go.Scatter(
-			x=[x_min, x_max], y=[numpy.nan, numpy.nan], showlegend=False))
-	fig.data[1].xaxis = "x2" # assign the "ghost trace" to a new axis object
+		fig = go.Figure()
+		fig.layout.yaxis.range = [y_min, y_max]
+		fig.layout.xaxis.range = [rest_x_min, rest_x_max]
 
-	for i in spec_line_emi: # emission
-		j, x = i[2], i[1] # j is the label, x is the wavelength
-		if x not in list_emi: continue # skip if the wavelength is not in the active plotting dictionary
-		x = float(x)
-		if (rest_x_min <= x and x <= rest_x_max):
-			fig.add_vline(x=x, line_dash="solid", opacity=1 / 4)
-			fig.add_annotation(x=x, y=y_max, text=j, hovertext=f" {j} ({x} Å)", textangle=70)
+		# For each spectrum "i" in the list
+		for i in range(0, len(waves)):
+			kws = dict()
+			if fullmatch(r"allplate-\d+.*", str(names[i]), IGNORECASE):
+				kws = dict(line_color="#606060")
+			if fullmatch(r"allFPS-\d+.*", str(names[i]), IGNORECASE):
+				kws = dict(line_color="#000000")
+			# create trace of smoothed spectra
+			fig.add_trace(go.Scatter(
+				x=waves[i] if i < noop_size else waves[i] / (z + 1),
+				y=convolve(fluxes[i], Box1DKernel(smooth)),
+				name=str(names[i]), opacity=1 / 2, mode="lines", **kws))
+			# create "ghost trace" spanning the displayed observed wavelength range:
+			fig.add_trace(go.Scatter(
+				x=[x_min, x_max], y=[numpy.nan, numpy.nan], showlegend=False))
+		fig.data[1].xaxis = "x2" # assign the "ghost trace" to a new axis object
 
-	for i in spec_line_abs: # absorption
-		j, xs = i[3], i[2].split() # j is the label, xs is the wavelength list
-		# j, xs, n, b = i[3], i[2].split(), i[1], bool(i[0]) # j = label, xs = wavelength list, n = multiplicity, b = 0/1
-		labeled = False # reset labeling flag
-		if xs[0] not in list_abs: continue # skip if the transition is not in the active plotting dictionary
-		for x in (xs := list(map(float, xs))): # for each wavelength in the wavelength list
+		for i in spec_line_emi: # emission
+			j, x = i[2], i[1] # j is the label, x is the wavelength
+			if x not in list_emi: continue # skip if the wavelength is not in the active plotting dictionary
+			x = float(x)
 			if (rest_x_min <= x and x <= rest_x_max):
-				fig.add_vline(x=x, line_dash="dot", opacity=1 / 2)
-				# label the first entry in the list of wavelengths
-				labeled or fig.add_annotation(x=x, y=y_min, text=j, hovertext=f" {j} ({xs} Å)", textangle=70)
-				labeled = True
+				fig.add_vline(x=x, line_dash="solid", opacity=1 / 4)
+				fig.add_annotation(x=x, y=y_max, text=j, hovertext=f" {j} ({x} Å)", textangle=70)
 
-	fig.update_layout( # Rest wavelengths on top axis; observed wavelengths on bottom axis
-		xaxis1={"side": "top", "title_text": "Rest-Frame Wavelength (Å)"},
-		xaxis2={"anchor": "y", "overlaying": "x", "title_text": "Observed Wavelength (Å)"},
-	)
+		for i in spec_line_abs: # absorption
+			j, xs = i[3], i[2].split() # j is the label, xs is the wavelength list
+			# j, xs, n, b = i[3], i[2].split(), i[1], bool(i[0]) # j = label, xs = wavelength list, n = multiplicity, b = 0/1
+			labeled = False # reset labeling flag
+			if xs[0] not in list_abs: continue # skip if the transition is not in the active plotting dictionary
+			for x in (xs := list(map(float, xs))): # for each wavelength in the wavelength list
+				if (rest_x_min <= x and x <= rest_x_max):
+					fig.add_vline(x=x, line_dash="dot", opacity=1 / 2)
+					# label the first entry in the list of wavelengths
+					labeled or fig.add_annotation(x=x, y=y_min, text=j, hovertext=f" {j} ({xs} Å)", textangle=70)
+					labeled = True
 
-	fig.update_layout(xaxis2_range=[x_min, x_max]) # this line is necessary for some reason
+		fig.update_layout( # Rest wavelengths on top axis; observed wavelengths on bottom axis
+			xaxis1={"side": "top", "title_text": "Rest-Frame Wavelength (Å)"},
+			xaxis2={"anchor": "y", "overlaying": "x", "title_text": "Observed Wavelength (Å)"},
+		)
 
-	# fig.update_layout(title_text="Add Info for Plot Title Here")
+		fig.update_layout(xaxis2_range=[x_min, x_max]) # this line is necessary for some reason
+
+		# fig.update_layout(title_text="Add Info for Plot Title Here")
+
+	except: print_exc()
 
 	return fig, redshift
 
 
 
 if __name__ == "__main__":
-	# app.run_server(debug=True)
-	# app.run_server(host="0.0.0.0", port=8050, debug=True)
-	app.run_server(host="127.0.0.1", port=8050, debug=True)
+	# app.run_server(threaded=True, debug=True)
+	# app.run_server(host="0.0.0.0", port=8050, threaded=True, debug=True)
+	app.run_server(host="127.0.0.1", port=8050, threaded=True, debug=True)
 
 
