@@ -646,7 +646,7 @@ def set_input_or_dropdown(location: str, program: str):
 	hash = url.fragment.lstrip("#")
 	fid_mjd, catalog, redshift = "", "", ""
 	for x in search.split("&"):
-		if program: break
+		if program and program != "(other)": break
 		if not fullmatch(r"\d+p?-\d+-[^-](.*[^-])?", x): continue
 		program = "(other)"
 		fid_mjd = "-".join(x.split("-", 2)[:2])
