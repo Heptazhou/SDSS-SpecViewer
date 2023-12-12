@@ -168,7 +168,7 @@ def fetch_catID(field, catID, extra=""):
 		try:
 			dat = SDSSV_fetch(username, password, fid, mjd, objID, branch)
 		except Exception as e:
-			if str(e): print(e)
+			if str(e): print_exc()
 			continue
 		try:
 			mjd_f = dat[0]["MJD_FINAL"][0]
@@ -214,8 +214,8 @@ def fetch_catID(field, catID, extra=""):
 		if mjd <= 59392:
 			try:
 				dat = SDSSV_fetch(username, password, "allepoch", mjd, catID)
-			except:
-				# print_exc()
+			except Exception as e:
+				# if str(e): print_exc()
 				continue
 			wave.append(dat[1])
 			flux.append(dat[2])
@@ -227,8 +227,8 @@ def fetch_catID(field, catID, extra=""):
 		if mjd >= 59393:
 			try:
 				dat = SDSSV_fetch(username, password, "allepoch", mjd, catID)
-			except:
-				# print_exc()
+			except Exception as e:
+				# if str(e): print_exc()
 				continue
 			wave.append(dat[1])
 			flux.append(dat[2])
@@ -709,14 +709,11 @@ def set_catalogid_options(selected_fieldid, selected_program):
 def set_fieldid_value(available_fieldid_options, input, program):
 	try:
 		if program and program == "(other)": return input or ""
-		# print("set_fieldid_value", available_fieldid_options[0]["value"], available_catalogid_options[0]["value"]) # for testing
-		# uncomment the following line if you prefer to automatically choose the first field in the program
+		# uncomment the following line to automatically choose the first field in the program
 		# return available_fieldid_options[0]["value"]
 		return ""
 	except Exception as e:
-		if str(e): print(e)
-		# print("set_fieldid_value except", available_fieldid_options) # for testing
-		# print("set_fieldid_value except") # for testing
+		if str(e): print_exc()
 		return ""
 
 @app.callback(
@@ -727,13 +724,11 @@ def set_fieldid_value(available_fieldid_options, input, program):
 def set_catalogid_value(available_catalogid_options, input, program):
 	try:
 		if program and program == "(other)": return input or ""
-		# print("set_catalogid_value", available_catalogid_options[0]["value"]) # for testing
-		# uncomment the following line if you prefer to automatically choose the first catid in the field
+		# uncomment the following line to automatically choose the first catid in the field
 		# return available_catalogid_options[0]["value"]
 		return ""
 	except Exception as e:
-		if str(e): print(e)
-		# print("set_catalogid_value except", catalogid_dropdown) # for testing
+		if str(e): print_exc()
 		return ""
 
 # enable/disable stepping for the redshift input (see comment in the beginning of the file)
@@ -847,8 +842,8 @@ def show_pipeline_redshift(fieldid, catalogid):
 	try:
 		meta = fetch_catID(fieldid, catalogid)[0]
 		return meta[0], meta[1], meta[2]
-	except:
-		print_exc()
+	except Exception as e:
+		if str(e): print_exc()
 		return None, None, None
 
 ## plot the spectra
@@ -885,8 +880,8 @@ def make_multiepoch_spectra(fieldid, catalogid, extra_obj, redshift, redshift_st
 		waves.extend(_waves), fluxes.extend(_fluxes), names.extend(_names)
 		if meta[1] and not redshift and redshift_step == "any": redshift = meta[1]
 		smooth, z = int(smooth or smooth_default), float(redshift or redshift_default)
-	except:
-		print_exc()
+	except Exception as e:
+		if str(e): print_exc()
 		return go.Figure(), redshift
 
 	try:
