@@ -33,7 +33,7 @@ dictionaries = json.load(open("dictionaries.txt"))
 authentication = "authentication.txt"
 programs: dict[str, list[int]] = dictionaries[0]
 fieldIDs: dict[str, list[int]] = dictionaries[1]
-catalogIDs: dict[str, list[list]] = dictionaries[2]
+catalogIDs: dict[str, list[list | int]] = dictionaries[2]
 
 # for testing
 # print(programs)
@@ -126,7 +126,14 @@ def SDSSV_fetch(username: str, password: str, field, MJD: int, objID, branch="")
 			field = str(field).zfill(6)
 	except: None
 	field, objID = str(field), str(objID) # ensure type
-	branch = branch or "v6_1_1"
+
+	if not branch:
+		try:
+			r = SDSSV_fetch(username, password, field, MJD, objID, "master")
+		except:
+			r = SDSSV_fetch(username, password, field, MJD, objID, "v6_1_1")
+		return tuple(r) # ensure type
+
 	if (field, MJD, objID, branch) in cache:
 		return cache[(field, MJD, objID, branch)]
 	if not (field and MJD and objID and branch):
@@ -158,8 +165,8 @@ def fetch_catID(field, catID, extra=""):
 	# # print("catalogIDs[catID]")
 	# testval = catalogIDs[catID]
 	# print(testval)
-	data = catalogIDs.get(catID, [[None, None, None]]) # [(ZWARNING, Z, RCHI2), (FIELD, MJD, MJD_FINAL)...]
-	meta = data[0] # (ZWARNING, Z, RCHI2)
+	data = catalogIDs.get(catID, [[]]) # [(ZWARNING, Z, RCHI2), {FIELD,J2K}...]
+	meta = list(data[0] or [None, None, None]) # (ZWARNING, Z, RCHI2)
 	for x in extra.split(","):
 		x, branch = [*x.split("@", 1), ""][:2]
 		if not fullmatch(r"\d+p?-\d+-[^-](.*[^-])?", x): continue
@@ -178,13 +185,14 @@ def fetch_catID(field, catID, extra=""):
 		flux.append(dat[2])
 		name.append(mjd_f)
 	if fullmatch(r"\d+p?-\d+", field):
-		catID, branch = [*catID.split("@", 1), "master"][:2]
+		catID, branch = [*catID.split("@", 1), ""][:2]
 		fid, mjd = field.split("-", 1)
 		mjd = int(mjd)
 		try:
 			dat = SDSSV_fetch(username, password, fid, mjd, catID, branch)
-		except:
-			dat = SDSSV_fetch(username, password, fid, mjd, catID)
+		except Exception as e:
+			if str(e): print_exc()
+			raise
 		if not meta[0]: meta[0] = dat[0]["ZWARNING"][0]
 		if not meta[1]: meta[1] = dat[0]["Z"][0]
 		if not meta[2]: meta[2] = dat[0]["RCHI2"][0]
@@ -198,14 +206,19 @@ def fetch_catID(field, catID, extra=""):
 		mjd_list = [mjd]
 	else:
 		mjd_list = []
-		for x in data[1:]: # (FIELD, MJD, MJD_FINAL)
-			fid, mjd, mjd_final = int(x[0]), int(x[1]), float(x[2])
+		for x in data[1:]: # {13'FIELD,5'J2K}
+			fid, j2k = map(int, divmod(int(x), 10**5))
 			if field == "all" or int(field) == fid:
 				# print("all", fid, i[1], catID) # for testing
+				mjd = j2k + 51544 # +2000-01-01 == MJD 51544
 				dat = SDSSV_fetch(username, password, fid, mjd, catID)
+				try:
+					mjd_f = dat[0]["MJD_FINAL"][0]
+				except:
+					mjd_f = dat[0]["MJD"][0]
 				wave.append(dat[1])
 				flux.append(dat[2])
-				name.append(mjd_final)
+				name.append(mjd_f)
 				if mjd not in mjd_list: mjd_list.append(mjd)
 	mjd_list.sort(reverse=True)
 	# print(mjd_list)
