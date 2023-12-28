@@ -23,6 +23,7 @@ from astropy.convolution import Box1DKernel, convolve
 from astropy.io import fits
 from dash import dcc, html
 from dash.dependencies import Input, Output, State
+from requests.exceptions import HTTPError
 
 ###
 ### input the data directory path
@@ -53,7 +54,7 @@ redshift_default = 0
 redshift = None
 stepping = None
 
-# global dict to save results of `fetch_catID`, which greatly improves responsiveness after the first plot
+# global dict to save results of `SDSSV_fetch` and `fetch_catID`
 cache: dict[tuple, tuple] = {}
 
 # default y-axis range of spectrum plots
@@ -128,16 +129,19 @@ def SDSSV_fetch(username: str, password: str, field, MJD: int, objID, branch="")
 	field, objID = str(field), str(objID) # ensure type
 
 	if not branch:
-		try:
-			r = SDSSV_fetch(username, password, field, MJD, objID, "master")
-		except:
-			r = SDSSV_fetch(username, password, field, MJD, objID, "v6_1_1")
-		return tuple(r) # ensure type
+		for v in ("master", "v6_1_2", "v6_1_1"):
+			try:
+				r = SDSSV_fetch(username, password, field, MJD, objID, v)
+				return tuple(r) # ensure type
+			except:
+				continue
+		# all attempts have failed
 
 	if (field, MJD, objID, branch) in cache:
 		return cache[(field, MJD, objID, branch)]
 	if not (field and MJD and objID and branch):
-		raise Exception((field, MJD, objID, branch, "Error in SDSSV_fetch"))
+		raise Exception("SDSSV_fetch failed for " + (field, MJD, objID, branch))
+
 	url = SDSSV_buildURL(field, MJD, objID, branch)
 	# print(url) # for testing
 	r = requests.get(url, auth=(username, password) if "/sdsswork/" in url else None)
@@ -175,7 +179,7 @@ def fetch_catID(field, catID, extra=""):
 		try:
 			dat = SDSSV_fetch(username, password, fid, mjd, objID, branch)
 		except Exception as e:
-			if str(e): print_exc()
+			if str(e): print(e) if isinstance(e, HTTPError) else print_exc()
 			continue
 		try:
 			mjd_f = dat[0]["MJD_FINAL"][0]
@@ -191,7 +195,7 @@ def fetch_catID(field, catID, extra=""):
 		try:
 			dat = SDSSV_fetch(username, password, fid, mjd, catID, branch)
 		except Exception as e:
-			if str(e): print_exc()
+			if str(e): print(e) if isinstance(e, HTTPError) else print_exc()
 			raise
 		if not meta[0]: meta[0] = dat[0]["ZWARNING"][0]
 		if not meta[1]: meta[1] = dat[0]["Z"][0]
@@ -228,7 +232,7 @@ def fetch_catID(field, catID, extra=""):
 			try:
 				dat = SDSSV_fetch(username, password, "allepoch", mjd, catID)
 			except Exception as e:
-				# if str(e): print_exc()
+				# if str(e): print(e) if isinstance(e, HTTPError) else print_exc()
 				continue
 			wave.append(dat[1])
 			flux.append(dat[2])
@@ -241,7 +245,7 @@ def fetch_catID(field, catID, extra=""):
 			try:
 				dat = SDSSV_fetch(username, password, "allepoch", mjd, catID)
 			except Exception as e:
-				# if str(e): print_exc()
+				# if str(e): print(e) if isinstance(e, HTTPError) else print_exc()
 				continue
 			wave.append(dat[1])
 			flux.append(dat[2])
@@ -250,9 +254,10 @@ def fetch_catID(field, catID, extra=""):
 			break
 	# print(flux) # for testing
 	if not (meta and wave and flux and name):
-		raise Exception((field, catID, extra, "Error in fetch_catID"))
-	cache[(field, catID, extra)] = meta, wave, flux, name
-	return cache[(field, catID, extra)]
+		raise Exception("fetch_catID failed for " + (field, catID, extra))
+	r = meta, wave, flux, name
+	cache[(field, catID, extra)] = r
+	return r
 
 
 
@@ -390,9 +395,10 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 		html.Div(className="col-sm-4 col-xs-12", children=[
 			dcc.Checklist(id="extra_func_list", options={
 				"z": "pipeline redshift",
+				"p": "auto match program",
 				"u": "file uploader",
 			},
-				value=["z"], inline=True, persistence=True, persistence_type="session",
+				value=["z", "p"], inline=True, persistence=True, persistence_type="local",
 				style={"marginTop": "20px", "display": "flex", "flexFlow": "wrap"},
 				inputStyle={"marginRight": "5px"},
 				labelStyle={"marginRight": "55px", "whiteSpace": "nowrap"},
@@ -666,8 +672,9 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 	Output("redshift_input", "value", allow_duplicate=True),
 	Input("window_location", "href"),
 	Input("program_dropdown", "value"),
+	State("extra_func_list", "value"),
 	prevent_initial_call="initial_duplicate")
-def set_input_or_dropdown(location: str, program: str):
+def set_input_or_dropdown(location: str, program: str, checklist: list[str]):
 	url = urlsplit(location) # <scheme>://<netloc>/<path>?<query>#<fragment>
 	search = url.query.lstrip("?")
 	hash = url.fragment.lstrip("#")
@@ -682,6 +689,15 @@ def set_input_or_dropdown(location: str, program: str):
 		if not fullmatch(r"[^=]+=[^=]+", x): continue
 		k, v = x.split("=", 1)
 		if k == "z": redshift = v
+	if program == "(other)" and "p" in checklist:
+		field = int(fid_mjd.split("-", 2)[0])
+		catid = int(catalog)
+		for prog in programs.keys():
+			if field not in programs.get(f"{prog    }", []): continue
+			if catid not in fieldIDs.get(f"{field   }", []): continue
+			if catid not in fieldIDs.get(f"{prog}-all", []): continue
+			program = prog
+
 	tt, ff = (True, True), (False, False)
 	ret = location, program, fid_mjd, catalog, redshift
 	if program == "(other)":
@@ -719,9 +735,11 @@ def set_catalogid_options(selected_fieldid, selected_program):
 	Input("fieldid_dropdown", "options"),
 	Input("fieldid_input", "value"),
 	State("program_dropdown", "value"))
-def set_fieldid_value(available_fieldid_options, input, program):
+def set_fieldid_value(available_fieldid_options, input: str, program: str):
+	try: input = str(int(input.split("-", 2)[0]))
+	except: None
 	try:
-		if program and program == "(other)": return input or ""
+		if program: return input or ""
 		# uncomment the following line to automatically choose the first field in the program
 		# return available_fieldid_options[0]["value"]
 		return ""
@@ -734,9 +752,9 @@ def set_fieldid_value(available_fieldid_options, input, program):
 	Input("catalogid_dropdown", "options"),
 	Input("catalogid_input", "value"),
 	State("program_dropdown", "value"))
-def set_catalogid_value(available_catalogid_options, input, program):
+def set_catalogid_value(available_catalogid_options, input: str, program: str):
 	try:
-		if program and program == "(other)": return input or ""
+		if program: return input or ""
 		# uncomment the following line to automatically choose the first catid in the field
 		# return available_catalogid_options[0]["value"]
 		return ""
@@ -813,7 +831,7 @@ def reset_on_obj_change(y_max, y_min, x_max, x_min, redshift, redshift_step, has
 @app.callback(
 	Output("file_ul_div", "hidden"),
 	Input("extra_func_list", "value"))
-def hide_file_upload(checklist):
+def hide_file_upload(checklist: list[str]):
 	return "u" not in checklist
 @app.callback(
 	Output("dash-user-upload", "data"),
@@ -843,7 +861,7 @@ def process_upload(sto: dict, contents: list[str], filename: list[str], timestam
 @app.callback(
 	Output("pipeline_redshift", "hidden"),
 	Input("extra_func_list", "value"))
-def hide_pipeline_redshift(checklist):
+def hide_pipeline_redshift(checklist: list[str]):
 	return "z" not in checklist
 @app.callback(
 	Output("redshift_sdss_zwarning", "value"),
@@ -856,7 +874,7 @@ def show_pipeline_redshift(fieldid, catalogid):
 		meta = fetch_catID(fieldid, catalogid)[0]
 		return meta[0], meta[1], meta[2]
 	except Exception as e:
-		if str(e): print_exc()
+		if str(e): print(e) if isinstance(e, HTTPError) else print_exc()
 		return None, None, None
 
 ## plot the spectra
@@ -894,7 +912,7 @@ def make_multiepoch_spectra(fieldid, catalogid, extra_obj, redshift, redshift_st
 		if meta[1] and not redshift and redshift_step == "any": redshift = meta[1]
 		smooth, z = int(smooth or smooth_default), float(redshift or redshift_default)
 	except Exception as e:
-		if str(e): print_exc()
+		if str(e): print(e) if isinstance(e, HTTPError) else print_exc()
 		return go.Figure(), redshift
 
 	try:
@@ -966,8 +984,8 @@ def make_multiepoch_spectra(fieldid, catalogid, extra_obj, redshift, redshift_st
 
 
 if __name__ == "__main__":
-	# app.run_server(threaded=True, debug=True)
-	# app.run_server(host="0.0.0.0", port=8050, threaded=True, debug=True)
-	app.run_server(host="127.0.0.1", port=8050, threaded=True, debug=True)
+	# app.run(threaded=True, debug=True)
+	# app.run(host="0.0.0.0", port=8050, threaded=True, debug=True)
+	app.run(host="127.0.0.1", port=8050, threaded=True, debug=True)
 
 

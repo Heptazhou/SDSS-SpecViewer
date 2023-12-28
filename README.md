@@ -39,9 +39,9 @@ python sdssv_spec_appREMOTE.py
 
 ### Keeping up-to-date
 
-The `dictionaries.txt` file is the backbone to this tool. By running the `update_dictionaries.jl` file, it will look for a FITS file (e.g., `spAll-lite-v6_1_1.fits`) on your local machine and update said dictionary file. Runtime was ~50s on AMD Zen 1, or ~30s on AMD Zen 3, FWIW. The file provided here is up-to-date for BHM targets ***for GOOD fields ONLY*** as of 2023-10-16.
+The `dictionaries.txt` file is the backbone to this tool. By running the `update_dictionaries.jl` file, it will look for FITS file(s) (e.g., `spAll-lite-master.fits`) on your local machine and update said dictionary file. Runtime was ~50s on AMD Zen 1, or ~30s on AMD Zen 3, FWIW. The file provided here is up-to-date for BHM targets ***for GOOD fields ONLY*** as of 2023-12-27.
 
-To update `dictionaries.txt`, please have the FITS file ready, and do:
+To update `dictionaries.txt`, please have the FITS file(s) ready, and do:
 1.	Install latest version of [Julia](https://julialang.org/) (you could either install the [official binary](https://julialang.org/downloads/) or install it with your package manager of choice).
 2.	Install/update the needed packages by:
 
