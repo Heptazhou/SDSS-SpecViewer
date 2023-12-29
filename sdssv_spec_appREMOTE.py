@@ -81,8 +81,8 @@ def SDSSV_buildURL(field: str, MJD: int, objID: str, branch: str):
 	"""
 	A function to build the url that will be used to fetch the data.
 
-	Field IDs don't start with zero but the URLs need leading zeroes;
-	using zfill(6) fixes this.
+	Field ID may require leading zero(es),
+	use str.zfill(6) to fix it.
 	"""
 	path = ""
 	file = f"spec-{field.rstrip('p')}-{MJD}-{objID}.fits" # PBH
@@ -111,10 +111,11 @@ def SDSSV_buildURL(field: str, MJD: int, objID: str, branch: str):
 	# print(url) # for testing
 	return url
 
-def SDSSV_fetch(username: str, password: str, field, MJD: int, objID, branch=""):
+def SDSSV_fetch(username: str, password: str, field, MJD: int, objID, branch="") \
+	-> tuple[list, list, list]:
 	"""
-	Fetches spectral data for a SDSS-RM object on a
-		specific field on a specific MJD. Uses the user
+	Fetch spectral data for a SDSS-RM object on a
+		specific field on a specific MJD, using the user
 		supplied authentication.
 	"""
 	if type(field) == str:
@@ -132,7 +133,7 @@ def SDSSV_fetch(username: str, password: str, field, MJD: int, objID, branch="")
 		for v in ("master", "v6_1_2", "v6_1_1"):
 			try:
 				r = SDSSV_fetch(username, password, field, MJD, objID, v)
-				return tuple(r) # ensure type
+				return r
 			except:
 				continue
 		# all attempts have failed
@@ -155,7 +156,7 @@ def SDSSV_fetch(username: str, password: str, field, MJD: int, objID, branch="")
 	cache[(field, MJD, objID, branch)] = meta, wave, flux
 	return cache[(field, MJD, objID, branch)]
 
-def fetch_catID(field, catID, extra=""):
+def fetch_catID(field, catID, extra="") -> tuple[list, list, list, list]:
 	# print("fetch_catID", field, catID) # for testing
 	if not (field and catID or extra):
 		raise Exception()
@@ -164,7 +165,7 @@ def fetch_catID(field, catID, extra=""):
 	extra = str(extra).replace(" ", "")
 	if (field, catID, extra) in cache:
 		return cache[(field, catID, extra)]
-	wave, flux, name = [], [], []
+	name, wave, flux = [], [], []
 	# print(catID)
 	# # print("catalogIDs[catID]")
 	# testval = catalogIDs[catID]
@@ -234,10 +235,10 @@ def fetch_catID(field, catID, extra=""):
 			except Exception as e:
 				# if str(e): print(e) if isinstance(e, HTTPError) else print_exc()
 				continue
+			# print(f"Found allplate-{mjd} for {catID}")
+			name.append(f"allplate-{mjd}")
 			wave.append(dat[1])
 			flux.append(dat[2])
-			name.append(f"allplate-{mjd}")
-			# print(f"Found allplate-{mjd} for {catID}")
 			break
 	# allFPS
 	for mjd in mjd_list:
@@ -247,15 +248,15 @@ def fetch_catID(field, catID, extra=""):
 			except Exception as e:
 				# if str(e): print(e) if isinstance(e, HTTPError) else print_exc()
 				continue
+			# print(f"Found allFPS-{mjd} for {catID}")
+			name.append(f"allFPS-{mjd}")
 			wave.append(dat[1])
 			flux.append(dat[2])
-			name.append(f"allFPS-{mjd}")
-			# print(f"Found allFPS-{mjd} for {catID}")
 			break
 	# print(flux) # for testing
-	if not (meta and wave and flux and name):
+	if not (meta and name and wave and flux):
 		raise HTTPError(f"fetch_catID failed for {(field, catID, extra)}")
-	r = meta, wave, flux, name
+	r = meta, name, wave, flux
 	cache[(field, catID, extra)] = r
 	return r
 
@@ -896,18 +897,18 @@ def show_pipeline_redshift(fieldid, catalogid):
 def make_multiepoch_spectra(fieldid, catalogid, extra_obj, redshift, redshift_step,
                             y_max, y_min, x_max, x_min, list_emi, list_abs, smooth,
                             user_data: dict):
-	waves, fluxes, names = list(), list(), list()
+	names, waves, fluxes = [], [], []
 	if user_data:
 		for k, v in user_data.items():
 			try: #
-				wave, flux, name = numpy.asarray(v[0]), numpy.asarray(v[1]), str(k)
-				# print((wave, flux, name))
-				waves.append(wave), fluxes.append(flux), names.append(name)
+				name, wave, flux = str(k), numpy.asarray(v[0]), numpy.asarray(v[1])
+				# print((name, wave, flux))
+				names.append(name), waves.append(wave), fluxes.append(flux)
 			except: print_exc()
 	noop_size = len(waves)
 	try:
-		meta, _waves, _fluxes, _names = fetch_catID(fieldid, catalogid, extra_obj)
-		waves.extend(_waves), fluxes.extend(_fluxes), names.extend(_names)
+		meta, name, wave, flux = fetch_catID(fieldid, catalogid, extra_obj)
+		names.extend(name), waves.extend(wave), fluxes.extend(flux)
 		if meta[1] and not redshift and redshift_step == "any": redshift = meta[1]
 		smooth, z = int(smooth or smooth_default), float(redshift or redshift_default)
 	except Exception as e:
