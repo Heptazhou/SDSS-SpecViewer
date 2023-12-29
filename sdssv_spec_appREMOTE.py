@@ -140,7 +140,7 @@ def SDSSV_fetch(username: str, password: str, field, MJD: int, objID, branch="")
 	if (field, MJD, objID, branch) in cache:
 		return cache[(field, MJD, objID, branch)]
 	if not (field and MJD and objID and branch):
-		raise Exception("SDSSV_fetch failed for " + (field, MJD, objID, branch))
+		raise HTTPError(f"SDSSV_fetch failed for {(field, MJD, objID, branch)}")
 
 	url = SDSSV_buildURL(field, MJD, objID, branch)
 	# print(url) # for testing
@@ -254,7 +254,7 @@ def fetch_catID(field, catID, extra=""):
 			break
 	# print(flux) # for testing
 	if not (meta and wave and flux and name):
-		raise Exception("fetch_catID failed for " + (field, catID, extra))
+		raise HTTPError(f"fetch_catID failed for {(field, catID, extra)}")
 	r = meta, wave, flux, name
 	cache[(field, catID, extra)] = r
 	return r
@@ -689,7 +689,7 @@ def set_input_or_dropdown(location: str, program: str, checklist: list[str]):
 		if not fullmatch(r"[^=]+=[^=]+", x): continue
 		k, v = x.split("=", 1)
 		if k == "z": redshift = v
-	if program == "(other)" and "p" in checklist:
+	if program == "(other)" and "p" in checklist and fullmatch(r"\d+(-.*)?", fid_mjd):
 		field = int(fid_mjd.split("-", 2)[0])
 		catid = int(catalog)
 		for prog in programs.keys():
@@ -818,13 +818,12 @@ def reset_on_obj_change(y_max, y_min, x_max, x_min, redshift, redshift_step, has
 		redshift_step, redshift = "", ""
 		y_min, y_max = y_min_default, y_max_default
 		x_min, x_max = int(wave_min), int(wave_max)
-	if program == "(other)":
-		for x in (hash := str(hash).lstrip("#").split("&") if hash else []):
-			if not fullmatch(r"[^=]+=[^=]+", x): continue
-			k, v = x.split("=", 1)
-			if k == "m": smooth = v
-			if k == "y" and fullmatch(r"[^,]+,[^,]+", v): y_min, y_max = v.split(",", 1)
-			if k == "x" and fullmatch(r"[^,]+,[^,]+", v): x_min, x_max = v.split(",", 1)
+	for x in (hash := str(hash).lstrip("#").split("&") if hash else []):
+		if not fullmatch(r"[^=]+=[^=]+", x): continue
+		k, v = x.split("=", 1)
+		if k == "m": smooth = v
+		if k == "y" and fullmatch(r"[^,]+,[^,]+", v): y_min, y_max = v.split(",", 1)
+		if k == "x" and fullmatch(r"[^,]+,[^,]+", v): x_min, x_max = v.split(",", 1)
 	return y_max, y_min, x_max, x_min, redshift_step, redshift, smooth
 
 ## show/hide file upload div
