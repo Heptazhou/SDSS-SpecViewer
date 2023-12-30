@@ -112,7 +112,7 @@ def SDSSV_buildURL(field: str, MJD: int, objID: str, branch: str):
 	return url
 
 def SDSSV_fetch(username: str, password: str, field, MJD: int, objID, branch="") \
-	-> tuple[list, list, list]:
+	-> tuple[list, list, list, list]:
 	"""
 	Fetch spectral data for a SDSS-RM object on a
 		specific field on a specific MJD, using the user
@@ -131,11 +131,8 @@ def SDSSV_fetch(username: str, password: str, field, MJD: int, objID, branch="")
 
 	if not branch:
 		for v in ("master", "v6_1_2", "v6_1_1"):
-			try:
-				r = SDSSV_fetch(username, password, field, MJD, objID, v)
-				return r
-			except:
-				continue
+			try: return SDSSV_fetch(username, password, field, MJD, objID, v)
+			except: continue
 		# all attempts have failed
 
 	if (field, MJD, objID, branch) in cache:
@@ -152,9 +149,11 @@ def SDSSV_fetch(username: str, password: str, field, MJD: int, objID, branch="")
 	meta = HDUs["SPALL"].data
 	wave = 10**HDUs["COADD"].data["LOGLAM"]
 	flux = HDUs["COADD"].data["FLUX"]
+	errs = []
 	# print(flux) # for testing
-	cache[(field, MJD, objID, branch)] = meta, wave, flux
-	return cache[(field, MJD, objID, branch)]
+	r = meta, wave, flux, errs
+	cache[(field, MJD, objID, branch)] = r
+	return r
 
 def fetch_catID(field, catID, extra="") \
 	-> tuple[list, list, list, list, list]:
@@ -189,7 +188,7 @@ def fetch_catID(field, catID, extra="") \
 			mjd_f = dat[0]["MJD"][0]
 		wave.append(dat[1])
 		flux.append(dat[2])
-		errs.append([])
+		errs.append(dat[3])
 		name.append(mjd_f)
 	if fullmatch(r"\d+p?-\d+", field):
 		catID, branch = [*catID.split("@", 1), ""][:2]
@@ -209,7 +208,7 @@ def fetch_catID(field, catID, extra="") \
 			mjd_f = dat[0]["MJD"][0]
 		wave.append(dat[1])
 		flux.append(dat[2])
-		errs.append([])
+		errs.append(dat[3])
 		name.append(mjd_f)
 		mjd_list = [mjd]
 	else:
@@ -226,7 +225,7 @@ def fetch_catID(field, catID, extra="") \
 					mjd_f = dat[0]["MJD"][0]
 				wave.append(dat[1])
 				flux.append(dat[2])
-				errs.append([])
+				errs.append(dat[3])
 				name.append(mjd_f)
 				if mjd not in mjd_list: mjd_list.append(mjd)
 	mjd_list.sort(reverse=True)
@@ -243,7 +242,7 @@ def fetch_catID(field, catID, extra="") \
 			name.append(f"allplate-{mjd}")
 			wave.append(dat[1])
 			flux.append(dat[2])
-			errs.append([])
+			errs.append(dat[3])
 			break
 	# allFPS
 	for mjd in mjd_list:
@@ -257,7 +256,7 @@ def fetch_catID(field, catID, extra="") \
 			name.append(f"allFPS-{mjd}")
 			wave.append(dat[1])
 			flux.append(dat[2])
-			errs.append([])
+			errs.append(dat[3])
 			break
 	# print(flux) # for testing
 	if not (meta and name and wave and flux):
