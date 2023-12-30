@@ -397,20 +397,21 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 
 	html.Div(className="row", children=[
 
-		html.Div(className="col-sm-8 col-xs-12", children=[
+		html.Div(className="col-lg-6 col-sm-8 col-xs-12", children=[
 			html.H2("SDSSV-BHM Spectra Viewer (remote version)"),
 		]),
 
-		html.Div(className="col-sm-4 col-xs-12", children=[
+		html.Div(className="col-lg-6 col-sm-4 col-xs-12", children=[
 			dcc.Checklist(id="extra_func_list", options={
 				"z": "pipeline redshift",
-				"p": "auto match program",
+				"p": "match program",
+				"e": "show errorbar",
 				"u": "file uploader",
 			},
 				value=["z", "p"], inline=True, persistence=True, persistence_type="local",
 				style={"marginTop": "20px", "display": "flex", "flexFlow": "wrap"},
 				inputStyle={"marginRight": "5px"},
-				labelStyle={"marginRight": "55px", "whiteSpace": "nowrap"},
+				labelStyle={"width": "180px", "whiteSpace": "nowrap"},
 			),
 
 			html.Div(dcc.Upload(html.Div([
@@ -901,10 +902,11 @@ def show_pipeline_redshift(fieldid, catalogid):
 	Input("line_list_emi", "value"),
 	Input("line_list_abs", "value"),
 	Input("smooth_input", "value"),
+	Input("extra_func_list", "value"),
 	Input("dash-user-upload", "data"))
 def make_multiepoch_spectra(fieldid, catalogid, extra_obj, redshift, redshift_step,
                             y_max, y_min, x_max, x_min, list_emi, list_abs, smooth,
-                            user_data: dict):
+                            checklist: list[str], user_data: dict):
 	names, waves, fluxes, delta = [], [], [], []
 	if user_data:
 		for k, v in user_data.items():
@@ -952,7 +954,7 @@ def make_multiepoch_spectra(fieldid, catalogid, extra_obj, redshift, redshift_st
 				x=waves[i] if i < noop_size else waves[i] / (z + 1),
 				y=convolve(fluxes[i], Box1DKernel(smooth)),
 				error_y_width=0, error_y_thickness=1, error_y_type="data",
-				error_y_array=delta[i] if delta[i].size else None,
+				error_y_array=delta[i] if delta[i].size and "e" in checklist else None,
 				name=str(names[i]), opacity=1 / 2, mode="lines", **kws))
 			# create "ghost trace" spanning the displayed observed wavelength range:
 			fig.add_trace(go.Scatter(
