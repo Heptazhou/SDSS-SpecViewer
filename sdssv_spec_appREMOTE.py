@@ -64,7 +64,7 @@ y_min_default = -10
 # smoothing along x-axis, disabled by default (one means no smoothing)
 # we need an upper limit since a very large value freezes the program
 smooth_default = 1
-smooth_max = 10000
+smooth_max = 1000
 
 ### css files
 external_stylesheets = [ "https://codepen.io/chriddyp/pen/bWLwgP.css",
@@ -145,11 +145,14 @@ def SDSSV_fetch(username: str, password: str, field, MJD: int, objID, branch="")
 	r = requests.get(url, auth=(username, password) if "/sdsswork/" in url else None)
 	r.raise_for_status()
 	print(r.status_code, url)
+	numpy.seterr(divide="ignore")
 	HDUs = fits.open(BytesIO(r.content))
 	meta = HDUs["SPALL"].data
-	wave = 10**HDUs["COADD"].data["LOGLAM"]
+	wave = HDUs["COADD"].data["LOGLAM"]
 	flux = HDUs["COADD"].data["FLUX"]
-	errs = []
+	errs = HDUs["COADD"].data["IVAR"]
+	wave = 10**wave
+	errs = 1 / errs
 	# print(flux) # for testing
 	r = meta, wave, flux, errs
 	cache[(field, MJD, objID, branch)] = r
@@ -907,8 +910,9 @@ def make_multiepoch_spectra(fieldid, catalogid, extra_obj, redshift, redshift_st
 		for k, v in user_data.items():
 			try: #
 				name, wave, flux = str(k), numpy.asarray(v[0]), numpy.asarray(v[1])
+				errs = numpy.asarray([])
 				# print((name, wave, flux))
-				names.append(name), waves.append(wave), fluxes.append(flux), delta.append([])
+				names.append(name), waves.append(wave), fluxes.append(flux), delta.append(errs)
 			except: print_exc()
 	noop_size = len(waves)
 	try:
@@ -947,6 +951,8 @@ def make_multiepoch_spectra(fieldid, catalogid, extra_obj, redshift, redshift_st
 			fig.add_trace(go.Scatter(
 				x=waves[i] if i < noop_size else waves[i] / (z + 1),
 				y=convolve(fluxes[i], Box1DKernel(smooth)),
+				error_y_width=0, error_y_thickness=1, error_y_type="data",
+				error_y_array=delta[i] if delta[i].size else None,
 				name=str(names[i]), opacity=1 / 2, mode="lines", **kws))
 			# create "ghost trace" spanning the displayed observed wavelength range:
 			fig.add_trace(go.Scatter(
