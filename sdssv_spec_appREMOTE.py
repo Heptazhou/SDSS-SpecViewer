@@ -156,7 +156,8 @@ def SDSSV_fetch(username: str, password: str, field, MJD: int, objID, branch="")
 	cache[(field, MJD, objID, branch)] = meta, wave, flux
 	return cache[(field, MJD, objID, branch)]
 
-def fetch_catID(field, catID, extra="") -> tuple[list, list, list, list, list]:
+def fetch_catID(field, catID, extra="") \
+	-> tuple[list, list, list, list, list]:
 	# print("fetch_catID", field, catID) # for testing
 	if not (field and catID or extra):
 		raise Exception()
@@ -165,7 +166,7 @@ def fetch_catID(field, catID, extra="") -> tuple[list, list, list, list, list]:
 	extra = str(extra).replace(" ", "")
 	if (field, catID, extra) in cache:
 		return cache[(field, catID, extra)]
-	name, wave, flux = [], [], []
+	name, wave, flux, errs = [], [], [], []
 	# print(catID)
 	# # print("catalogIDs[catID]")
 	# testval = catalogIDs[catID]
@@ -188,6 +189,7 @@ def fetch_catID(field, catID, extra="") -> tuple[list, list, list, list, list]:
 			mjd_f = dat[0]["MJD"][0]
 		wave.append(dat[1])
 		flux.append(dat[2])
+		errs.append([])
 		name.append(mjd_f)
 	if fullmatch(r"\d+p?-\d+", field):
 		catID, branch = [*catID.split("@", 1), ""][:2]
@@ -207,6 +209,7 @@ def fetch_catID(field, catID, extra="") -> tuple[list, list, list, list, list]:
 			mjd_f = dat[0]["MJD"][0]
 		wave.append(dat[1])
 		flux.append(dat[2])
+		errs.append([])
 		name.append(mjd_f)
 		mjd_list = [mjd]
 	else:
@@ -223,6 +226,7 @@ def fetch_catID(field, catID, extra="") -> tuple[list, list, list, list, list]:
 					mjd_f = dat[0]["MJD"][0]
 				wave.append(dat[1])
 				flux.append(dat[2])
+				errs.append([])
 				name.append(mjd_f)
 				if mjd not in mjd_list: mjd_list.append(mjd)
 	mjd_list.sort(reverse=True)
@@ -239,6 +243,7 @@ def fetch_catID(field, catID, extra="") -> tuple[list, list, list, list, list]:
 			name.append(f"allplate-{mjd}")
 			wave.append(dat[1])
 			flux.append(dat[2])
+			errs.append([])
 			break
 	# allFPS
 	for mjd in mjd_list:
@@ -252,11 +257,12 @@ def fetch_catID(field, catID, extra="") -> tuple[list, list, list, list, list]:
 			name.append(f"allFPS-{mjd}")
 			wave.append(dat[1])
 			flux.append(dat[2])
+			errs.append([])
 			break
 	# print(flux) # for testing
 	if not (meta and name and wave and flux):
 		raise HTTPError(f"fetch_catID failed for {(field, catID, extra)}")
-	r = meta, name, wave, flux, []
+	r = meta, name, wave, flux, errs
 	cache[(field, catID, extra)] = r
 	return r
 
@@ -897,18 +903,18 @@ def show_pipeline_redshift(fieldid, catalogid):
 def make_multiepoch_spectra(fieldid, catalogid, extra_obj, redshift, redshift_step,
                             y_max, y_min, x_max, x_min, list_emi, list_abs, smooth,
                             user_data: dict):
-	names, waves, fluxes = [], [], []
+	names, waves, fluxes, delta = [], [], [], []
 	if user_data:
 		for k, v in user_data.items():
 			try: #
 				name, wave, flux = str(k), numpy.asarray(v[0]), numpy.asarray(v[1])
 				# print((name, wave, flux))
-				names.append(name), waves.append(wave), fluxes.append(flux)
+				names.append(name), waves.append(wave), fluxes.append(flux), delta.append([])
 			except: print_exc()
 	noop_size = len(waves)
 	try:
-		meta, name, wave, flux, _ = fetch_catID(fieldid, catalogid, extra_obj)
-		names.extend(name), waves.extend(wave), fluxes.extend(flux)
+		meta, name, wave, flux, errs = fetch_catID(fieldid, catalogid, extra_obj)
+		names.extend(name), waves.extend(wave), fluxes.extend(flux), delta.extend(errs)
 		if meta[1] and not redshift and redshift_step == "any": redshift = meta[1]
 		smooth, z = int(smooth or smooth_default), float(redshift or redshift_default)
 	except Exception as e:
