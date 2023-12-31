@@ -144,7 +144,7 @@ def SDSSV_fetch(username: str, password: str, field, MJD: int, objID, branch="")
 	r = requests.get(url, auth=(username, password) if "/sdsswork/" in url else None)
 	r.raise_for_status()
 	print(r.status_code, url)
-	numpy.seterr(divide="ignore")
+	numpy.seterr(divide="ignore") # Python does not comply with IEEE 754 :(
 	HDUs = fits.open(BytesIO(r.content))
 	meta = HDUs["SPALL"].data
 	wave = HDUs["COADD"].data["LOGLAM"]
