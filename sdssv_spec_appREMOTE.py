@@ -133,12 +133,11 @@ def SDSSV_fetch(username: str, password: str, field, MJD: int, objID, branch="")
 		for v in ("master", "v6_1_2", "v6_1_1"):
 			try: return SDSSV_fetch(username, password, field, MJD, objID, v)
 			except: continue
-		# all attempts have failed
-
+		raise HTTPError(f"SDSSV_fetch failed for {(field, MJD, objID)}")
+	if not (field and MJD and objID):
+		raise HTTPError(f"SDSSV_fetch failed for {(field, MJD, objID, branch)}")
 	if (field, MJD, objID, branch) in cache:
 		return cache[(field, MJD, objID, branch)]
-	if not (field and MJD and objID and branch):
-		raise HTTPError(f"SDSSV_fetch failed for {(field, MJD, objID, branch)}")
 
 	url = SDSSV_buildURL(field, MJD, objID, branch)
 	# print(url) # for testing
