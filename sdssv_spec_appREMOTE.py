@@ -24,6 +24,7 @@ from astropy.io import fits
 from astropy.io.fits.fitsrec import FITS_rec
 from dash import dcc, html
 from dash.dependencies import Input, Output, State
+from numpy import sqrt
 from numpy.typing import NDArray
 from requests.exceptions import HTTPError
 
@@ -153,7 +154,7 @@ def SDSSV_fetch(username: str, password: str, field, MJD: int, objID, branch="")
 	flux = HDUs["COADD"].data["FLUX"]
 	errs = HDUs["COADD"].data["IVAR"]
 	wave = 10**wave
-	errs = 1 / errs
+	errs = 1 / sqrt(errs)
 	# print(f"meta: {type(meta)} = {str(meta)[:100]}")
 	# print(f"wave: {type(wave)} = {str(wave)[:100]}")
 	# print(flux) # for testing
@@ -179,29 +180,29 @@ def fetch_catID(field, catID, extra="") \
 	data = catalogIDs.get(catID, [[]]) # [(ZWARNING, Z, RCHI2), {FIELD,MJD}...]
 	meta = list(data[0] or [None, None, None]) # (ZWARNING, Z, RCHI2)
 	for x in extra.split(","):
-		x, branch = [*x.split("@", 1), ""][:2]
+		x, ver = [*x.split("@", 1), ""][:2]
 		if not fullmatch(r"\d+p?-\d+-[^-](.*[^-])?", x): continue
-		fid, mjd, objID = x.split("-", 2)
+		fid, mjd, obj = x.split("-", 2)
 		mjd = int(mjd)
 		try:
-			dat = SDSSV_fetch(username, password, fid, mjd, objID, branch)
+			dat = SDSSV_fetch(username, password, fid, mjd, obj, ver)
 		except Exception as e:
 			if str(e): print(e) if isinstance(e, HTTPError) else print_exc()
 			continue
 		try:
-			mjd_f = dat[0]["MJD_FINAL"][0]
+			mjd_final = str(dat[0]["MJD_FINAL"][0])
 		except:
-			mjd_f = dat[0]["MJD"][0]
+			mjd_final = str(dat[0]["MJD"][0])
+		name.append(mjd_final)
 		wave.append(dat[1])
 		flux.append(dat[2])
 		errs.append(dat[3])
-		name.append(mjd_f)
 	if fullmatch(r"\d+p?-\d+", field):
-		catID, branch = [*catID.split("@", 1), ""][:2]
+		obj, ver = [*catID.split("@", 1), ""][:2]
 		fid, mjd = field.split("-", 1)
 		mjd = int(mjd)
 		try:
-			dat = SDSSV_fetch(username, password, fid, mjd, catID, branch)
+			dat = SDSSV_fetch(username, password, fid, mjd, obj, ver)
 		except Exception as e:
 			if str(e): print(e) if isinstance(e, HTTPError) else print_exc()
 			raise
@@ -209,14 +210,14 @@ def fetch_catID(field, catID, extra="") \
 		if not meta[1]: meta[1] = dat[0]["Z"][0]
 		if not meta[2]: meta[2] = dat[0]["RCHI2"][0]
 		try:
-			mjd_f = dat[0]["MJD_FINAL"][0]
+			mjd_final = str(dat[0]["MJD_FINAL"][0])
 		except:
-			mjd_f = dat[0]["MJD"][0]
+			mjd_final = str(dat[0]["MJD"][0])
+		mjd_list = [mjd]
+		name.append(mjd_final)
 		wave.append(dat[1])
 		flux.append(dat[2])
 		errs.append(dat[3])
-		name.append(mjd_f)
-		mjd_list = [mjd]
 	else:
 		mjd_list = []
 		for x in data[1:]: # {13'FIELD,5'MJD}
@@ -224,15 +225,15 @@ def fetch_catID(field, catID, extra="") \
 			if field == "all" or int(field) == fid:
 				dat = SDSSV_fetch(username, password, fid, mjd, catID)
 				try:
-					mjd_f = dat[0]["MJD_FINAL"][0]
+					mjd_final = str(dat[0]["MJD_FINAL"][0])
 				except:
-					mjd_f = dat[0]["MJD"][0]
+					mjd_final = str(dat[0]["MJD"][0])
+				name.append(mjd_final)
 				wave.append(dat[1])
 				flux.append(dat[2])
 				errs.append(dat[3])
-				name.append(mjd_f)
 				if mjd not in mjd_list: mjd_list.append(mjd)
-	mjd_list.sort(reverse=True)
+		mjd_list.sort(reverse=True)
 	# print(mjd_list)
 	# allplate
 	for mjd in mjd_list:
@@ -404,7 +405,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 			dcc.Checklist(id="extra_func_list", options={
 				"z": "pipeline redshift",
 				"p": "match program",
-				"e": "show errorbar",
+				"e": "show error (σ)",
 				"u": "file uploader",
 			},
 				value=["z", "p"], inline=True, persistence=True, persistence_type="local",
@@ -905,6 +906,9 @@ def show_pipeline_redshift(fieldid, catalogid):
 def make_multiepoch_spectra(fieldid, catalogid, extra_obj, redshift, redshift_step,
                             y_max, y_min, x_max, x_min, list_emi, list_abs, smooth,
                             checklist: list[str], user_data: dict):
+	layout_axis = dict(fixedrange=True)
+	layout = dict(yaxis=layout_axis, xaxis=layout_axis, xaxis2=layout_axis)
+
 	names, waves, fluxes, delta = list[str](), list[NDArray](), list[NDArray](), list[NDArray]()
 	if user_data:
 		for k, v in user_data.items():
@@ -914,7 +918,7 @@ def make_multiepoch_spectra(fieldid, catalogid, extra_obj, redshift, redshift_st
 				# print((name, wave, flux))
 				names.append(name), waves.append(wave), fluxes.append(flux), delta.append(errs)
 			except: print_exc()
-	noop_size = len(waves)
+	noop_size = len(names)
 	try:
 		meta, name, wave, flux, errs = fetch_catID(fieldid, catalogid, extra_obj)
 		names.extend(name), waves.extend(wave), fluxes.extend(flux), delta.extend(errs)
@@ -922,7 +926,7 @@ def make_multiepoch_spectra(fieldid, catalogid, extra_obj, redshift, redshift_st
 		smooth, z = int(smooth or smooth_default), float(redshift or redshift_default)
 	except Exception as e:
 		if str(e): print(e) if isinstance(e, HTTPError) else print_exc()
-		return go.Figure(), redshift
+		return go.Figure(layout=layout), redshift
 
 	try:
 
@@ -936,16 +940,16 @@ def make_multiepoch_spectra(fieldid, catalogid, extra_obj, redshift, redshift_st
 		rest_x_max = math.ceil(x_max / (z + 1))
 		rest_x_min = math.floor(x_min / (z + 1))
 
-		fig = go.Figure()
+		fig = go.Figure(layout=layout)
 		fig.layout.yaxis.range = [y_min, y_max]
 		fig.layout.xaxis.range = [rest_x_min, rest_x_max]
 
-		# For each spectrum "i" in the list
-		for i in range(0, len(waves)):
+		# For each spectrum in the list
+		for i in range(len(names)):
 			kws = dict()
-			if fullmatch(r"allplate-\d+.*", str(names[i]), IGNORECASE):
+			if fullmatch(r"allplate-\d+.*", names[i], IGNORECASE):
 				kws = dict(line_color="#606060")
-			if fullmatch(r"allFPS-\d+.*", str(names[i]), IGNORECASE):
+			if fullmatch(r"allFPS-\d+.*", names[i], IGNORECASE):
 				kws = dict(line_color="#000000")
 			# create trace of smoothed spectra
 			fig.add_trace(go.Scatter(
@@ -953,7 +957,7 @@ def make_multiepoch_spectra(fieldid, catalogid, extra_obj, redshift, redshift_st
 				y=convolve(fluxes[i], Box1DKernel(smooth)),
 				error_y_width=0, error_y_thickness=1, error_y_type="data",
 				error_y_array=delta[i] if delta[i].size and "e" in checklist else None,
-				name=str(names[i]), opacity=1 / 2, mode="lines", **kws))
+				name=names[i], opacity=1 / 2, mode="lines", **kws))
 			# create "ghost trace" spanning the displayed observed wavelength range:
 			fig.add_trace(go.Scatter(
 				x=[x_min, x_max], y=[numpy.nan, numpy.nan], showlegend=False))
