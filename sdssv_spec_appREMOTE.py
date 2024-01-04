@@ -221,7 +221,8 @@ def fetch_catID(field, catID, extra="") \
 	else:
 		mjd_list = []
 		for x in data[1:]: # {13'FIELD,5'MJD}
-			fid, mjd = map(int, divmod(int(x), 10**5))
+			x = int(x)
+			fid, mjd = divmod(abs(x), 10**5)
 			if field == "all" or int(field) == fid:
 				dat = SDSSV_fetch(username, password, fid, mjd, catID)
 				try:
@@ -627,7 +628,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 				),
 				dcc.Checklist(id="line_list_emi", options=[
 					# Set up emission-line active plotting dictionary with values set to the transition wavelengths
-					{"label": "{: <10}\t({}Å)".format(i[2], int(float(i[1]))),
+					{"label": "{: <10}\t({}Å)".format(i[2], round(float(i[1]))),
 					 "value": i[1]} for i in spec_line_emi],
 					value=spec_line_emi[numpy.bool_(spec_line_emi[:, 0]), 1].tolist(), # values are wavelengths
 					style={"columnCount": "2"},
@@ -643,7 +644,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 				),
 				dcc.Checklist(id="line_list_abs", options=[
 					# Set up absorption-line active plotting dictionary with values set to the transition names
-					{"label": "{: <10}\t({}Å)".format(i[3], int(float(i[2].split()[0]))),
+					{"label": "{: <10}\t({}Å)".format(i[3], round(float(i[2].split()[0]))),
 					 "value": i[2].split()[0]} for i in spec_line_abs],
 					value=[s.split()[0] for s in spec_line_abs[numpy.bool_(spec_line_abs[:, 0]), 2]], # wavelengths
 					style={"columnCount": "2"},

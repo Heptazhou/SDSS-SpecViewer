@@ -29,8 +29,7 @@ const getfirst(predicate::Function) = A -> A[findfirst(predicate, A)]
 const s_info(xs...) = @static nthreads() > 1 ? @spawn(@info string(xs...)) : @info string(xs...)
 const u_sort! = unique! ∘ sort!
 
-Base.cat(x::Union{Int32, Int64}, y::Union{Int32, Int64}, (::Val{5})) = Int64(10^5)x + mod(y, 10^5)
-Base.cat(x::Union{Int32, Int64}, y::Union{Int32, Int64}, (pad::Int)) = cat(x, y, (Val(pad)))
+Base.cat(x::Integer, y::Integer, ::Val{5}) = flipsign((10^5)abs(x) + mod(y, 10^5), x)
 Base.convert(::Type{S}, v::Vector) where S <: AbstractSet{T} where T = S(T[v;])
 Base.isless(::Any, ::Union{Number, VersionNumber}) = Bool(0)
 Base.isless(::Union{Number, VersionNumber}, ::Any) = Bool(1)
@@ -184,12 +183,12 @@ end
 
 const catalogIDs = @time @sync let
 	get_dict_of(ids::OrderedSet{cols[:CATALOGID]}) = @chain df begin
-		@rselect :CATALOGID :FIELD_J2K = cat(:FIELD, :MJD, 5) :RCHI2 :Z :ZWARNING
+		@rselect :CATALOGID :FIELD_MJD = cat(:FIELD, :MJD, Val(5)) :RCHI2 :Z :ZWARNING
 		@rsubset! :CATALOGID ∈ ids
 		@rorderby :CATALOGID :ZWARNING > 0 :RCHI2
 		@by :CATALOGID begin
 			:ks = string(:CATALOGID[1])
-			:vs = (Real[:ZWARNING :Z :RCHI2][1, :], u_sort!([:FIELD_J2K;])...)
+			:vs = (Real[:ZWARNING :Z :RCHI2][1, :], u_sort!([:FIELD_MJD;])...)
 		end
 		LittleDict(_.ks, _.vs)
 	end
