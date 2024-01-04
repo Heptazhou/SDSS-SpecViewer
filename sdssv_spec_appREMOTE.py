@@ -21,8 +21,10 @@ import plotly.graph_objects as go
 import requests
 from astropy.convolution import Box1DKernel, convolve
 from astropy.io import fits
+from astropy.io.fits.fitsrec import FITS_rec
 from dash import dcc, html
 from dash.dependencies import Input, Output, State
+from numpy.typing import NDArray
 from requests.exceptions import HTTPError
 
 ###
@@ -112,7 +114,7 @@ def SDSSV_buildURL(field: str, MJD: int, objID: str, branch: str):
 	return url
 
 def SDSSV_fetch(username: str, password: str, field, MJD: int, objID, branch="") \
-	-> tuple[list, list, list, list]:
+	-> tuple[FITS_rec, NDArray, NDArray, NDArray]:
 	"""
 	Fetch spectral data for a SDSS-RM object on a
 		specific field on a specific MJD, using the user
@@ -152,14 +154,16 @@ def SDSSV_fetch(username: str, password: str, field, MJD: int, objID, branch="")
 	errs = HDUs["COADD"].data["IVAR"]
 	wave = 10**wave
 	errs = 1 / errs
+	# print(f"meta: {type(meta)} = {str(meta)[:100]}")
+	# print(f"wave: {type(wave)} = {str(wave)[:100]}")
 	# print(flux) # for testing
 	r = meta, wave, flux, errs
 	cache[(field, MJD, objID, branch)] = r
 	return r
 
 def fetch_catID(field, catID, extra="") \
-	-> tuple[list, list, list, list, list]:
-	# print("fetch_catID", field, catID) # for testing
+	-> tuple[list[float], list[str], list[NDArray], list[NDArray], list[NDArray]]:
+	#        here float is actually int & float, as float in Python contains int :(
 	if not (field and catID or extra):
 		raise Exception()
 	field = str(field).replace(" ", "")
@@ -167,12 +171,12 @@ def fetch_catID(field, catID, extra="") \
 	extra = str(extra).replace(" ", "")
 	if (field, catID, extra) in cache:
 		return cache[(field, catID, extra)]
-	name, wave, flux, errs = [], [], [], []
+	name, wave, flux, errs = list[str](), list[NDArray](), list[NDArray](), list[NDArray]()
 	# print(catID)
 	# # print("catalogIDs[catID]")
 	# testval = catalogIDs[catID]
 	# print(testval)
-	data = catalogIDs.get(catID, [[]]) # [(ZWARNING, Z, RCHI2), {FIELD,J2K}...]
+	data = catalogIDs.get(catID, [[]]) # [(ZWARNING, Z, RCHI2), {FIELD,MJD}...]
 	meta = list(data[0] or [None, None, None]) # (ZWARNING, Z, RCHI2)
 	for x in extra.split(","):
 		x, branch = [*x.split("@", 1), ""][:2]
@@ -215,11 +219,9 @@ def fetch_catID(field, catID, extra="") \
 		mjd_list = [mjd]
 	else:
 		mjd_list = []
-		for x in data[1:]: # {13'FIELD,5'J2K}
-			fid, j2k = map(int, divmod(int(x), 10**5))
+		for x in data[1:]: # {13'FIELD,5'MJD}
+			fid, mjd = map(int, divmod(int(x), 10**5))
 			if field == "all" or int(field) == fid:
-				# print("all", fid, i[1], catID) # for testing
-				mjd = j2k + 51544 # +2000-01-01 == MJD 51544
 				dat = SDSSV_fetch(username, password, fid, mjd, catID)
 				try:
 					mjd_f = dat[0]["MJD_FINAL"][0]
@@ -240,7 +242,6 @@ def fetch_catID(field, catID, extra="") \
 			except Exception as e:
 				# if str(e): print(e) if isinstance(e, HTTPError) else print_exc()
 				continue
-			# print(f"Found allplate-{mjd} for {catID}")
 			name.append(f"allplate-{mjd}")
 			wave.append(dat[1])
 			flux.append(dat[2])
@@ -254,7 +255,6 @@ def fetch_catID(field, catID, extra="") \
 			except Exception as e:
 				# if str(e): print(e) if isinstance(e, HTTPError) else print_exc()
 				continue
-			# print(f"Found allFPS-{mjd} for {catID}")
 			name.append(f"allFPS-{mjd}")
 			wave.append(dat[1])
 			flux.append(dat[2])
@@ -720,7 +720,6 @@ def set_input_or_dropdown(location: str, program: str, checklist: list[str]):
 	Input("program_dropdown", "value"))
 def set_fieldid_options(selected_program):
 	if not selected_program or selected_program == "(other)": return []
-	# print(selected_program) # for testing
 	xs = programs.get(selected_program, []) + ["all"]
 	return [{"label": str(x), "value": str(x)} for x in xs]
 
@@ -906,7 +905,7 @@ def show_pipeline_redshift(fieldid, catalogid):
 def make_multiepoch_spectra(fieldid, catalogid, extra_obj, redshift, redshift_step,
                             y_max, y_min, x_max, x_min, list_emi, list_abs, smooth,
                             checklist: list[str], user_data: dict):
-	names, waves, fluxes, delta = [], [], [], []
+	names, waves, fluxes, delta = list[str](), list[NDArray](), list[NDArray](), list[NDArray]()
 	if user_data:
 		for k, v in user_data.items():
 			try: #

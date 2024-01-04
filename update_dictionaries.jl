@@ -29,7 +29,8 @@ const getfirst(predicate::Function) = A -> A[findfirst(predicate, A)]
 const s_info(xs...) = @static nthreads() > 1 ? @spawn(@info string(xs...)) : @info string(xs...)
 const u_sort! = unique! ∘ sort!
 
-Base.cat(x::Union{Int32, Int64}, y::Union{Int32, Int64}, ::Val{(5)}) = Int64(10^5)x + mod(y, 10^5)
+Base.cat(x::Union{Int32, Int64}, y::Union{Int32, Int64}, (::Val{5})) = Int64(10^5)x + mod(y, 10^5)
+Base.cat(x::Union{Int32, Int64}, y::Union{Int32, Int64}, (pad::Int)) = cat(x, y, (Val(pad)))
 Base.convert(::Type{S}, v::Vector) where S <: AbstractSet{T} where T = S(T[v;])
 Base.isless(::Any, ::Union{Number, VersionNumber}) = Bool(0)
 Base.isless(::Union{Number, VersionNumber}, ::Any) = Bool(1)
@@ -40,7 +41,7 @@ CFITSIO.cfitsio_typecode(::Type{UInt64}) = Cint(80)
 CFITSIO.type_from_bitpix(::Val{Cint(80)}) = UInt64
 
 # https://github.com/JuliaAstro/FITSIO.jl/pull/193
-FITSIO.CFITSIO_COLTYPE[80] = UInt64
+FITSIO.CFITSIO_COLTYPE[080] = UInt64
 FITSIO.fits_tform_char(::Type{UInt64}) = 'W'
 
 @static if VERSION < v"1.7"
@@ -183,7 +184,7 @@ end
 
 const catalogIDs = @time @sync let
 	get_dict_of(ids::OrderedSet{cols[:CATALOGID]}) = @chain df begin
-		@rselect :CATALOGID :FIELD_J2K = cat(:FIELD, :MJD - 51544, Val(5)) :RCHI2 :Z :ZWARNING
+		@rselect :CATALOGID :FIELD_J2K = cat(:FIELD, :MJD, 5) :RCHI2 :Z :ZWARNING
 		@rsubset! :CATALOGID ∈ ids
 		@rorderby :CATALOGID :ZWARNING > 0 :RCHI2
 		@by :CATALOGID begin
