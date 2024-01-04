@@ -17,12 +17,15 @@ from urllib.parse import urlsplit
 
 import dash
 import numpy
-import plotly.graph_objects as go
 import requests
 from astropy.convolution import Box1DKernel, convolve
 from astropy.io import fits
+from astropy.io.fits.fitsrec import FITS_rec
 from dash import dcc, html
 from dash.dependencies import Input, Output, State
+from numpy import sqrt
+from numpy.typing import NDArray
+from plotly.graph_objects import Figure, Scatter
 from requests.exceptions import HTTPError
 
 ###
@@ -64,7 +67,7 @@ y_min_default = -10
 # smoothing along x-axis, disabled by default (one means no smoothing)
 # we need an upper limit since a very large value freezes the program
 smooth_default = 1
-smooth_max = 10000
+smooth_max = 1000
 
 ### css files
 external_stylesheets = [ "https://codepen.io/chriddyp/pen/bWLwgP.css",
@@ -81,8 +84,8 @@ def SDSSV_buildURL(field: str, MJD: int, objID: str, branch: str):
 	"""
 	A function to build the url that will be used to fetch the data.
 
-	Field IDs don't start with zero but the URLs need leading zeroes;
-	using zfill(6) fixes this.
+	Field ID may require leading zero(es),
+	use str.zfill(6) to fix it.
 	"""
 	path = ""
 	file = f"spec-{field.rstrip('p')}-{MJD}-{objID}.fits" # PBH
@@ -111,10 +114,11 @@ def SDSSV_buildURL(field: str, MJD: int, objID: str, branch: str):
 	# print(url) # for testing
 	return url
 
-def SDSSV_fetch(username: str, password: str, field, MJD: int, objID, branch=""):
+def SDSSV_fetch(username: str, password: str, field, MJD: int, objID, branch="") \
+	-> tuple[FITS_rec, NDArray, NDArray, NDArray]:
 	"""
-	Fetches spectral data for a SDSS-RM object on a
-		specific field on a specific MJD. Uses the user
+	Fetch spectral data for a SDSS-RM object on a
+		specific field on a specific MJD, using the user
 		supplied authentication.
 	"""
 	if type(field) == str:
@@ -130,33 +134,37 @@ def SDSSV_fetch(username: str, password: str, field, MJD: int, objID, branch="")
 
 	if not branch:
 		for v in ("master", "v6_1_2", "v6_1_1"):
-			try:
-				r = SDSSV_fetch(username, password, field, MJD, objID, v)
-				return tuple(r) # ensure type
-			except:
-				continue
-		# all attempts have failed
-
+			try: return SDSSV_fetch(username, password, field, MJD, objID, v)
+			except: continue
+		raise HTTPError(f"SDSSV_fetch failed for {(field, MJD, objID)}")
+	if not (field and MJD and objID):
+		raise HTTPError(f"SDSSV_fetch failed for {(field, MJD, objID, branch)}")
 	if (field, MJD, objID, branch) in cache:
 		return cache[(field, MJD, objID, branch)]
-	if not (field and MJD and objID and branch):
-		raise HTTPError(f"SDSSV_fetch failed for {(field, MJD, objID, branch)}")
 
 	url = SDSSV_buildURL(field, MJD, objID, branch)
 	# print(url) # for testing
 	r = requests.get(url, auth=(username, password) if "/sdsswork/" in url else None)
 	r.raise_for_status()
 	print(r.status_code, url)
+	numpy.seterr(divide="ignore") # Python does not comply with IEEE 754 :(
 	HDUs = fits.open(BytesIO(r.content))
 	meta = HDUs["SPALL"].data
-	wave = 10**HDUs["COADD"].data["LOGLAM"]
-	flux = HDUs["COADD"].data["FLUX"]
+	wave = HDUs["COADD"].data["LOGLAM"] # lg(λ)
+	flux = HDUs["COADD"].data["FLUX"]   # f_λ
+	errs = HDUs["COADD"].data["IVAR"]   # τ = σ⁻²
+	wave = 10**wave                     # λ
+	errs = 1 / sqrt(errs)               # σ
+	# print(f"meta: {type(meta)} = {str(meta)[:100]}")
+	# print(f"wave: {type(wave)} = {str(wave)[:100]}")
 	# print(flux) # for testing
-	cache[(field, MJD, objID, branch)] = meta, wave, flux
-	return cache[(field, MJD, objID, branch)]
+	r = meta, wave, flux, errs
+	cache[(field, MJD, objID, branch)] = r
+	return r
 
-def fetch_catID(field, catID, extra=""):
-	# print("fetch_catID", field, catID) # for testing
+def fetch_catID(field, catID, extra="") \
+	-> tuple[list[float], list[str], list[NDArray], list[NDArray], list[NDArray]]:
+	#        here float is actually int & float, as float in Python contains int :(
 	if not (field and catID or extra):
 		raise Exception()
 	field = str(field).replace(" ", "")
@@ -164,36 +172,37 @@ def fetch_catID(field, catID, extra=""):
 	extra = str(extra).replace(" ", "")
 	if (field, catID, extra) in cache:
 		return cache[(field, catID, extra)]
-	wave, flux, name = [], [], []
+	name, wave, flux, errs = list[str](), list[NDArray](), list[NDArray](), list[NDArray]()
 	# print(catID)
 	# # print("catalogIDs[catID]")
 	# testval = catalogIDs[catID]
 	# print(testval)
-	data = catalogIDs.get(catID, [[]]) # [(ZWARNING, Z, RCHI2), {FIELD,J2K}...]
+	data = catalogIDs.get(catID, [[]]) # [(ZWARNING, Z, RCHI2), {FIELD,MJD}...]
 	meta = list(data[0] or [None, None, None]) # (ZWARNING, Z, RCHI2)
 	for x in extra.split(","):
-		x, branch = [*x.split("@", 1), ""][:2]
+		x, ver = [*x.split("@", 1), ""][:2]
 		if not fullmatch(r"\d+p?-\d+-[^-](.*[^-])?", x): continue
-		fid, mjd, objID = x.split("-", 2)
+		fid, mjd, obj = x.split("-", 2)
 		mjd = int(mjd)
 		try:
-			dat = SDSSV_fetch(username, password, fid, mjd, objID, branch)
+			dat = SDSSV_fetch(username, password, fid, mjd, obj, ver)
 		except Exception as e:
 			if str(e): print(e) if isinstance(e, HTTPError) else print_exc()
 			continue
 		try:
-			mjd_f = dat[0]["MJD_FINAL"][0]
+			mjd_final = str(dat[0]["MJD_FINAL"][0])
 		except:
-			mjd_f = dat[0]["MJD"][0]
+			mjd_final = str(dat[0]["MJD"][0])
+		name.append(mjd_final)
 		wave.append(dat[1])
 		flux.append(dat[2])
-		name.append(mjd_f)
+		errs.append(dat[3])
 	if fullmatch(r"\d+p?-\d+", field):
-		catID, branch = [*catID.split("@", 1), ""][:2]
+		obj, ver = [*catID.split("@", 1), ""][:2]
 		fid, mjd = field.split("-", 1)
 		mjd = int(mjd)
 		try:
-			dat = SDSSV_fetch(username, password, fid, mjd, catID, branch)
+			dat = SDSSV_fetch(username, password, fid, mjd, obj, ver)
 		except Exception as e:
 			if str(e): print(e) if isinstance(e, HTTPError) else print_exc()
 			raise
@@ -201,30 +210,31 @@ def fetch_catID(field, catID, extra=""):
 		if not meta[1]: meta[1] = dat[0]["Z"][0]
 		if not meta[2]: meta[2] = dat[0]["RCHI2"][0]
 		try:
-			mjd_f = dat[0]["MJD_FINAL"][0]
+			mjd_final = str(dat[0]["MJD_FINAL"][0])
 		except:
-			mjd_f = dat[0]["MJD"][0]
+			mjd_final = str(dat[0]["MJD"][0])
+		mjd_list = [mjd]
+		name.append(mjd_final)
 		wave.append(dat[1])
 		flux.append(dat[2])
-		name.append(mjd_f)
-		mjd_list = [mjd]
+		errs.append(dat[3])
 	else:
 		mjd_list = []
-		for x in data[1:]: # {13'FIELD,5'J2K}
-			fid, j2k = map(int, divmod(int(x), 10**5))
+		for x in data[1:]: # {13'FIELD,5'MJD}
+			x = int(x)
+			fid, mjd = divmod(abs(x), 10**5)
 			if field == "all" or int(field) == fid:
-				# print("all", fid, i[1], catID) # for testing
-				mjd = j2k + 51544 # +2000-01-01 == MJD 51544
 				dat = SDSSV_fetch(username, password, fid, mjd, catID)
 				try:
-					mjd_f = dat[0]["MJD_FINAL"][0]
+					mjd_final = str(dat[0]["MJD_FINAL"][0])
 				except:
-					mjd_f = dat[0]["MJD"][0]
+					mjd_final = str(dat[0]["MJD"][0])
+				name.append(mjd_final)
 				wave.append(dat[1])
 				flux.append(dat[2])
-				name.append(mjd_f)
+				errs.append(dat[3])
 				if mjd not in mjd_list: mjd_list.append(mjd)
-	mjd_list.sort(reverse=True)
+		mjd_list.sort(reverse=True)
 	# print(mjd_list)
 	# allplate
 	for mjd in mjd_list:
@@ -234,10 +244,10 @@ def fetch_catID(field, catID, extra=""):
 			except Exception as e:
 				# if str(e): print(e) if isinstance(e, HTTPError) else print_exc()
 				continue
+			name.append(f"allplate-{mjd}")
 			wave.append(dat[1])
 			flux.append(dat[2])
-			name.append(f"allplate-{mjd}")
-			# print(f"Found allplate-{mjd} for {catID}")
+			errs.append(dat[3])
 			break
 	# allFPS
 	for mjd in mjd_list:
@@ -247,15 +257,15 @@ def fetch_catID(field, catID, extra=""):
 			except Exception as e:
 				# if str(e): print(e) if isinstance(e, HTTPError) else print_exc()
 				continue
+			name.append(f"allFPS-{mjd}")
 			wave.append(dat[1])
 			flux.append(dat[2])
-			name.append(f"allFPS-{mjd}")
-			# print(f"Found allFPS-{mjd} for {catID}")
+			errs.append(dat[3])
 			break
 	# print(flux) # for testing
-	if not (meta and wave and flux and name):
+	if not (meta and name and wave and flux):
 		raise HTTPError(f"fetch_catID failed for {(field, catID, extra)}")
-	r = meta, wave, flux, name
+	r = meta, name, wave, flux, errs
 	cache[(field, catID, extra)] = r
 	return r
 
@@ -296,29 +306,44 @@ except:
 
 ### spectral lines to label in plot
 # https://classic.sdss.org/dr6/algorithms/linestable.html
+# https://github.com/desihub/desisim/blob/main/py/desisim/data/forbidden_lines.ecsv
+# https://github.com/desihub/desisim/blob/main/py/desisim/data/recombination_lines.ecsv
+# https://github.com/desihub/desisim/blob/main/py/desisim/lya_spectra.py
+# https://github.com/sdss/idlspec2d/blob/master/etc/emlines.par
 # the first column means whether to show this line or not by default
 # the second column is the wavelength, which must be unique
 spec_line_emi = numpy.asarray([
-	[1, 6564.61, "H α"    ],
-	[1, 5008.24, "[O III]"],
-	[1, 4960.30, "[O III]"],
-	[1, 4862.68, "H β"    ],
-	[1, 4341.68, "H γ"    ],
-	[1, 4102.89, "H δ"    ],
-	[0, 3889.00, "He I"   ],
-	[1, 3727.09, "[O II]" ],
-	[1, 2798.75, "Mg II"  ],
-	[1, 2326.00, "C II"   ],
-	[1, 1908.73, "C III]" ],
-	[0, 1640.40, "He II"  ],
-	[1, 1549.06, "C IV"   ],
-	[1, 1396.75, "Si IV"  ],
-	[0, 1305.53, "O I"    ],
-	[1, 1240.00, "N V"    ],
-	[1, 1215.67, "Ly α"   ],
-	[0, 1123.00, "P V"    ],
-	[1, 1034.00, "O VI"   ],
-	[1, 1025.72, "Ly β"   ],
+	[1, 7753.1900, "[Ar III]"],
+	[1, 7137.7700, "[Ar III]"],
+	[1, 6564.6130, "H α"     ],
+	[0, 6365.5350, "[O I]"   ],
+	[0, 6302.0460, "[O I]"   ],
+	[0, 5877.2990, "He I"    ],
+	[0, 5577.3390, "[O I]"   ],
+	[0, 5411.5200, "He II"   ],
+	[1, 5008.2390, "[O III]" ],
+	[1, 4960.2950, "[O III]" ],
+	[1, 4862.6830, "H β"     ],
+	[0, 4685.6800, "He II"   ],
+	[0, 4363.2090, "[O III]" ],
+	[1, 4341.6840, "H γ"     ],
+	[1, 4102.8920, "H δ"     ],
+	[0, 3971.1950, "H ε"     ],
+	[0, 3890.1510, "H ζ"     ],
+	[0, 3889.7520, "He I"    ],
+	[1, 3728.4830, "[O II]"  ], # 3729.8740 3727.0920
+	[1, 2799.9410, "Mg II"   ], # 2803.5300 2796.3520
+	[1, 2326.0000, "C II"    ],
+	[1, 1908.7340, "C III]"  ],
+	[0, 1640.4200, "He II"   ],
+	[1, 1549.4800, "C IV"    ],
+	[1, 1396.7500, "Si IV"   ],
+	[0, 1305.5300, "O I"     ],
+	[1, 1240.8100, "N V"     ],
+	[1, 1215.6710, "Ly α"    ],
+	[0, 1123.0000, "P V"     ],
+	[1, 1034.0000, "O VI"    ],
+	[1, 1025.7220, "Ly β"    ],
 ])
 # custom absorption line list for quasars
 # the second column is the multiplicity of the line, and gives the number of lines that will share a single label
@@ -327,26 +352,26 @@ spec_line_abs = numpy.asarray([
 	[1, 2, "5897.5581 5891.5833          ", "Na I"       ],
 	[1, 2, "3969.5910 3934.7770          ", "Ca II"      ],
 	[0, 1, "2852.9642                    ", "Mg I"       ],
-	[1, 2, "2803.5310 2796.3520          ", "Mg II"      ],
-	[0, 2, "2600.1729 2586.6500          ", "Fe II UV1"  ],
-	[0, 3, "2382.7652 2374.4612 2344.2139", "Fe II UV2+3"],
-	[1, 2, "1862.7895 1854.7164          ", "Al III"     ],
-	[0, 1, "1670.7874                    ", "Al II"      ],
+	[1, 2, "2803.5324 2796.3511          ", "Mg II"      ],
+	[0, 2, "2600.1725 2586.6496          ", "Fe II UV1"  ],
+	[0, 3, "2382.7642 2374.4603 2344.2130", "Fe II UV2+3"],
+	[1, 2, "1862.7911 1854.7183          ", "Al III"     ],
+	[0, 1, "1670.7886                    ", "Al II"      ],
 	[0, 1, "1608.4511                    ", "Fe II 1608" ],
-	[1, 2, "1550.7740 1548.2020          ", "C IV"       ],
-	[0, 1, "1526.7071                    ", "Si II 1526" ],
-	[1, 2, "1402.7700 1393.7550          ", "Si IV"      ],
+	[1, 2, "1550.7785 1548.2049          ", "C IV"       ],
+	[0, 1, "1526.7070                    ", "Si II 1526" ],
+	[1, 2, "1402.7729 1393.7602          ", "Si IV"      ],
 	[1, 1, "1334.5323                    ", "C II"       ],
-	[0, 1, "1304.3711                    ", "Si II 1304" ],
+	[0, 1, "1304.3702                    ", "Si II 1304" ],
 	[0, 1, "1302.1685                    ", "O I"        ],
-	[0, 1, "1260.4223                    ", "Si II 1260" ],
+	[0, 1, "1260.4221                    ", "Si II 1260" ],
 	[1, 2, "1242.8040 1238.8210          ", "N V"        ],
 	[1, 1, "1215.6701                    ", "Ly α"       ],
 	[0, 2, "1128.0080 1117.9770          ", "P V"        ],
 	[1, 2, "1037.6155 1031.9265          ", "O VI"       ],
 	[1, 1, "1025.7223                    ", "Ly β"       ],
 	[0, 1, "0972.5368                    ", "Ly γ"       ],
-	[0, 1, "0949.7430                    ", "Ly δ"       ],
+	[0, 1, "0949.7431                    ", "Ly δ"       ],
 	[0, 1, "0937.8035                    ", "Ly ε"       ],
 	[1, 1, "0911.7600                    ", "Lyman limit"],
 ])
@@ -388,20 +413,21 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 
 	html.Div(className="row", children=[
 
-		html.Div(className="col-sm-8 col-xs-12", children=[
+		html.Div(className="col-lg-6 col-sm-8 col-xs-12", children=[
 			html.H2("SDSSV-BHM Spectra Viewer (remote version)"),
 		]),
 
-		html.Div(className="col-sm-4 col-xs-12", children=[
+		html.Div(className="col-lg-6 col-sm-4 col-xs-12", children=[
 			dcc.Checklist(id="extra_func_list", options={
 				"z": "pipeline redshift",
-				"p": "auto match program",
+				"p": "match program",
+				"e": "show error (σ)",
 				"u": "file uploader",
 			},
 				value=["z", "p"], inline=True, persistence=True, persistence_type="local",
 				style={"marginTop": "20px", "display": "flex", "flexFlow": "wrap"},
 				inputStyle={"marginRight": "5px"},
-				labelStyle={"marginRight": "55px", "whiteSpace": "nowrap"},
+				labelStyle={"width": "180px", "whiteSpace": "nowrap"},
 			),
 
 			html.Div(dcc.Upload(html.Div([
@@ -617,7 +643,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 				),
 				dcc.Checklist(id="line_list_emi", options=[
 					# Set up emission-line active plotting dictionary with values set to the transition wavelengths
-					{"label": "{: <10}\t({}Å)".format(i[2], int(float(i[1]))),
+					{"label": "{: <10}\t({}Å)".format(i[2], round(float(i[1]))),
 					 "value": i[1]} for i in spec_line_emi],
 					value=spec_line_emi[numpy.bool_(spec_line_emi[:, 0]), 1].tolist(), # values are wavelengths
 					style={"columnCount": "2"},
@@ -633,7 +659,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 				),
 				dcc.Checklist(id="line_list_abs", options=[
 					# Set up absorption-line active plotting dictionary with values set to the transition names
-					{"label": "{: <10}\t({}Å)".format(i[3], int(float(i[2].split()[0]))),
+					{"label": "{: <10}\t({}Å)".format(i[3], round(float(i[2].split()[0]))),
 					 "value": i[2].split()[0]} for i in spec_line_abs],
 					value=[s.split()[0] for s in spec_line_abs[numpy.bool_(spec_line_abs[:, 0]), 2]], # wavelengths
 					style={"columnCount": "2"},
@@ -711,7 +737,6 @@ def set_input_or_dropdown(location: str, program: str, checklist: list[str]):
 	Input("program_dropdown", "value"))
 def set_fieldid_options(selected_program):
 	if not selected_program or selected_program == "(other)": return []
-	# print(selected_program) # for testing
 	xs = programs.get(selected_program, []) + ["all"]
 	return [{"label": str(x), "value": str(x)} for x in xs]
 
@@ -892,27 +917,32 @@ def show_pipeline_redshift(fieldid, catalogid):
 	Input("line_list_emi", "value"),
 	Input("line_list_abs", "value"),
 	Input("smooth_input", "value"),
+	Input("extra_func_list", "value"),
 	Input("dash-user-upload", "data"))
 def make_multiepoch_spectra(fieldid, catalogid, extra_obj, redshift, redshift_step,
                             y_max, y_min, x_max, x_min, list_emi, list_abs, smooth,
-                            user_data: dict):
-	waves, fluxes, names = list(), list(), list()
+                            checklist: list[str], user_data: dict):
+	layout_axis = dict(fixedrange=True)
+	layout = dict(yaxis=layout_axis, xaxis=layout_axis, xaxis2=layout_axis)
+
+	names, waves, fluxes, delta = list[str](), list[NDArray](), list[NDArray](), list[NDArray]()
 	if user_data:
 		for k, v in user_data.items():
 			try: #
-				wave, flux, name = numpy.asarray(v[0]), numpy.asarray(v[1]), str(k)
-				# print((wave, flux, name))
-				waves.append(wave), fluxes.append(flux), names.append(name)
+				name, wave, flux = str(k), numpy.asarray(v[0]), numpy.asarray(v[1])
+				errs = numpy.asarray([])
+				# print((name, wave, flux))
+				names.append(name), waves.append(wave), fluxes.append(flux), delta.append(errs)
 			except: print_exc()
-	noop_size = len(waves)
+	noop_size = len(names)
 	try:
-		meta, _waves, _fluxes, _names = fetch_catID(fieldid, catalogid, extra_obj)
-		waves.extend(_waves), fluxes.extend(_fluxes), names.extend(_names)
+		meta, name, wave, flux, errs = fetch_catID(fieldid, catalogid, extra_obj)
+		names.extend(name), waves.extend(wave), fluxes.extend(flux), delta.extend(errs)
 		if meta[1] and not redshift and redshift_step == "any": redshift = meta[1]
 		smooth, z = int(smooth or smooth_default), float(redshift or redshift_default)
 	except Exception as e:
 		if str(e): print(e) if isinstance(e, HTTPError) else print_exc()
-		return go.Figure(), redshift
+		return Figure(layout=layout), redshift
 
 	try:
 
@@ -926,24 +956,26 @@ def make_multiepoch_spectra(fieldid, catalogid, extra_obj, redshift, redshift_st
 		rest_x_max = math.ceil(x_max / (z + 1))
 		rest_x_min = math.floor(x_min / (z + 1))
 
-		fig = go.Figure()
+		fig = Figure(layout=layout)
 		fig.layout.yaxis.range = [y_min, y_max]
 		fig.layout.xaxis.range = [rest_x_min, rest_x_max]
 
-		# For each spectrum "i" in the list
-		for i in range(0, len(waves)):
+		# For each spectrum in the list
+		for i in range(len(names)):
 			kws = dict()
-			if fullmatch(r"allplate-\d+.*", str(names[i]), IGNORECASE):
+			if fullmatch(r"allplate-\d+.*", names[i], IGNORECASE):
 				kws = dict(line_color="#606060")
-			if fullmatch(r"allFPS-\d+.*", str(names[i]), IGNORECASE):
+			if fullmatch(r"allFPS-\d+.*", names[i], IGNORECASE):
 				kws = dict(line_color="#000000")
 			# create trace of smoothed spectra
-			fig.add_trace(go.Scatter(
+			fig.add_trace(Scatter(
 				x=waves[i] if i < noop_size else waves[i] / (z + 1),
 				y=convolve(fluxes[i], Box1DKernel(smooth)),
-				name=str(names[i]), opacity=1 / 2, mode="lines", **kws))
+				error_y_width=0, error_y_thickness=1, error_y_type="data", # σ
+				error_y_array=delta[i] if delta[i].size and "e" in checklist else None,
+				name=names[i], opacity=1 / 2, mode="lines", **kws))
 			# create "ghost trace" spanning the displayed observed wavelength range:
-			fig.add_trace(go.Scatter(
+			fig.add_trace(Scatter(
 				x=[x_min, x_max], y=[numpy.nan, numpy.nan], showlegend=False))
 		fig.data[1].xaxis = "x2" # assign the "ghost trace" to a new axis object
 
@@ -968,13 +1000,13 @@ def make_multiepoch_spectra(fieldid, catalogid, extra_obj, redshift, redshift_st
 					labeled = True
 
 		fig.update_layout( # Rest wavelengths on top axis; observed wavelengths on bottom axis
-			xaxis1={"side": "top", "title_text": "Rest-Frame Wavelength (Å)"},
-			xaxis2={"anchor": "y", "overlaying": "x", "title_text": "Observed Wavelength (Å)"},
+			xaxis1=dict(side="top", title_text="Rest-Frame Wavelength (Å)"),
+			xaxis2=dict(anchor="y", overlaying="x", title_text="Observed Wavelength (Å)"),
 		)
 
 		fig.update_layout(xaxis2_range=[x_min, x_max]) # this line is necessary for some reason
 
-		# fig.update_layout(title_text="Add Info for Plot Title Here")
+		fig.update_layout(uirevision=f"{fieldid};{catalogid};{extra_obj}")
 
 	except: print_exc()
 

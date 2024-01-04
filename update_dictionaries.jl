@@ -1,4 +1,4 @@
-# Copyright (C) 2023 Heptazhou <zhou@0h7z.com>
+# Copyright (C) 2023-2024 Heptazhou <zhou@0h7z.com>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -29,8 +29,8 @@ const getfirst(predicate::Function) = A -> A[findfirst(predicate, A)]
 const s_info(xs...) = @static nthreads() > 1 ? @spawn(@info string(xs...)) : @info string(xs...)
 const u_sort! = unique! ∘ sort!
 
-Base.cat(x::Union{Int32, Int64}, y::Union{Int32, Int64}, pad::Integer) = Int64(10)^pad * x + y
-Base.convert(::Type{AS}, v::Vector) where AS <: AbstractSet{T} where T = AS(T[v;])
+Base.cat(x::Integer, y::Integer, ::Val{5}) = flipsign((10^5)abs(x) + mod(y, 10^5), x)
+Base.convert(::Type{S}, v::Vector) where S <: AbstractSet{T} where T = S(T[v;])
 Base.isless(::Any, ::Union{Number, VersionNumber}) = Bool(0)
 Base.isless(::Union{Number, VersionNumber}, ::Any) = Bool(1)
 
@@ -40,7 +40,7 @@ CFITSIO.cfitsio_typecode(::Type{UInt64}) = Cint(80)
 CFITSIO.type_from_bitpix(::Val{Cint(80)}) = UInt64
 
 # https://github.com/JuliaAstro/FITSIO.jl/pull/193
-FITSIO.CFITSIO_COLTYPE[80] = UInt64
+FITSIO.CFITSIO_COLTYPE[080] = UInt64
 FITSIO.fits_tform_char(::Type{UInt64}) = 'W'
 
 @static if VERSION < v"1.7"
@@ -72,7 +72,8 @@ const cols = LittleDict{Symbol, DataType}(
 )
 const fits = try
 	has_7z = (f::String) -> try
-		any(startswith(r"7-Zip\b"i), readlines(`7z`))
+		# https://github.com/mcmilk/7-Zip/blob/master/CPP/7zip/UI/Console/Main.cpp
+		any(startswith("7-Zip "), readlines(`7z`)) || error()
 	catch
 		(@info "7z not found. Skipping archive `$f`"; false)
 	end
@@ -183,12 +184,12 @@ end
 
 const catalogIDs = @time @sync let
 	get_dict_of(ids::OrderedSet{cols[:CATALOGID]}) = @chain df begin
-		@rselect :CATALOGID :FIELD_J2K = cat(:FIELD, :MJD - 51544, 5) :RCHI2 :Z :ZWARNING
+		@rselect :CATALOGID :FIELD_MJD = cat(:FIELD, :MJD, Val(5)) :RCHI2 :Z :ZWARNING
 		@rsubset! :CATALOGID ∈ ids
 		@rorderby :CATALOGID :ZWARNING > 0 :RCHI2
 		@by :CATALOGID begin
 			:ks = string(:CATALOGID[1])
-			:vs = (Real[:ZWARNING :Z :RCHI2][1, :], u_sort!([:FIELD_J2K;])...)
+			:vs = (Real[:ZWARNING :Z :RCHI2][1, :], u_sort!([:FIELD_MJD;])...)
 		end
 		LittleDict(_.ks, _.vs)
 	end
