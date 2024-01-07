@@ -306,15 +306,30 @@ except:
 
 ### spectral lines to label in plot
 # https://classic.sdss.org/dr6/algorithms/linestable.html
+# https://github.com/desihub/desisim/blob/main/py/desisim/data/forbidden_lines.ecsv
+# https://github.com/desihub/desisim/blob/main/py/desisim/data/recombination_lines.ecsv
+# https://github.com/desihub/desisim/blob/main/py/desisim/lya_spectra.py
+# https://github.com/sdss/idlspec2d/blob/master/etc/emlines.par
 # the first column means whether to show this line or not by default
 # the second column is the wavelength, which must be unique
 spec_line_emi = numpy.asarray([
+	[1, 7753.1900, "[Ar III]"],
+	[1, 7137.7700, "[Ar III]"],
 	[1, 6564.6130, "H α"     ],
+	[0, 6365.5350, "[O I]"   ],
+	[0, 6302.0460, "[O I]"   ],
+	[0, 5877.2990, "He I"    ],
+	[0, 5577.3390, "[O I]"   ],
+	[0, 5411.5200, "He II"   ],
 	[1, 5008.2390, "[O III]" ],
 	[1, 4960.2950, "[O III]" ],
 	[1, 4862.6830, "H β"     ],
+	[0, 4685.6800, "He II"   ],
+	[0, 4363.2090, "[O III]" ],
 	[1, 4341.6840, "H γ"     ],
 	[1, 4102.8920, "H δ"     ],
+	[0, 3971.1950, "H ε"     ],
+	[0, 3890.1510, "H ζ"     ],
 	[0, 3889.7520, "He I"    ],
 	[1, 3728.4830, "[O II]"  ], # 3729.8740 3727.0920
 	[1, 2799.9410, "Mg II"   ], # 2803.5300 2796.3520
