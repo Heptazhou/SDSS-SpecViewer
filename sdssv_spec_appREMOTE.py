@@ -17,7 +17,6 @@ from urllib.parse import urlsplit
 
 import dash
 import numpy
-import plotly.graph_objects as go
 import requests
 from astropy.convolution import Box1DKernel, convolve
 from astropy.io import fits
@@ -26,6 +25,7 @@ from dash import dcc, html
 from dash.dependencies import Input, Output, State
 from numpy import sqrt
 from numpy.typing import NDArray
+from plotly.graph_objects import Figure, Scatter
 from requests.exceptions import HTTPError
 
 ###
@@ -150,11 +150,11 @@ def SDSSV_fetch(username: str, password: str, field, MJD: int, objID, branch="")
 	numpy.seterr(divide="ignore") # Python does not comply with IEEE 754 :(
 	HDUs = fits.open(BytesIO(r.content))
 	meta = HDUs["SPALL"].data
-	wave = HDUs["COADD"].data["LOGLAM"]
-	flux = HDUs["COADD"].data["FLUX"]
-	errs = HDUs["COADD"].data["IVAR"]
-	wave = 10**wave
-	errs = 1 / sqrt(errs)
+	wave = HDUs["COADD"].data["LOGLAM"] # lg(λ)
+	flux = HDUs["COADD"].data["FLUX"]   # f
+	errs = HDUs["COADD"].data["IVAR"]   # τ = σ⁻²
+	wave = 10**wave                     # λ
+	errs = 1 / sqrt(errs)               # σ
 	# print(f"meta: {type(meta)} = {str(meta)[:100]}")
 	# print(f"wave: {type(wave)} = {str(wave)[:100]}")
 	# print(flux) # for testing
@@ -942,7 +942,7 @@ def make_multiepoch_spectra(fieldid, catalogid, extra_obj, redshift, redshift_st
 		smooth, z = int(smooth or smooth_default), float(redshift or redshift_default)
 	except Exception as e:
 		if str(e): print(e) if isinstance(e, HTTPError) else print_exc()
-		return go.Figure(layout=layout), redshift
+		return Figure(layout=layout), redshift
 
 	try:
 
@@ -956,7 +956,7 @@ def make_multiepoch_spectra(fieldid, catalogid, extra_obj, redshift, redshift_st
 		rest_x_max = math.ceil(x_max / (z + 1))
 		rest_x_min = math.floor(x_min / (z + 1))
 
-		fig = go.Figure(layout=layout)
+		fig = Figure(layout=layout)
 		fig.layout.yaxis.range = [y_min, y_max]
 		fig.layout.xaxis.range = [rest_x_min, rest_x_max]
 
@@ -968,14 +968,14 @@ def make_multiepoch_spectra(fieldid, catalogid, extra_obj, redshift, redshift_st
 			if fullmatch(r"allFPS-\d+.*", names[i], IGNORECASE):
 				kws = dict(line_color="#000000")
 			# create trace of smoothed spectra
-			fig.add_trace(go.Scatter(
+			fig.add_trace(Scatter(
 				x=waves[i] if i < noop_size else waves[i] / (z + 1),
 				y=convolve(fluxes[i], Box1DKernel(smooth)),
-				error_y_width=0, error_y_thickness=1, error_y_type="data",
+				error_y_width=0, error_y_thickness=1, error_y_type="data", # σ
 				error_y_array=delta[i] if delta[i].size and "e" in checklist else None,
 				name=names[i], opacity=1 / 2, mode="lines", **kws))
 			# create "ghost trace" spanning the displayed observed wavelength range:
-			fig.add_trace(go.Scatter(
+			fig.add_trace(Scatter(
 				x=[x_min, x_max], y=[numpy.nan, numpy.nan], showlegend=False))
 		fig.data[1].xaxis = "x2" # assign the "ghost trace" to a new axis object
 
@@ -1000,13 +1000,13 @@ def make_multiepoch_spectra(fieldid, catalogid, extra_obj, redshift, redshift_st
 					labeled = True
 
 		fig.update_layout( # Rest wavelengths on top axis; observed wavelengths on bottom axis
-			xaxis1={"side": "top", "title_text": "Rest-Frame Wavelength (Å)"},
-			xaxis2={"anchor": "y", "overlaying": "x", "title_text": "Observed Wavelength (Å)"},
+			xaxis1=dict(side="top", title_text="Rest-Frame Wavelength (Å)"),
+			xaxis2=dict(anchor="y", overlaying="x", title_text="Observed Wavelength (Å)"),
 		)
 
 		fig.update_layout(xaxis2_range=[x_min, x_max]) # this line is necessary for some reason
 
-		# fig.update_layout(title_text="Add Info for Plot Title Here")
+		# fig.update_layout(uirevision=f"{fieldid};{catalogid};{extra_obj}")
 
 	except: print_exc()
 
