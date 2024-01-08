@@ -72,7 +72,8 @@ const cols = LittleDict{Symbol, DataType}(
 )
 const fits = try
 	has_7z = (f::String) -> try
-		any(startswith(r"7-Zip\b"i), readlines(`7z`))
+		# https://github.com/mcmilk/7-Zip/blob/master/CPP/7zip/UI/Console/Main.cpp
+		any(startswith("7-Zip "), readlines(`7z`)) || error()
 	catch
 		(@info "7z not found. Skipping archive `$f`"; false)
 	end

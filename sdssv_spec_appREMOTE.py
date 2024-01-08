@@ -151,7 +151,7 @@ def SDSSV_fetch(username: str, password: str, field, MJD: int, objID, branch="")
 	HDUs = fits.open(BytesIO(r.content))
 	meta = HDUs["SPALL"].data
 	wave = HDUs["COADD"].data["LOGLAM"] # lg(λ)
-	flux = HDUs["COADD"].data["FLUX"]   # f
+	flux = HDUs["COADD"].data["FLUX"]   # f_λ
 	errs = HDUs["COADD"].data["IVAR"]   # τ = σ⁻²
 	wave = 10**wave                     # λ
 	errs = 1 / sqrt(errs)               # σ
@@ -1006,7 +1006,7 @@ def make_multiepoch_spectra(fieldid, catalogid, extra_obj, redshift, redshift_st
 
 		fig.update_layout(xaxis2_range=[x_min, x_max]) # this line is necessary for some reason
 
-		# fig.update_layout(uirevision=f"{fieldid};{catalogid};{extra_obj}")
+		fig.update_layout(uirevision=f"{fieldid};{catalogid};{extra_obj}")
 
 	except: print_exc()
 
