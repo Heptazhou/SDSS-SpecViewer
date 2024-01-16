@@ -716,7 +716,7 @@ def set_input_or_dropdown(location: str, program: str, checklist: list[str]):
 		k, v = x.split("=", 1)
 		if k == "z": redshift = v
 	if program == "(other)" and "p" in checklist and fullmatch(r"\d+(-.*)?", fid_mjd):
-		field = int(fid_mjd.split("-", 2)[0])
+		field = int(fid_mjd.split("-", 1)[0])
 		catid = int(catalog)
 		for prog in programs.keys():
 			if field not in programs.get(f"{prog    }", []): continue
@@ -761,16 +761,16 @@ def set_catalogid_options(selected_fieldid, selected_program):
 	Input("fieldid_input", "value"),
 	State("program_dropdown", "value"))
 def set_fieldid_value(available_fieldid_options, input: str, program: str):
-	try: input = str(int(input.split("-", 2)[0]))
-	except: None
 	try:
-		if program: return input or ""
+		if input and program == "(other)":
+			return input
+		if input and program and fullmatch(r"\d+(-.*)?", input):
+			return input.split("-", 1)[0]
 		# uncomment the following line to automatically choose the first field in the program
 		# return available_fieldid_options[0]["value"]
-		return ""
 	except Exception as e:
 		if str(e): print_exc()
-		return ""
+	return ""
 
 @app.callback(
 	Output("catalogid_dropdown", "value"),
@@ -779,13 +779,13 @@ def set_fieldid_value(available_fieldid_options, input: str, program: str):
 	State("program_dropdown", "value"))
 def set_catalogid_value(available_catalogid_options, input: str, program: str):
 	try:
-		if program: return input or ""
+		if input and program:
+			return input
 		# uncomment the following line to automatically choose the first catid in the field
 		# return available_catalogid_options[0]["value"]
-		return ""
 	except Exception as e:
 		if str(e): print_exc()
-		return ""
+	return ""
 
 # enable/disable stepping for the redshift input (see comment in the beginning of the file)
 @app.callback(
@@ -830,17 +830,17 @@ def set_fieldid_options(search: str):
 	State("axis_y_min", "value"),
 	State("axis_x_max", "value"),
 	State("axis_x_min", "value"),
-	State("redshift_step", "value"),
 	State("redshift_input", "value"),
+	State("redshift_step", "value"),
 	Input("window_location", "hash"),
 	Input("program_dropdown", "value"),
 	Input("fieldid_dropdown", "value"),
 	Input("catalogid_dropdown", "value"),
 	prevent_initial_call=True)
-def reset_on_obj_change(y_max, y_min, x_max, x_min, redshift, redshift_step, hash, program, *_):
+def reset_on_obj_change(y_max, y_min, x_max, x_min, z, z_step, hash, program, *_):
 	smooth = smooth_default
 	if program != "(other)":
-		redshift_step, redshift = "", ""
+		z, z_step = "", ""
 		y_min, y_max = y_min_default, y_max_default
 		x_min, x_max = int(wave_min), int(wave_max)
 	for x in (hash := str(hash).lstrip("#").split("&") if hash else []):
@@ -849,7 +849,7 @@ def reset_on_obj_change(y_max, y_min, x_max, x_min, redshift, redshift_step, has
 		if k == "m": smooth = v
 		if k == "y" and fullmatch(r"[^,]+,[^,]+", v): y_min, y_max = v.split(",", 1)
 		if k == "x" and fullmatch(r"[^,]+,[^,]+", v): x_min, x_max = v.split(",", 1)
-	return y_max, y_min, x_max, x_min, redshift_step, redshift, smooth
+	return y_max, y_min, x_max, x_min, z, z_step, smooth
 
 ## show/hide file upload div
 @app.callback(
