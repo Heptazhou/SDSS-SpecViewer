@@ -310,6 +310,7 @@ except:
 # https://github.com/desihub/desisim/blob/main/py/desisim/data/recombination_lines.ecsv
 # https://github.com/desihub/desisim/blob/main/py/desisim/lya_spectra.py
 # https://github.com/sdss/idlspec2d/blob/master/etc/emlines.par
+# https://physics.nist.gov/PhysRefData/Handbook/Tables/irontable2.htm
 # the first column means whether to show this line or not by default
 # the second column is the wavelength, which must be unique
 spec_line_emi = numpy.asarray([
@@ -331,8 +332,15 @@ spec_line_emi = numpy.asarray([
 	[0, 3971.1950, "H ε"     ],
 	[0, 3890.1510, "H ζ"     ],
 	[0, 3889.7520, "He I"    ],
+	[0, 3850.8100, "Fe I"    ], # 3886.2822 3859.9114 3820.4253
+	[0, 3739.3497, "Fe I"    ], # 3758.2329 3749.4854 3748.2622 3745.5613 3737.1316 3734.8638 3719.9348
 	[1, 3728.4830, "[O II]"  ], # 3729.8740 3727.0920
+	[0, 3524.9583, "Fe I"    ], # 3581.1931 3440.606
 	[1, 2799.9410, "Mg II"   ], # 2803.5300 2796.3520
+	[0, 2748.7814, "Fe II"   ], # 2755.7365 2749.3216 2739.5474
+	[0, 2587.3092, "Fe II"   ], # 2611.8736 2607.0871 2599.3956 2598.3692 2585.8758 2493.2637
+	[0, 2492.2473, "Fe I"    ], # 2522.8494 2490.6443 2488.1426 2483.2708
+	[0, 2384.1601, "Fe II"   ], # 2404.8858 2395.6254 2382.0376 2343.4951
 	[1, 2326.0000, "C II"    ],
 	[1, 1908.7340, "C III]"  ],
 	[0, 1640.4200, "He II"   ],
@@ -514,7 +522,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 				dcc.Input( # do not use type="number"! it is automatically updated when the next field changes
 					id="redshift_input", # redshift_dropdown
 					type="text", step="any", pattern=r"-?\d+(\.\d*)?|-?\.\d+",
-					value=redshift or "", placeholder=redshift_default, min=0,
+					value=redshift or "", placeholder=redshift_default, min=-1,
 					style={"height": "36px", "width": "100%"}, inputMode="numeric",
 				)]),
 
@@ -639,7 +647,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 			## label spectral lines (emission) (2 columns)
 			html.Div(className="col-md-6 col-sm-9 col-xs-12", children=[
 				html.Label(
-					html.H4("Emission lines"),
+					html.H4("Emission lines", id="line_list_emi_h4", n_clicks=0),
 				),
 				dcc.Checklist(id="line_list_emi", options=[
 					# Set up emission-line active plotting dictionary with values set to the transition wavelengths
@@ -655,7 +663,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 			## label spectral lines (absorption) (2 columns)
 			html.Div(className="col-md-6 col-sm-9 col-xs-12", children=[
 				html.Label(
-					html.H4("Absorption lines"),
+					html.H4("Absorption lines", id="line_list_abs_h4", n_clicks=0),
 				),
 				dcc.Checklist(id="line_list_abs", options=[
 					# Set up absorption-line active plotting dictionary with values set to the transition names
@@ -901,6 +909,34 @@ def show_pipeline_redshift(fieldid, catalogid):
 		if str(e): print(e) if isinstance(e, HTTPError) else print_exc()
 		return None, None, None
 
+@app.callback(
+	Output("line_list_emi_h4", "n_clicks"),
+	Output("line_list_emi", "value"),
+	Input("line_list_emi_h4", "n_clicks"),
+	State("line_list_emi", "value"),
+	State("line_list_emi", "options"),
+)
+def line_list_emi_select_all(clk: int, val: list, opt: list):
+	if (clk > 0):
+		clk = 0
+		all = [x["value"] for x in opt]
+		val = all if len(val) < len(all) else []
+	return clk, val
+
+@app.callback(
+	Output("line_list_abs_h4", "n_clicks"),
+	Output("line_list_abs", "value"),
+	Input("line_list_abs_h4", "n_clicks"),
+	State("line_list_abs", "value"),
+	State("line_list_abs", "options"),
+)
+def line_list_abs_select_all(clk: int, val: list, opt: list):
+	if (clk > 0):
+		clk = 0
+		all = [x["value"] for x in opt]
+		val = all if len(val) < len(all) else []
+	return clk, val
+
 ## plot the spectra
 @app.callback(
 	Output("spectra_plot", "figure"),
@@ -953,6 +989,7 @@ def make_multiepoch_spectra(fieldid, catalogid, extra_obj, redshift, redshift_st
 		if y_max < y_min: y_min, y_max = y_max, y_min
 		if x_max < x_min: x_min, x_max = x_max, x_min
 		# changed following to explicitly be in rest frame (bottom x axis)
+		if z == -1: z = math.nextafter(z, (0))
 		rest_x_max = math.ceil(x_max / (z + 1))
 		rest_x_min = math.floor(x_min / (z + 1))
 
