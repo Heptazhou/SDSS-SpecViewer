@@ -23,7 +23,7 @@ from astropy.io import fits
 from astropy.io.fits.fitsrec import FITS_rec
 from dash import dcc, html
 from dash.dependencies import Input, Output, State
-from numpy import sqrt
+from numpy import mean, median, sqrt
 from numpy.typing import NDArray
 from plotly.graph_objects import Figure, Scatter
 from requests.exceptions import HTTPError
@@ -441,8 +441,10 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 			html.Div(dcc.Upload(html.Div([
 				html.Br(), html.H4("Drag and drop / select file(s)"), html.Br(),
 			], style={"margin": "0 20px", "textAlign": "center"}),
-				id="file_ul", multiple=True, style={"border": "1px dashed", "borderRadius": "5px"},
-			), id="file_ul_div", hidden=True, style={"margin": "20px 0", "width": "100%"}),
+				id="file_ul", multiple=True,
+			), id="file_ul_div", hidden=True, style={
+				"margin": "20px 0", "width": "100%",
+				"border": "1px dashed", "borderRadius": "5px"}),
 		]),
 	]),
 
@@ -880,12 +882,17 @@ def process_upload(sto: dict, contents: list[str], filename: list[str], timestam
 		for s, f, t in zip(contents, filename, timestamp):
 			try:
 				# print((s[:100], f, t))
-				mime, data = s.split(",", 1)
 				f = tmpdir / f
+				mime, data = s.split(",", 1)
+				head, data = 0, b64decode(data).decode()
+				for line in data.splitlines():
+					if fullmatch(r"^\s*[+-]?\d+.*", line): break
+					head += 1
 				with open(f, mode="w+") as io:
-					io.write(b64decode(data).decode())
-				a = numpy.genfromtxt(f).transpose()
+					io.write(data)
+				a = numpy.genfromtxt(f, skip_header=head).transpose()
 				sto[f.stem] = a
+				# print(a)
 			except: print_exc()
 	return sto
 
@@ -961,13 +968,21 @@ def make_multiepoch_spectra(fieldid, catalogid, extra_obj, redshift, redshift_st
 	layout_axis = dict(fixedrange=True)
 	layout = dict(yaxis=layout_axis, xaxis=layout_axis, xaxis2=layout_axis)
 
+	smooth, z = int(smooth or smooth_default), float(redshift or redshift_default)
+	if (1 + z) <= 0: z = math.nextafter(-1, 0) # z ∈ (-1, +∞)
+
 	names, waves, fluxes, delta = list[str](), list[NDArray](), list[NDArray](), list[NDArray]()
 	if user_data:
 		for k, v in user_data.items():
 			try: #
 				name, wave, flux = str(k), numpy.asarray(v[0]), numpy.asarray(v[1])
-				errs = numpy.asarray([])
-				# print((name, wave, flux))
+				errs = numpy.asarray([] if len(v) < 2 else v[2])
+				if mean(wave) <= 10: wave = 10**wave # λ
+				if median(wave) >= 5000: wave = wave / (1 + z) # consider as observed instead of rest frame
+				if len(errs) > 0:
+					numpy.seterr(divide="ignore") # :(
+					errs = 1 / sqrt(errs) # σ
+				# print((name, wave, flux, errs))
 				names.append(name), waves.append(wave), fluxes.append(flux), delta.append(errs)
 			except: print_exc()
 	noop_size = len(names)
@@ -975,7 +990,6 @@ def make_multiepoch_spectra(fieldid, catalogid, extra_obj, redshift, redshift_st
 		meta, name, wave, flux, errs = fetch_catID(fieldid, catalogid, extra_obj)
 		names.extend(name), waves.extend(wave), fluxes.extend(flux), delta.extend(errs)
 		if meta[1] and not redshift and redshift_step == "any": redshift = meta[1]
-		smooth, z = int(smooth or smooth_default), float(redshift or redshift_default)
 	except Exception as e:
 		if str(e): print(e) if isinstance(e, HTTPError) else print_exc()
 		return Figure(layout=layout), redshift
@@ -989,9 +1003,8 @@ def make_multiepoch_spectra(fieldid, catalogid, extra_obj, redshift, redshift_st
 		if y_max < y_min: y_min, y_max = y_max, y_min
 		if x_max < x_min: x_min, x_max = x_max, x_min
 		# changed following to explicitly be in rest frame (bottom x axis)
-		if z == -1: z = math.nextafter(z, (0))
-		rest_x_max = math.ceil(x_max / (z + 1))
-		rest_x_min = math.floor(x_min / (z + 1))
+		rest_x_max = math.ceil(x_max / (1 + z))
+		rest_x_min = math.floor(x_min / (1 + z))
 
 		fig = Figure(layout=layout)
 		fig.layout.yaxis.range = [y_min, y_max]
@@ -1006,7 +1019,7 @@ def make_multiepoch_spectra(fieldid, catalogid, extra_obj, redshift, redshift_st
 				kws = dict(line_color="#000000")
 			# create trace of smoothed spectra
 			fig.add_trace(Scatter(
-				x=waves[i] if i < noop_size else waves[i] / (z + 1),
+				x=waves[i] if i < noop_size else waves[i] / (1 + z),
 				y=convolve(fluxes[i], Box1DKernel(smooth)),
 				error_y_width=0, error_y_thickness=1, error_y_type="data", # σ
 				error_y_array=delta[i] if delta[i].size and "e" in checklist else None,
