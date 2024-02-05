@@ -976,7 +976,7 @@ def make_multiepoch_spectra(fieldid, catalogid, extra_obj, redshift, redshift_st
 		for k, v in user_data.items():
 			try: #
 				name, wave, flux = str(k), numpy.asarray(v[0]), numpy.asarray(v[1])
-				errs = numpy.asarray([] if len(v) < 2 else v[2])
+				errs = numpy.asarray(v[2] if 2 < len(v) else [])
 				if mean(wave) <= 10: wave = 10**wave # λ
 				if median(wave) >= 5000: wave = wave / (1 + z) # consider as observed instead of rest frame
 				if len(errs) > 0:
