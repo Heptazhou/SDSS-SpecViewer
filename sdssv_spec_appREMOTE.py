@@ -23,7 +23,7 @@ from astropy.io import fits
 from astropy.io.fits.fitsrec import FITS_rec
 from dash import dcc, html
 from dash.dependencies import Input, Output, State
-from numpy import mean, median, sqrt
+from numpy import mean, median, sqrt, std
 from numpy.typing import NDArray
 from plotly.graph_objects import Figure, Scatter
 from requests.exceptions import HTTPError
@@ -88,7 +88,7 @@ def SDSSV_buildURL(field: str, MJD: int, objID: str, branch: str):
 	use str.zfill(6) to fix it.
 	"""
 	path = ""
-	file = f"spec-{field.rstrip('p')}-{MJD}-{objID}.fits" # PBH
+	file = f"spec-%s-{MJD}-{objID}.fits" % field.rstrip("p")
 
 	if branch == "v5_4_45":
 		path = "https://data.sdss.org/sas/dr9/sdss/spectro/redux"
@@ -106,7 +106,7 @@ def SDSSV_buildURL(field: str, MJD: int, objID: str, branch: str):
 		path = "https://data.sdss.org/sas/dr16/sdss/spectro/redux"
 	if branch == "v5_13_2":
 		path = "https://data.sdss.org/sas/dr18/spectro/sdss/redux"
-	if not path:
+	if path == "":
 		path = "https://data.sdss5.org/sas/sdsswork/bhm/boss/spectro/redux"
 		file = f"{MJD}/{file}"
 
@@ -129,7 +129,7 @@ def SDSSV_fetch(username: str, password: str, field, MJD: int, objID, branch="")
 			branch = branch or "v5_13_2"
 		else:
 			field = str(field).zfill(6)
-	except: None
+	except: pass
 	field, objID = str(field), str(objID) # ensure type
 
 	if not branch:
@@ -205,7 +205,7 @@ def fetch_catID(field, catID, extra="") \
 			dat = SDSSV_fetch(username, password, fid, mjd, obj, ver)
 		except Exception as e:
 			if str(e): print(e) if isinstance(e, HTTPError) else print_exc()
-			raise
+			raise # re-raise
 		if not meta[0]: meta[0] = dat[0]["ZWARNING"][0]
 		if not meta[1]: meta[1] = dat[0]["Z"][0]
 		if not meta[2]: meta[2] = dat[0]["RCHI2"][0]
@@ -551,7 +551,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 			dcc.Input(
 				id="redshift_sdss_z", placeholder="N/A", value="", readOnly=True,
 				style={"height": "36px", "width": "100%"}, inputMode="numeric",
-			)]),
+			)], title="Read only"),
 
 		## pipeline info - reduced χ²
 		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
@@ -561,7 +561,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 			dcc.Input(
 				id="redshift_sdss_rchi2", placeholder="N/A", value="", readOnly=True,
 				style={"height": "36px", "width": "100%"}, inputMode="numeric",
-			)]),
+			)], title="Read only"),
 
 		## pipeline info - bad redshift fits
 		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
@@ -571,7 +571,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 			dcc.Input(
 				id="redshift_sdss_zwarning", placeholder="N/A", value="", readOnly=True,
 				style={"height": "36px", "width": "100%"}, inputMode="numeric",
-			)]),
+			)], title="Read only"),
 
 	]),
 
@@ -653,8 +653,8 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 				),
 				dcc.Checklist(id="line_list_emi", options=[
 					# Set up emission-line active plotting dictionary with values set to the transition wavelengths
-					{"label": "{: <10}\t({}Å)".format(i[2], round(float(i[1]))),
-					 "value": i[1]} for i in spec_line_emi],
+					{"label": f"{i[2]: <10}\t(%sÅ)" % round(float(i[1])),
+					 "value": f"{i[1]}"} for i in spec_line_emi],
 					value=spec_line_emi[numpy.bool_(spec_line_emi[:, 0]), 1].tolist(), # values are wavelengths
 					style={"columnCount": "2"},
 					inputStyle={"marginRight": "5px"},
@@ -669,8 +669,8 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 				),
 				dcc.Checklist(id="line_list_abs", options=[
 					# Set up absorption-line active plotting dictionary with values set to the transition names
-					{"label": "{: <10}\t({}Å)".format(i[3], round(float(i[2].split()[0]))),
-					 "value": i[2].split()[0]} for i in spec_line_abs],
+					{"label": f"{i[3]: <10}\t(%sÅ)" % round(float(i[2].split()[0])),
+					 "value": f"{i[2].split()[0]}"} for i in spec_line_abs],
 					value=[s.split()[0] for s in spec_line_abs[numpy.bool_(spec_line_abs[:, 0]), 2]], # wavelengths
 					style={"columnCount": "2"},
 					inputStyle={"marginRight": "5px"},
@@ -980,8 +980,10 @@ def make_multiepoch_spectra(fieldid, catalogid, extra_obj, redshift, redshift_st
 				if mean(wave) <= 10: wave = 10**wave # λ
 				if median(wave) >= 5000: wave = wave / (1 + z) # consider as observed instead of rest frame
 				if len(errs) > 0:
-					numpy.seterr(divide="ignore") # :(
-					errs = 1 / sqrt(errs) # σ
+					if mean(errs) < 1 and median(errs) < 1 and std(errs) < 1: pass # consider as σ
+					else:
+						numpy.seterr(divide="ignore") # :(
+						errs = 1 / sqrt(errs) # σ
 				# print((name, wave, flux, errs))
 				names.append(name), waves.append(wave), fluxes.append(flux), delta.append(errs)
 			except: print_exc()

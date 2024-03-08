@@ -198,5 +198,12 @@ const catalogIDs = @time @sync let
 end
 
 @info "Dumping dictionaries to file"
-write("dictionaries.txt", "[\n", join(json.([programs, fieldIDs, catalogIDs]), ",\n"), "\n]", "\n")
+write("dictionaries.txt",
+	"""
+	[
+		$(json(programs)),
+		$(json(fieldIDs)),
+		$(json(catalogIDs))
+	]
+	""")
 
