@@ -21,7 +21,7 @@ using Base.Threads: @spawn, @threads, nthreads
 using DataFrames: DataFrame
 using DataFramesMeta
 using FITSIO: FITS, Tables.columnnames
-using FITSIO: FITSIO, CFITSIO # problematic
+using FITSIO: FITSIO # fix merged but not released
 using JSON: json
 using OrderedCollections
 
@@ -33,11 +33,6 @@ Base.cat(x::Integer, y::Integer, ::Val{5}) = flipsign((10^5)abs(x) + mod(y, 10^5
 Base.convert(::Type{S}, v::Vector) where S <: AbstractSet{T} where T = S(T[v;])
 Base.isless(::Any, ::Union{Number, VersionNumber}) = Bool(0)
 Base.isless(::Union{Number, VersionNumber}, ::Any) = Bool(1)
-
-# https://github.com/JuliaAstro/CFITSIO.jl/pull/22
-CFITSIO.bitpix_from_type(::Type{UInt64}) = Cint(80)
-CFITSIO.cfitsio_typecode(::Type{UInt64}) = Cint(80)
-CFITSIO.type_from_bitpix(::Val{Cint(80)}) = UInt64
 
 # https://github.com/JuliaAstro/FITSIO.jl/pull/193
 FITSIO.CFITSIO_COLTYPE[080] = UInt64

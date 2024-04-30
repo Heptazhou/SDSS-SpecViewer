@@ -19,8 +19,8 @@ import dash
 import numpy
 import requests
 from astropy.convolution import Box1DKernel, convolve
-from astropy.io import fits
-from astropy.io.fits.fitsrec import FITS_rec
+from astropy.io import fits as FITS
+from astropy.io.fits import BinTableHDU, FITS_rec
 from dash import dcc, html
 from dash.dependencies import Input, Output, State
 from numpy import mean, median, sqrt, std
@@ -32,7 +32,6 @@ from requests.exceptions import HTTPError
 ### input the data directory path
 ###
 
-# NOTE TO CODER: JSON LIKES STRING KEYS FOR DICTIONARIES!!!!!!
 dictionaries = json.load(open("dictionaries.txt"))
 authentication = "authentication.txt"
 programs: dict[str, list[int]] = dictionaries[0]
@@ -46,8 +45,8 @@ catalogIDs: dict[str, list[list | int]] = dictionaries[2]
 # print("those were fieldIDs")
 # print(catalogIDs)
 # print("those were catalogIDs")
-# print("catalog*5", catalogIDs["27021598109009995"]) # for testing
-# print("field17049", fieldIDs["17049"]) # for testing
+# print("catalog*5", catalogIDs["27021598109009995"])
+# print("field17049", fieldIDs["17049"])
 
 # the redshift and stepping to easily adjust redshift using arrow keys or mouse wheel, disabled by default
 # because unfortunately, setting a numeric `step` attribute for an `input` element also means the value of
@@ -111,7 +110,7 @@ def SDSSV_buildURL(field: str, MJD: int, objID: str, branch: str):
 		file = f"{MJD}/{file}"
 
 	url = f"{path}/{branch}/spectra/lite/{field}/{file}"
-	# print(url) # for testing
+	# print(url)
 	return url
 
 def SDSSV_fetch(username: str, password: str, field, MJD: int, objID, branch="") \
@@ -133,7 +132,7 @@ def SDSSV_fetch(username: str, password: str, field, MJD: int, objID, branch="")
 	field, objID = str(field), str(objID) # ensure type
 
 	if not branch:
-		for v in ("master", "v6_1_2", "v6_1_1"):
+		for v in ("master", "v6_1_3", "v6_1_2"):
 			try: return SDSSV_fetch(username, password, field, MJD, objID, v)
 			except: continue
 		raise HTTPError(f"SDSSV_fetch failed for {(field, MJD, objID)}")
@@ -143,21 +142,23 @@ def SDSSV_fetch(username: str, password: str, field, MJD: int, objID, branch="")
 		return cache[(field, MJD, objID, branch)]
 
 	url = SDSSV_buildURL(field, MJD, objID, branch)
-	# print(url) # for testing
+	# print(url)
 	r = requests.get(url, auth=(username, password) if "/sdsswork/" in url else None)
 	r.raise_for_status()
 	print(r.status_code, url)
 	numpy.seterr(divide="ignore") # Python does not comply with IEEE 754 :(
-	HDUs = fits.open(BytesIO(r.content))
-	meta = HDUs["SPALL"].data
-	wave = HDUs["COADD"].data["LOGLAM"] # lg(λ)
-	flux = HDUs["COADD"].data["FLUX"]   # f_λ
-	errs = HDUs["COADD"].data["IVAR"]   # τ = σ⁻²
+	fits = FITS.open(BytesIO(r.content))
+	hdu2: BinTableHDU = fits["COADD"]
+	hdu3: BinTableHDU = fits["SPALL"]
+	meta: FITS_rec = hdu3.data
+	wave: NDArray = hdu2.data["LOGLAM"] # lg(λ)
+	flux: NDArray = hdu2.data["FLUX"]   # f_λ
+	errs: NDArray = hdu2.data["IVAR"]   # τ = σ⁻²
 	wave = 10**wave                     # λ
 	errs = 1 / sqrt(errs)               # σ
 	# print(f"meta: {type(meta)} = {str(meta)[:100]}")
 	# print(f"wave: {type(wave)} = {str(wave)[:100]}")
-	# print(flux) # for testing
+	# print(flux)
 	r = meta, wave, flux, errs
 	cache[(field, MJD, objID, branch)] = r
 	return r
@@ -178,7 +179,8 @@ def fetch_catID(field, catID, extra="") \
 	# testval = catalogIDs[catID]
 	# print(testval)
 	data = catalogIDs.get(catID, [[]]) # [(ZWARNING, Z, RCHI2), {FIELD,MJD}...]
-	meta = list(data[0] or [None, None, None]) # (ZWARNING, Z, RCHI2)
+	meta = list(data[0])
+	meta = meta or [None, None, None] # (ZWARNING, Z, RCHI2)
 	for x in extra.split(","):
 		x, ver = [*x.split("@", 1), ""][:2]
 		if not fullmatch(r"\d+p?-\d+-[^-](.*[^-])?", x): continue
@@ -262,7 +264,7 @@ def fetch_catID(field, catID, extra="") \
 			flux.append(dat[2])
 			errs.append(dat[3])
 			break
-	# print(flux) # for testing
+	# print(flux)
 	if not (meta and name and wave and flux):
 		raise HTTPError(f"fetch_catID failed for {(field, catID, extra)}")
 	r = meta, name, wave, flux, errs
@@ -811,15 +813,14 @@ def set_redshift_stepping(z, step):
 		type = "text"
 	else:
 		type = "number"
-	if type == "number" and z:
-		z = f"%0.{-int(math.log10(step))}f" % float(z)
+		if z: z = f"%0.{-int(math.log10(float(step)))}f" % float(z)
 	return z, type, step
 
 # set extra object(s) list to plot for comparison
 @app.callback(
 	Output("extra_obj_input", "value"),
 	Input("window_location", "search"))
-def set_fieldid_options(search: str):
+def set_extra_obj(search: str):
 	extra_obj = ""
 	for x in search.lstrip("?").split("&"):
 		if not fullmatch(r"[^=]+=[^=]+", x): continue
@@ -890,7 +891,7 @@ def process_upload(sto: dict, contents: list[str], filename: list[str], timestam
 					head += 1
 				with open(f, mode="w+") as io:
 					io.write(data)
-				a = numpy.genfromtxt(f, skip_header=head).transpose()
+				a = numpy.genfromtxt(f, dtype=None, skip_header=head).transpose()
 				sto[f.stem] = a
 				# print(a)
 			except: print_exc()
@@ -1068,7 +1069,7 @@ def make_multiepoch_spectra(fieldid, catalogid, extra_obj, redshift, redshift_st
 
 if __name__ == "__main__":
 	# app.run(threaded=True, debug=True)
-	# app.run(host="0.0.0.0", port=8050, threaded=True, debug=True)
-	app.run(host="127.0.0.1", port=8050, threaded=True, debug=True)
+	# app.run(host="0.0.0.0", port="8050", threaded=True, debug=True)
+	app.run(host="127.0.0.1", port="8050", threaded=True, debug=True)
 
 
