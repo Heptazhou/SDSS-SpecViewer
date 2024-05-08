@@ -1,4 +1,4 @@
-### SpecViewer for Python 3.9+
+### SpecViewer for Python v3.9+
 
 """
 Excelsior!
@@ -13,6 +13,7 @@ from pathlib import Path
 from re import IGNORECASE, fullmatch
 from tempfile import TemporaryDirectory
 from traceback import print_exc
+from typing import Union
 from urllib.parse import urlsplit
 
 import dash
@@ -36,7 +37,9 @@ dictionaries = json.load(open("dictionaries.txt"))
 authentication = "authentication.txt"
 programs: dict[str, list[int]] = dictionaries[0]
 fieldIDs: dict[str, list[int]] = dictionaries[1]
-catalogIDs: dict[str, list[list | int]] = dictionaries[2]
+# https://docs.python.org/3/library/typing.html#typing.Union
+# catalogIDs: dict[str, list[list | int]] = dictionaries[2] # require Python v3.10
+catalogIDs: dict[str, list[Union[list, int]]] = dictionaries[2]
 
 # for testing
 # print(programs)
