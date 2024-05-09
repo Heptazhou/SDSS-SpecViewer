@@ -63,8 +63,8 @@ stepping = None
 cache: dict[tuple, tuple] = {}
 
 # default y-axis range of spectrum plots
-y_max_default = 100
-y_min_default = -10
+y_max_default = 20
+y_min_default = 0
 
 # smoothing along x-axis, disabled by default (one means no smoothing)
 # we need an upper limit since a very large value freezes the program
