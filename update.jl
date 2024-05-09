@@ -1,4 +1,4 @@
-# Copyright (C) 2023 Heptazhou <zhou@0h7z.com>
+# Copyright (C) 2023-2024 Heptazhou <zhou@0h7z.com>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -13,20 +13,22 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-using Pkg: Pkg
+using Pkg: Pkg, Registry, RegistrySpec
 cd(@__DIR__)
 Pkg.activate(".")
 
 try
-	"Manifest.toml" |> f -> (v"1.7" ≤ VERSION && isfile(f) || return;
-	any(startswith("julia_version"), eachline(f)) || rm(f))
-	Pkg.Registry.update("General")
+	Registry.update("General")
+	Registry.update(RegistrySpec(uuid = "7b72b01d-f38d-499e-a380-e4075523b21d"))
+catch
+	Registry.add("General")
+	Registry.add(RegistrySpec(url = "https://github.com/0h7z/0hjl.git"))
+end
+try
 	Pkg.resolve()
 	Pkg.instantiate()
+	using DataFramesMeta, Exts, FITSIO, JSON, OrderedCollections
 catch
-	Pkg.Registry.add("General")
 	Pkg.update()
 end
-using DataFrames, DataFramesMeta,
-	FITSIO, JSON, OrderedCollections
 

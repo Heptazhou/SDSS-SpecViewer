@@ -17,36 +17,23 @@ using Pkg: Pkg
 cd(@__DIR__)
 Pkg.activate(".")
 
-using Base.Threads: @spawn, @threads, nthreads
-using DataFrames: DataFrame
 using DataFramesMeta
+using Exts
 using FITSIO: FITS, Tables.columnnames
 using FITSIO: FITSIO # fix merged but not released
-using JSON: json
+using JSON5: json
 using OrderedCollections
 
-const getfirst(predicate::Function) = A -> A[findfirst(predicate, A)]
 const s_info(xs...) = @static nthreads() > 1 ? @spawn(@info string(xs...)) : @info string(xs...)
 const u_sort! = unique! ∘ sort!
 
 Base.cat(x::Integer, y::Integer, ::Val{5}) = flipsign((10^5)abs(x) + mod(y, 10^5), x)
-Base.convert(::Type{S}, v::Vector) where S <: AbstractSet{T} where T = S(T[v;])
 Base.isless(::Any, ::Union{Number, VersionNumber}) = Bool(0)
 Base.isless(::Union{Number, VersionNumber}, ::Any) = Bool(1)
 
 # https://github.com/JuliaAstro/FITSIO.jl/pull/193
 FITSIO.CFITSIO_COLTYPE[080] = UInt64
 FITSIO.fits_tform_char(::Type{UInt64}) = 'W'
-
-@static if VERSION < v"1.7"
-	(fc::ComposedFunction)(xs...; kw...) = fc.outer(fc.inner(xs...; kw...))
-	macro something(xs...)
-		:(something($(esc.(xs)...)))
-	end
-end
-@static if VERSION < v"1.9"
-	Base.filter(f) = Base.Fix1(filter, f)
-end
 
 @info "Looking for spAll file (.fits|.fits.tmp) or archive (.7z|.gz|.rar|.zip)"
 
@@ -107,23 +94,20 @@ const df = @time @sync let cols = cols.keys, fits = fits
 			@eval $col = read(FITS($fits)[$n], $(String(col)))
 			@eval $col isa Vector || ($col = eachslice($col, dims = ndims($col)))
 		end
-		@chain DataFrame(@eval (; $(cols...))) begin
-			@rsubset! :FIELDQUALITY ≡ "good"
-			@select! $(Not(:FIELDQUALITY))
-		end
+		DataFrame(@eval (; $(cols...)))
 	end
-	unique!(fits isa String ? f2df(fits) : mapreduce(f2df, vcat, fits))
+	df = unique!(mapreduce(f2df, vcat, fits))
+	df = @rsubset(df, :FIELDQUALITY ≡ "good")
 end
 # LittleDict(propertynames(df), map(eltype, eachcol(df)))
 
 @info "Setting up dictionary for fieldIDs with each RM_field"
 
-const programs =
-	LittleDict{String, OrderedSet{cols[:FIELD]}}(
-		"SDSS-RM"   => [15171, 15172, 15173, 15290, 16169, 20867, 112359],
-		"XMMLSS-RM" => [15000, 15002, 23175, 112361],
-		"COSMOS-RM" => [15038, 15070, 15071, 15252, 15253, 16163, 16164, 16165, 20868, 23288, 112360],
-	)
+const programs = LittleDict{String, OrderedSet{cols[:FIELD]}}(
+	"SDSS-RM"   => [15171, 15172, 15173, 15290, 16169, 20867, 112359],
+	"XMMLSS-RM" => [15000, 15002, 23175, 112361],
+	"COSMOS-RM" => [15038, 15070, 15071, 15252, 15253, 16163, 16164, 16165, 20868, 23288, 112360],
+)
 
 @info "Sorting out the fields (including the `all` option if instructed to do so)"
 
