@@ -14,7 +14,6 @@ from re import IGNORECASE, fullmatch
 from tempfile import TemporaryDirectory
 from traceback import print_exc
 from typing import Union
-from urllib.parse import urlsplit
 
 import dash
 import numpy
@@ -706,30 +705,23 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 	Output("catalogid_input_div", "hidden"),
 	Output("fieldid_dropdown_div", "hidden"),
 	Output("catalogid_dropdown_div", "hidden"),
-	Output("window_location", "href"),
+	Output("window_location", "search"),
 	Output("program_dropdown", "value"),
 	Output("fieldid_input", "value"),
 	Output("catalogid_input", "value"),
 	Output("redshift_input", "value", allow_duplicate=True),
-	Input("window_location", "href"),
+	Input("window_location", "search"),
 	Input("program_dropdown", "value"),
 	State("extra_func_list", "value"),
 	prevent_initial_call="initial_duplicate")
-def set_input_or_dropdown(location: str, program: str, checklist: list[str]):
-	url = urlsplit(location) # <scheme>://<netloc>/<path>?<query>#<fragment>
-	search = url.query.lstrip("?")
-	hash = url.fragment.lstrip("#")
+def set_input_or_dropdown(search: str, program: str, checklist: list[str]):
 	fid_mjd, catalog, redshift = "", "", ""
-	for x in search.split("&"):
+	for x in search.lstrip("?").split("&"):
 		if program and program != "(other)": break
 		if not fullmatch(r"\d+p?-\d+-[^-](.*[^-])?", x): continue
 		program = "(other)"
 		fid_mjd = "-".join(x.split("-", 2)[:2])
 		catalog = "-".join(x.split("-", 2)[2:])
-	for x in hash.split("&"):
-		if not fullmatch(r"[^=]+=[^=]+", x): continue
-		k, v = x.split("=", 1)
-		if k == "z": redshift = v
 	if program == "(other)" and "p" in checklist and fullmatch(r"\d+(-.*)?", fid_mjd):
 		field = int(fid_mjd.split("-", 1)[0])
 		catid = int(catalog)
@@ -740,7 +732,7 @@ def set_input_or_dropdown(location: str, program: str, checklist: list[str]):
 			program = prog
 
 	tt, ff = (True, True), (False, False)
-	ret = location, program, fid_mjd, catalog, redshift
+	ret = search, program, fid_mjd, catalog, redshift
 	if program == "(other)":
 		return *ff, *tt, *ret
 	else:
@@ -851,15 +843,16 @@ def set_extra_obj(search: str):
 	Input("fieldid_dropdown", "value"),
 	Input("catalogid_dropdown", "value"),
 	prevent_initial_call=True)
-def reset_on_obj_change(y_max, y_min, x_max, x_min, z, z_step, hash, program, *_):
+def reset_on_obj_change(y_max, y_min, x_max, x_min, z, z_step, hash: str, program: str, *_):
 	smooth = smooth_default
 	if program != "(other)":
 		z, z_step = "", ""
 		y_min, y_max = y_min_default, y_max_default
 		x_min, x_max = int(wave_min), int(wave_max)
-	for x in (hash := str(hash).lstrip("#").split("&") if hash else []):
+	for x in hash.lstrip("#").split("&"):
 		if not fullmatch(r"[^=]+=[^=]+", x): continue
 		k, v = x.split("=", 1)
+		if k == "z": z = v
 		if k == "m": smooth = v
 		if k == "y" and fullmatch(r"[^,]+,[^,]+", v): y_min, y_max = v.split(",", 1)
 		if k == "x" and fullmatch(r"[^,]+,[^,]+", v): x_min, x_max = v.split(",", 1)
