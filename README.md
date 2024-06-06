@@ -48,7 +48,7 @@ Next, run this to install/update the dependencies for you:
 julia update.jl
 ```
 
-Then, having the FITS files accessible in the same directory (either copies or via symbolic links), run:
+Then, having the FITS files or archive files (each archive should contain only one FITS file, and would be used only if the filename to be extracted does not exist) accessible in the same directory (either copies or via symbolic links), run:
 ```shell
 julia update_dictionaries.jl
 ```

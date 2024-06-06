@@ -27,7 +27,7 @@ end
 try
 	Pkg.resolve()
 	Pkg.instantiate()
-	using DataFramesMeta, Exts, FITSIO, JSON, OrderedCollections
+	using DataFramesMeta, Exts, FITSIO, JSON5, OrderedCollections
 catch
 	Pkg.update()
 end
