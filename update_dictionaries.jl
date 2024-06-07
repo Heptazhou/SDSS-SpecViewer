@@ -17,38 +17,20 @@ using Pkg: Pkg
 cd(@__DIR__)
 Pkg.activate(".")
 
-using Base.Threads: @spawn, @threads, nthreads
-using DataFrames: DataFrame
 using DataFramesMeta
-using FITSIO: FITS, Tables.columnnames
-using FITSIO: FITSIO # fix merged but not released
-using JSON: json
+using Exts
+using FITSIO: FITS
+using JSON5: json
 using OrderedCollections
 
-const getfirst(predicate::Function) = A -> A[findfirst(predicate, A)]
 const s_info(xs...) = @static nthreads() > 1 ? @spawn(@info string(xs...)) : @info string(xs...)
 const u_sort! = unique! ∘ sort!
 
 Base.cat(x::Integer, y::Integer, ::Val{5}) = flipsign((10^5)abs(x) + mod(y, 10^5), x)
-Base.convert(::Type{S}, v::Vector) where S <: AbstractSet{T} where T = S(T[v;])
 Base.isless(::Any, ::Union{Number, VersionNumber}) = Bool(0)
 Base.isless(::Union{Number, VersionNumber}, ::Any) = Bool(1)
 
-# https://github.com/JuliaAstro/FITSIO.jl/pull/193
-FITSIO.CFITSIO_COLTYPE[080] = UInt64
-FITSIO.fits_tform_char(::Type{UInt64}) = 'W'
-
-@static if VERSION < v"1.7"
-	(fc::ComposedFunction)(xs...; kw...) = fc.outer(fc.inner(xs...; kw...))
-	macro something(xs...)
-		:(something($(esc.(xs)...)))
-	end
-end
-@static if VERSION < v"1.9"
-	Base.filter(f) = Base.Fix1(filter, f)
-end
-
-@info "Looking for spAll file (.fits|.fits.tmp) or archive (.7z|.gz|.rar|.zip)"
+@info "Looking for spAll files or archives"
 
 # https://data.sdss.org/datamodel/files/BOSS_SPECTRO_REDUX/RUN2D/spAll.html
 # https://github.com/sciserver/sqlloader/blob/master/schema/sql/SpectroTables.sql
@@ -66,19 +48,14 @@ const cols = LittleDict{Symbol, DataType}(
 	:ZWARNING     => Int64,   # A flag set for bad redshift fits; see bitmasks
 )
 const fits = try
-	has_7z = (f::String) -> try
-		# https://github.com/mcmilk/7-Zip/blob/master/CPP/7zip/UI/Console/Main.cpp
-		any(startswith("7-Zip "), readlines(`7z`)) || error()
-	catch
-		(@info "7z not found. Skipping archive `$f`"; false)
-	end
-	extracts(arc::String) = run(`7z x $arc`)
-	filename(arc::String) = readlines(`7z l -ba -slt $arc`)[1][8:end]
-	is_arc = endswith(r"\.(7z|gz|rar|zip)")
+	exe_7z = Pkg.PlatformEngines.exe7z()
+	extracts(arc::String) = run(`$exe_7z x $arc`)
+	filename(arc::String) = readlines(`$exe_7z l -ba -slt $arc`)[1][8:end]
+	is_arc = endswith(r"\.([7gx]z|rar|zip)")
 	is_tmp = endswith(r"\.tmp")
 	d = OrderedDict{String, String}()
 	for f ∈ (map)(filter(isfile), [ARGS, readdir()]) |> getfirst(!isempty)
-		n = !is_arc(f) ? f : has_7z(f) ? filename(f) : (continue)
+		n = !is_arc(f) ? f : filename(f)
 		contains(n, r"\bspall\b"i) || continue
 		contains(n, r"\ballepoch\b"i) && continue
 		endswith(n, r"\.fits(\.tmp)?") && (d[n] = f)
@@ -94,36 +71,27 @@ catch
 end
 # FITS(fits[end])["SPALL"]
 
-const df = @time @sync let cols = cols.keys, fits = fits
-	f2df(fits::String; n::Union{Int, String} = "SPALL") = begin
-		try
-			FITS(fits)[n]
-		catch
-			n = 2
-		end
-		# cols = columnnames(FITS(fits)[n]) # uncomment this to read all columns
-		s_info("Reading ", length(cols), " column(s) from `$fits` (t = $(nthreads()))")
-		@threads for col ∈ cols
-			@eval $col = read(FITS($fits)[$n], $(String(col)))
-			@eval $col isa Vector || ($col = eachslice($col, dims = ndims($col)))
-		end
-		@chain DataFrame(@eval (; $(cols...))) begin
-			@rsubset! :FIELDQUALITY ≡ "good"
-			@select! $(Not(:FIELDQUALITY))
-		end
+const df = @time @sync let
+	f2df(f::String; n::Union{Int, String} = "SPALL") = begin
+		#! format: off
+		FITS(f -> try f[n] catch; n = 2 end, f)
+		#! format: on
+		s_info("Reading ", length(cols), " column(s) from `$f[$n]` (t = $(nthreads()))")
+		# use `read(f[n], DataFrame)` to read all columns in f[n]
+		FITS(f -> read(f[n], DataFrame, cols.keys), f)
 	end
-	unique!(fits isa String ? f2df(fits) : mapreduce(f2df, vcat, fits))
+	df = unique!(mapreduce(f2df, vcat, fits))
+	df = @rsubset(df, :FIELDQUALITY ≡ "good")
 end
 # LittleDict(propertynames(df), map(eltype, eachcol(df)))
 
 @info "Setting up dictionary for fieldIDs with each RM_field"
 
-const programs =
-	LittleDict{String, OrderedSet{cols[:FIELD]}}(
-		"SDSS-RM"   => [15171, 15172, 15173, 15290, 16169, 20867, 112359],
-		"XMMLSS-RM" => [15000, 15002, 23175, 112361],
-		"COSMOS-RM" => [15038, 15070, 15071, 15252, 15253, 16163, 16164, 16165, 20868, 23288, 112360],
-	)
+const programs = LittleDict{String, OrderedSet{cols[:FIELD]}}(
+	"SDSS-RM"   => [15171, 15172, 15173, 15290, 16169, 20867, 112359],
+	"XMMLSS-RM" => [15000, 15002, 23175, 112361],
+	"COSMOS-RM" => [15038, 15070, 15071, 15252, 15253, 16163, 16164, 16165, 20868, 23288, 112360],
+)
 
 @info "Sorting out the fields (including the `all` option if instructed to do so)"
 

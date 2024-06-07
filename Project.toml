@@ -1,18 +1,13 @@
 [deps]
-DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 DataFramesMeta = "1313f7d8-7da2-5740-9ea0-a2ca25f37964"
+Exts = "0b12d779-4123-4875-9d6c-e33c2e29e2c9"
 FITSIO = "525bcba6-941b-5504-bd06-fd0dc1a4d2eb"
-JSON = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
+JSON5 = "275fdaeb-5887-4102-8704-6b08b28f797b"
 OrderedCollections = "bac558e1-5e72-5ebc-8fee-abe8a469f55d"
 Pkg = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 
 [compat]
-CFITSIO = "≥ 1.4.2"
-DataFrames = "≥ 1"
 DataFramesMeta = "≥ 0.9"
-FITSIO = "≥ 0.16.6"
+Exts = "≥ 0.1.5"
 OrderedCollections = "≥ 1.5"
-julia = "≥ 1.6.2"
-
-[extras]
-CFITSIO = "3b1b4be9-1499-4b22-8d78-7db3344d1961"
+julia = "≥ 1.9"

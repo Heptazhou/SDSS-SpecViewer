@@ -41,23 +41,22 @@ python sdssv_spec_appREMOTE.py
 
 The `dictionaries.txt` file is the backbone to this tool. By running the `update_dictionaries.jl` file, it will look for FITS file(s) (e.g., `spAll-lite-master.fits`) on your local machine and update said dictionary file. Runtime was ~50s on AMD Zen 1, or ~30s on AMD Zen 3, FWIW. The file provided here is up-to-date for BHM targets ***for GOOD fields ONLY*** as of 2024-04-30.
 
-To update `dictionaries.txt`, please have the FITS file(s) ready, and do:
-1.	Install latest version of [Julia](https://julialang.org/) (you could either install the [official binary](https://julialang.org/downloads/) or install it with your package manager of choice).
-2.	Install/update the needed packages by:
+To update `dictionaries.txt`, please first install latest version of [Julia](https://julialang.org/), and set environment variable `JULIA_NUM_THREADS=auto` ([read more](https://docs.julialang.org/en/v1/manual/multi-threading/#Starting-Julia-with-multiple-threads)).
 
-	```shell
-	julia update.jl
-	```
-3.	Build the dictionary file by:
+Next, run this to install/update the dependencies for you:
+```shell
+julia update.jl
+```
 
-	```shell
-	julia --startup-file=no -t auto update_dictionaries.jl
-	```
-	Note: you could ignore the `--startup-file` argument if you do not have a startup file; and with Julia v1.7+, I highly recommend setting environment variable `JULIA_NUM_THREADS=auto` instead of specifing `-t`, then simply:
-
-	```shell
-	julia update_dictionaries.jl
-	```
+Then, having the FITS files or archive files (each archive should contain only one FITS file, and would be used only if the filename to be extracted does not exist) accessible in the same directory (either copies or via symbolic links), run:
+```shell
+julia update_dictionaries.jl
+```
+Alternatively, provide paths as arguments:
+```shell
+julia update_dictionaries.jl <path/to/file1> <path/to/file2> ...
+```
+PS: The filename(s) shall match the pattern `/\bspall\b.*\.fits(\.tmp)?$/i` and not match `/\ballepoch\b/i`.
 
 
 ### User's guide
