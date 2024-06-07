@@ -73,13 +73,11 @@ end
 
 const df = @time @sync let
 	f2df(f::String; n::Union{Int, String} = "SPALL") = begin
-		FITS(f -> try
-				f[n]
-			catch
-				n = 2
-			end, f)
+		#! format: off
+		FITS(f -> try f[n] catch; n = 2 end, f)
+		#! format: on
 		s_info("Reading ", length(cols), " column(s) from `$f[$n]` (t = $(nthreads()))")
-		# use `read(f[n], DataFrame)` to read all columns
+		# use `read(f[n], DataFrame)` to read all columns in f[n]
 		FITS(f -> read(f[n], DataFrame, cols.keys), f)
 	end
 	df = unique!(mapreduce(f2df, vcat, fits))

@@ -17,18 +17,9 @@ using Pkg: Pkg, Registry, RegistrySpec
 cd(@__DIR__)
 Pkg.activate(".")
 
-try
-	Registry.update("General")
-	Registry.update(RegistrySpec(uuid = "7b72b01d-f38d-499e-a380-e4075523b21d"))
-catch
-	Registry.add("General")
-	Registry.add(RegistrySpec(url = "https://github.com/0h7z/0hjl.git"))
-end
-try
-	Pkg.resolve()
-	Pkg.instantiate()
-	using DataFramesMeta, Exts, FITSIO, JSON5, OrderedCollections
-catch
-	Pkg.update()
+let registry = getfield.(Registry.reachable_registries(), :name)
+	registry ∋ "0hjl" || Registry.add(RegistrySpec(url = "https://github.com/0h7z/0hjl.git"))
+	registry ∋ "General" || Registry.add("General")
+	isfile("Manifest.toml") ? Pkg.update() : Pkg.instantiate()
 end
 
