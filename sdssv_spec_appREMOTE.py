@@ -8,7 +8,9 @@ import json
 import math
 import sys
 from base64 import b64decode
+from datetime import datetime, timedelta, timezone
 from io import BytesIO
+from os.path import getmtime
 from pathlib import Path
 from re import IGNORECASE, fullmatch
 from tempfile import TemporaryDirectory
@@ -32,13 +34,13 @@ from requests.exceptions import HTTPError
 ### input the data directory path
 ###
 
-dictionaries = json.load(open("dictionaries.txt"))
+dictionaries = "dictionaries.txt"
 authentication = "authentication.txt"
-programs: dict[str, list[int]] = dictionaries[0]
-fieldIDs: dict[str, list[int]] = dictionaries[1]
+programs: dict[str, list[int]]
+fieldIDs: dict[str, list[int]]
 # https://docs.python.org/3/library/typing.html#typing.Union
-# catalogIDs: dict[str, list[list | int]] = dictionaries[2] # require Python v3.10
-catalogIDs: dict[str, list[Union[list, int]]] = dictionaries[2]
+# catalogIDs: dict[str, list[list | int]] # require Python v3.10
+catalogIDs: dict[str, list[Union[list, int]]]
 
 # for testing
 # print(programs)
@@ -278,14 +280,15 @@ def fetch_catID(field, catID, extra="") \
 ###
 ### Authentication
 ###
+
 try:
 	print("Reading authentication file.")
 	with open(authentication, "r", newline="") as io:
 		lines = io.readlines()
 		username = lines[0].strip()
 		password = lines[1].strip()
-except: # any error from above will fall through to here.
-	print("authentication.txt broken or not exist. Please enter authentication.")
+except:
+	print(f"{authentication} broken or not exist. Please enter authentication.")
 	username = input("Enter SDSS-V username: ").strip()
 	password = input("Enter SDSS-V password: ").strip()
 	sys.stdout.write("\r\x1bc\r") # "\ec"
@@ -306,6 +309,37 @@ except:
 	# print("Contact Meg (megan.c.davis@uconn.edu) if the issue persists.")
 	exit(1)
 
+try:
+	def latest(f: Path):
+		if f.is_file():
+			z = timezone.utc
+			t = datetime.fromtimestamp(getmtime(f), z)
+			if (datetime.now(z) < t + timedelta(minutes=120)):
+				return True
+		return False
+
+	datadir = Path("data")
+	datadir.mkdir(exist_ok=True)
+	if not latest(dicts_cached := datadir / dictionaries):
+		try:
+			url = "https://data.sdss5.org/sas/sdsswork/bhm/sandbox/SpecViewer/master/" + dictionaries
+			r = requests.get(url, auth=(username, password) if "/sdsswork/" in url else None)
+			r.raise_for_status()
+			print(r.status_code, url)
+
+			s = r.content.decode()
+			json.loads(s) # verify
+			with open(dicts_cached, "w", newline="") as io:
+				io.write(s)
+		except: print_exc()
+
+	dicts = json.load(open(dicts_cached))
+except:
+	dicts = json.load(open(dictionaries))
+finally:
+	programs = dicts[0]
+	fieldIDs = dicts[1]
+	catalogIDs = dicts[2]
 
 
 ### spectral lines to label in plot

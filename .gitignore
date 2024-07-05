@@ -3,5 +3,6 @@
 *.fits
 *.fits.*
 authentication.txt
+data/
 dictionaries.txt.*
 Manifest.toml
