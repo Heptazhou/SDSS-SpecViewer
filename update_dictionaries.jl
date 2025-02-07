@@ -1,9 +1,8 @@
-# Copyright (C) 2023-2024 Heptazhou <zhou@0h7z.com>
+# Copyright (C) 2023-2025 Heptazhou <zhou@0h7z.com>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
-# published by the Free Software Foundation, either version 3 of the
-# License, or (at your option) any later version.
+# published by the Free Software Foundation, version 3.
 #
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -13,15 +12,22 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-using Pkg: Pkg
-cd(@__DIR__)
-Pkg.activate(".")
+@static if dirname(Base.active_project()) ≠ @__DIR__
+	using Pkg: Pkg
+	Pkg.activate(@__DIR__)
+end
+
+let manifest = Base.project_file_manifest_path(Base.active_project())
+	if isnothing(manifest) || 0 < mtime(manifest) < time() - 86400 * 30 # 30 day
+		include("update.jl")
+	end
+end
 
 using DataFramesMeta
 using Exts
 using FITSIO: FITS
 using JSON5: json
-using OrderedCollections
+using Pkg: PlatformEngines
 
 const s_info(xs...) = @static nthreads() > 1 ? @spawn(@info string(xs...)) : @info string(xs...)
 const u_sort! = unique! ∘ sort!
@@ -35,7 +41,7 @@ Base.isless(::Union{Number, VersionNumber}, ::Any) = Bool(1)
 # https://data.sdss.org/datamodel/files/BOSS_SPECTRO_REDUX/RUN2D/spAll.html
 # https://github.com/sciserver/sqlloader/blob/master/schema/sql/SpectroTables.sql
 # https://www.sdss.org/dr18/data_access/bitmasks/
-const cols = LittleDict{Symbol, DataType}(
+const cols = LDict{Symbol, DataType}(
 	:CATALOGID    => Int64,   # SDSS-V CatalogID
 	:FIELD        => Int64,   # Field number
 	:FIELDQUALITY => String,  # Quality of field ("good" | "bad")
@@ -48,12 +54,12 @@ const cols = LittleDict{Symbol, DataType}(
 	:ZWARNING     => Int64,   # A flag set for bad redshift fits; see bitmasks
 )
 const fits = try
-	exe_7z = Pkg.PlatformEngines.exe7z()
+	exe_7z = @try PlatformEngines.find7z() PlatformEngines.exe7z()
 	extracts(arc::String) = run(`$exe_7z x $arc`)
 	filename(arc::String) = readlines(`$exe_7z l -ba -slt $arc`)[1][8:end]
 	is_arc = endswith(r"\.([7gx]z|rar|zip)")
 	is_tmp = endswith(r"\.tmp")
-	d = OrderedDict{String, String}()
+	d = ODict{String, String}()
 	for f ∈ (map)(filter(isfile), [ARGS, readdir()]) |> getfirst(!isempty)
 		n = !is_arc(f) ? f : filename(f)
 		contains(n, r"\bspall\b"i) || continue
@@ -64,10 +70,11 @@ const fits = try
 		is_arc(v) && (d[k] = filename(v); isfile(d[k]) || extracts(v); v = d[k])
 		is_tmp(v) && (d[k] = replace(v, r"\.tmp$" => ""); isfile(d[k]) || mv(v, d[k]))
 	end
+	@assert !isempty(d)
 	u_sort!(d.vals, by = s -> (m = match(r"\bv\d+[._]\d+[._]\d+\b", s)) |> isnothing ?
 							  "master" : VersionNumber(replace(m.match, "_" => ".")))
 catch
-	throw(SystemError("*spall*.fits", 2)) # ENOENT 2 No such file or directory
+	systemerror("*spall*.fits", Libc.ENOENT) # 2 No such file or directory
 end
 # FITS(fits[end])["SPALL"]
 
@@ -83,11 +90,11 @@ const df = @time @sync let
 	df = unique!(mapreduce(f2df, vcat, fits))
 	df = @rsubset(df, :FIELDQUALITY ≡ "good")
 end
-# LittleDict(propertynames(df), map(eltype, eachcol(df)))
+# LDict(propertynames(df), map(eltype, eachcol(df)))
 
 @info "Setting up dictionary for fieldIDs with each RM_field"
 
-const programs = LittleDict{String, OrderedSet{cols[:FIELD]}}(
+const programs = LDict{String, OSet{cols[:FIELD]}}(
 	"SDSS-RM"   => [15171, 15172, 15173, 15290, 16169, 20867, 112359],
 	"XMMLSS-RM" => [15000, 15002, 23175, 112361],
 	"COSMOS-RM" => [15038, 15070, 15071, 15252, 15253, 16163, 16164, 16165, 20868, 23288, 112360],
@@ -96,7 +103,7 @@ const programs = LittleDict{String, OrderedSet{cols[:FIELD]}}(
 @info "Sorting out the fields (including the `all` option if instructed to do so)"
 
 const programs_cats = @time @sync let
-	f_programs_dict = LittleDict{String, Expr}(
+	f_programs_dict = LDict{String, Expr}(
 		"eFEDS1"       => :(:SURVEY ≡ "BHM" && :OBJTYPE ≡ "QSO" && :PROGRAMNAME ≡ "eFEDS1"),
 		"eFEDS2"       => :(:SURVEY ≡ "BHM" && :OBJTYPE ≡ "QSO" && :PROGRAMNAME ≡ "eFEDS2"),
 		"eFEDS3"       => :(:SURVEY ≡ "BHM" && :OBJTYPE ≡ "QSO" && :PROGRAMNAME ≡ "eFEDS3"),
@@ -115,9 +122,9 @@ const programs_cats = @time @sync let
 	)
 	foreach(sort!, programs.vals)
 	x = :(any([$(f_programs_dict.vals...)]))
-	all_cats = @spawn @eval (OrderedSet ∘ sort!)(@rsubset(df, $x).CATALOGID)
+	all_cats = @spawn @eval (OSet ∘ sort!)(@rsubset(df, $x).CATALOGID)
 	for (p, x) ∈ f_programs_dict
-		programs[p] = @eval (OrderedSet ∘ sort!)(@rsubset(df, $x).FIELD)
+		programs[p] = @eval (OSet ∘ sort!)(@rsubset(df, $x).FIELD)
 	end
 	all_cats |> fetch
 end
@@ -125,12 +132,12 @@ end
 @info "Filling fieldIDs and catalogIDs with only science targets and completed epochs"
 
 const fieldIDs = @time @sync let cat_t = cols[:CATALOGID]
-	get_data_of(ids::OrderedSet{cols[:FIELD]}) = @chain df begin
+	get_data_of(ids::OSet{cols[:FIELD]}) = @chain df begin
 		@select :CATALOGID :FIELD :SURVEY :OBJTYPE
 		@rsubset! :FIELD ∈ ids && :SURVEY ≡ "BHM" && :OBJTYPE ∈ ("QSO", "science")
 		@by :FIELD :CATALOGID = [:CATALOGID]
 	end
-	d, init = OrderedDict{String, Vector{cat_t}}(), cat_t[]
+	d, init = ODict{String, Vector{cat_t}}(), cat_t[]
 	s_info("Processing ", sum(length, programs.vals), " entries of ", length(programs), " programs")
 	for (prog, opts) ∈ programs
 		data = get_data_of(opts) |> eachrow
@@ -146,7 +153,7 @@ end
 @info "Building dictionary for catalogIDs"
 
 const catalogIDs = @time @sync let
-	get_dict_of(ids::OrderedSet{cols[:CATALOGID]}) = @chain df begin
+	get_dict_of(ids::OSet{cols[:CATALOGID]}) = @chain df begin
 		@rselect :CATALOGID :FIELD_MJD = cat(:FIELD, :MJD, Val(5)) :RCHI2 :Z :ZWARNING
 		@rsubset! :CATALOGID ∈ ids
 		@rorderby :CATALOGID :ZWARNING > 0 :RCHI2
@@ -154,7 +161,7 @@ const catalogIDs = @time @sync let
 			:ks = string(:CATALOGID[1])
 			:vs = (Real[:ZWARNING :Z :RCHI2][1, :], u_sort!([:FIELD_MJD;])...)
 		end
-		LittleDict(_.ks, _.vs)
+		LDict(_.ks, _.vs)
 	end
 	s_info("Processing ", length(programs_cats), " entries")
 	get_dict_of(programs_cats)

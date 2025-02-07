@@ -4,4 +4,5 @@
 *.fits.*
 authentication.txt
 dictionaries.txt.*
+Manifest-v*.toml
 Manifest.toml

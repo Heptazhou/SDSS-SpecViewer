@@ -1,12 +1,12 @@
 # SDSS SpecViewer
 authors: Dr. Jennifer Li (UIUC) and Meg Davis (UConn, <megan.c.davis@uconn.edu>), 2021 <br />
-authors: Pat Hall, Zezhou Zhu, and Kevin Welch (YorkU, <phall@yorku.ca>, <zzz@my.yorku.ca>), 2023-2024
+authors: Pat Hall, Zezhou Zhu, and Kevin Welch (YorkU, <phall@yorku.ca>, <zzz@my.yorku.ca>), 2023-2025
 
 This is a demo for a multi-epoch spectral viewer for SDSSV-BHM using [plotly/dash](https://dash.plotly.com/). The ultimate goal is to build a web application that allows quick spectral visualization for SDSSV BHM data. The current version will access the data via url and it takes 1-2 seconds to load each spectra.
 
 **Usage**: Please see the Getting Started section, below, before launching the tool. To launch the web app, you run the script `sdssv_spec_appREMOTE.py` as a regular python file. The web app will be at <http://127.0.0.1:8050/>, which you can open with any web browser.
 
----
+*****
 ## Getting Started
 
 ### Authentication
@@ -21,16 +21,27 @@ Please install the following Python packages to use this tool.
 - requests
 - numpy
 
-If you use [conda](https://conda.io/), you may run (preferably, within a separate [environment](https://docs.conda.io/projects/conda/en/latest/user-guide/getting-started.html#creating-environments)):
+*****
+If you are using [conda](https://docs.conda.io/)/[mamba](https://mamba.readthedocs.io/), you may run (preferably, within a separate [environment](https://docs.conda.io/projects/conda/en/latest/user-guide/getting-started.html#creating-environments)):
 ```shell
 conda install astropy dash numpy plotly requests
 ```
+Also, to update:
+```shell
+conda update astropy dash numpy plotly requests
+```
 
-If you use [pip](https://pip.pypa.io/), you may run (preferably, within a separate [environment](https://packaging.python.org/en/latest/tutorials/installing-packages/#creating-and-using-virtual-environments)):
+*****
+If you are using [pip](https://pip.pypa.io/), you may run (preferably, within a separate [environment](https://packaging.python.org/en/latest/tutorials/installing-packages/#creating-virtual-environments)):
 ```shell
 pip install astropy dash numpy plotly requests
 ```
+Also, to update:
+```shell
+pip install -U astropy dash numpy plotly requests
+```
 
+*****
 Then, run this to start the tool:
 ```shell
 python sdssv_spec_appREMOTE.py
@@ -39,22 +50,17 @@ python sdssv_spec_appREMOTE.py
 
 ### Keeping up-to-date
 
-The `dictionaries.txt` file is the backbone to this tool. By running the `update_dictionaries.jl` file, it will look for FITS file(s) (e.g., `spAll-lite-master.fits`) on your local machine and update said dictionary file. Runtime was ~50s on AMD Zen 1, or ~30s on AMD Zen 3, FWIW. The file provided here is up-to-date for BHM targets ***for GOOD fields ONLY*** as of 2024-04-30.
+The `dictionaries.txt` file is the backbone to this tool. By running the `update_dictionaries.jl` file, it will look for FITS file(s) (e.g., `spAll-lite-master.fits`) on your local machine and update said dictionary file. Runtime was ~50s on AMD Zen 1, or ~30s on AMD Zen 3, FWIW. The file provided here is up-to-date for BHM targets ***for GOOD fields ONLY*** ~~as of 2024-04-30~~.
 
-To update `dictionaries.txt`, please first install latest version of [Julia](https://julialang.org/), and set environment variable `JULIA_NUM_THREADS=auto` ([read more](https://docs.julialang.org/en/v1/manual/multi-threading/#Starting-Julia-with-multiple-threads)).
-
-Next, run this to install/update the dependencies for you:
-```shell
-julia update.jl
-```
+To update `dictionaries.txt`, install the latest version of [Julia](https://julialang.org/), and set environment variable `JULIA_NUM_THREADS=auto` so you can omit the `-t auto` argument ([read more](https://docs.julialang.org/en/v1/manual/multi-threading/#Starting-Julia-with-multiple-threads)).
 
 Then, having the FITS files or archive files (each archive should contain only one FITS file, and would be used only if the filename to be extracted does not exist) accessible in the same directory (either copies or via symbolic links), run:
 ```shell
-julia update_dictionaries.jl
+julia --project -t auto update_dictionaries.jl
 ```
 Alternatively, provide paths as arguments:
 ```shell
-julia update_dictionaries.jl <path/to/file1> <path/to/file2> ...
+julia --project -t auto update_dictionaries.jl <path/to/file>...
 ```
 PS: The filename(s) shall match the pattern `/\bspall\b.*\.fits(\.tmp)?$/i` and not match `/\ballepoch\b/i`.
 

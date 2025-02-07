@@ -112,11 +112,11 @@ def SDSSV_buildURL(field: str, MJD: int, objID: str, branch: str):
 		file = f"{MJD}/{file}"
 
 	# prior to v6_2_0
-	#url = f"{path}/{branch}/spectra/lite/{field}/{file}"
+	# url = f"{path}/{branch}/spectra/lite/{field}/{file}"
 	# v6_2_0+
-	fieldgroup=str(numpy.floor(int(field)/1000).astype(int)).zfill(3)+'XXX'
+	fieldgroup = str(numpy.floor(int(field) / 1000).astype(int)).zfill(3) + "XXX"
 	url = f"{path}/{branch}/spectra/daily/lite/{fieldgroup}/{field}/{file}"
-	#print(url)
+	# print(url)
 	return url
 
 def SDSSV_fetch(username: str, password: str, field, MJD: int, objID, branch="") \
@@ -147,9 +147,9 @@ def SDSSV_fetch(username: str, password: str, field, MJD: int, objID, branch="")
 	if (field, MJD, objID, branch) in cache:
 		return cache[(field, MJD, objID, branch)]
 
-	#print(field)
+	# print(field)
 	url = SDSSV_buildURL(field, MJD, objID, branch)
-	#print(url)
+	# print(url)
 	r = requests.get(url, auth=(username, password) if "/sdsswork/" in url else None)
 	r.raise_for_status()
 	print(r.status_code, url)
@@ -302,10 +302,10 @@ finally:
 try:
 	print("Verifying authentication...")
 	# fetch_test = SDSSV_fetch(username, password, 15173, 59281, 4350951054)
-	#fetch_test = SDSSV_fetch(username, password, 112359, 60086, 27021600949438682)
+	# fetch_test = SDSSV_fetch(username, password, 112359, 60086, 27021600949438682)
 	fetch_test = SDSSV_fetch(username, password, 101126, 60477, 63050394846126565)
-	#url = SDSSV_buildURL("102236", "60477", "63050394846126565", "")
-	#print(url)
+	# url = SDSSV_buildURL("102236", "60477", "63050394846126565", "")
+	# print(url)
 	print("Verification succeeded.")
 	print("Try loading http://127.0.0.1:8050/?101126-60477-63050394846126565")
 	print("Change any setting after loading to reset redshift from z=0.")
@@ -328,14 +328,14 @@ except:
 # the first column means whether to show this line or not by default
 # the second column is the wavelength, which must be unique
 spec_line_emi = numpy.asarray([
-	#[1, 7753.1900, "[Ar III]"],
-	#[1, 7137.7700, "[Ar III]"],
+	# [1, 7753.1900, "[Ar III]"],
+	# [1, 7137.7700, "[Ar III]"],
 	[1, 6564.6130, "H α"     ],
-	#[0, 6365.5350, "[O I]"   ],
-	#[0, 6302.0460, "[O I]"   ],
+	# [0, 6365.5350, "[O I]"   ],
+	# [0, 6302.0460, "[O I]"   ],
 	[0, 5877.2990, "He I"    ],
-	#[0, 5577.3390, "[O I]"   ],
-	#[0, 5411.5200, "He II"   ],
+	# [0, 5577.3390, "[O I]"   ],
+	# [0, 5411.5200, "He II"   ],
 	[1, 5008.2390, "[O III]" ],
 	[1, 4960.2950, "[O III]" ],
 	[1, 4862.6830, "H β"     ],
@@ -343,22 +343,22 @@ spec_line_emi = numpy.asarray([
 	[0, 4363.2090, "[O III]" ],
 	[1, 4341.6840, "H γ"     ],
 	[1, 4102.8920, "H δ"     ],
-	#[0, 3971.1950, "H ε"     ],
-	[0, 3968.5800, "[Ne III]" ],
-	#[0, 3890.1510, "H ζ"     ],
+	# [0, 3971.1950, "H ε"     ],
+	[0, 3968.5800, "[Ne III]"],
+	# [0, 3890.1510, "H ζ"     ],
 	[0, 3889.7520, "He I"    ],
-	[0, 3869.8500, "[Ne III]" ],
-	#[0, 3850.8100, "Fe I"    ], # 3886.2822 3859.9114 3820.4253
-	#[0, 3739.3497, "Fe I"    ], # 3758.2329 3749.4854 3748.2622 3745.5613 3737.1316 3734.8638 3719.9348
+	[0, 3869.8500, "[Ne III]"],
+	# [0, 3850.8100, "Fe I"    ], # 3886.2822 3859.9114 3820.4253
+	# [0, 3739.3497, "Fe I"    ], # 3758.2329 3749.4854 3748.2622 3745.5613 3737.1316 3734.8638 3719.9348
 	[1, 3728.4830, "[O II]"  ], # 3729.8740 3727.0920
-	[0, 3426.8400, "[Ne V]"  ], 
-	[0, 3346.8200, "[Ne V]"  ], 
-	#[0, 3524.9583, "Fe I"    ], # 3581.1931 3440.606
-	#[0, 3524.9583, "Fe I"    ], # 3581.1931 3440.606
+	[0, 3426.8400, "[Ne V]"  ],
+	[0, 3346.8200, "[Ne V]"  ],
+	# [0, 3524.9583, "Fe I"    ], # 3581.1931 3440.606
+	# [0, 3524.9583, "Fe I"    ], # 3581.1931 3440.606
 	[1, 2799.9410, "Mg II"   ], # 2803.5300 2796.3520
 	[0, 2748.7814, "Fe II"   ], # 2755.7365 2749.3216 2739.5474
 	[0, 2631.8295, "Fe II"   ], # 2611.8736 2607.0871 2599.3956 2598.3692 2585.8758 2493.2637
-	#[0, 2492.2473, "Fe I"    ], # 2522.8494 2490.6443 2488.1426 2483.2708
+	# [0, 2492.2473, "Fe I"    ], # 2522.8494 2490.6443 2488.1426 2483.2708
 	[0, 2414.0421, "Fe II"   ], # 2404.8858 2395.6254 2382.0376 2343.4951
 	[1, 2326.0000, "C II"    ],
 	[1, 1908.7340, "C III]"  ],
@@ -371,7 +371,7 @@ spec_line_emi = numpy.asarray([
 	[0, 1303.4900, "O I"     ],
 	[1, 1240.8100, "N V"     ],
 	[1, 1215.6710, "Ly α"    ],
-	#[0, 1123.0000, "P V"     ],
+	# [0, 1123.0000, "P V"     ],
 	[1, 1034.0000, "O VI"    ],
 	[1, 1025.7220, "Ly β"    ],
 ])
