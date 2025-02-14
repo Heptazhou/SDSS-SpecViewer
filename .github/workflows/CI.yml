@@ -1,0 +1,49 @@
+name: CI
+on:
+  pull_request:
+    branches:
+      - "master"
+  push:
+    branches:
+      - "*"
+    tags:
+      - "*"
+defaults:
+  run:
+    shell: bash
+env:
+  JULIA_NUM_THREADS: auto
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - windows-latest
+          - ubuntu-latest
+          - macos-latest
+        julia-version:
+          - "min"
+          - "lts"
+          - "1"
+          - "pre"
+          - "nightly"
+        exclude:
+          - os: macos-latest
+            julia-version: "min"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: julia-actions/setup-julia@v2
+        with:
+          show-versioninfo: true
+          version: ${{ matrix.julia-version }}
+      - uses: julia-actions/julia-buildpkg@v1
+        with:
+          ignore-no-cache: true
+          localregistry: https://github.com/0h7z/0hjl.git
+      - uses: julia-actions/julia-runtest@v1
+      - uses: heptazhou/julia-codecov@v1

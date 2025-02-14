@@ -1,3 +1,8 @@
+name = "SpecViewer"
+uuid = "13aed2ff-49da-4c20-8fef-027111bdd295"
+authors = ["Heptazhou <zhou at 0h7z dot com>"]
+version = "0.1.0"
+
 [deps]
 DataFramesMeta = "1313f7d8-7da2-5740-9ea0-a2ca25f37964"
 Exts = "0b12d779-4123-4875-9d6c-e33c2e29e2c9"

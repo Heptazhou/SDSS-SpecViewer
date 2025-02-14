@@ -1,0 +1,2 @@
+baremodule SpecViewer end
+
