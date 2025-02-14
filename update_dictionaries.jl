@@ -18,7 +18,8 @@
 end
 
 let manifest = Base.project_file_manifest_path(Base.active_project())
-	if isnothing(manifest) || 0 < mtime(manifest) < time() - 86400 * 30 # 30 day
+	if isnothing(manifest) || iszero(filesize(manifest)) ||
+	   0 < mtime(manifest) < time() - 86400(30) # 30 day
 		include("update.jl")
 	end
 end
@@ -60,11 +61,11 @@ const fits = try
 	is_arc = endswith(r"\.([7gx]z|rar|zip)")
 	is_tmp = endswith(r"\.tmp")
 	d = ODict{String, String}()
-	for f ∈ (map)(filter(isfile), [ARGS, readdir()]) |> getfirst(!isempty)
-		n = !is_arc(f) ? f : filename(f)
-		contains(n, r"\bspall\b"i) || continue
-		contains(n, r"\ballepoch\b"i) && continue
-		endswith(n, r"\.fits(\.tmp)?") && (d[n] = f)
+	for x ∈ getfirst(!isempty, map(filter(isfile), (ARGS, readdir())))
+		f = is_arc(x) ? filename(x) : x
+		contains(f, r"\bspall\b"i) || continue
+		contains(f, r"\ballepoch\b"i) && continue
+		endswith(f, r"\.fits(\.tmp)?") && (d[f] = x)
 	end
 	for (k, v) ∈ d
 		is_arc(v) && (d[k] = filename(v); isfile(d[k]) || extracts(v); v = d[k])
@@ -74,15 +75,13 @@ const fits = try
 	u_sort!(d.vals, by = s -> (m = match(r"\bv\d+[._]\d+[._]\d+\b", s)) |> isnothing ?
 							  "master" : VersionNumber(replace(m.match, "_" => ".")))
 catch
-	systemerror("*spall*.fits", Libc.ENOENT) # 2 No such file or directory
+	systemerror("*spAll*.(fits|[7gx]z)", Libc.ENOENT) # 2 No such file or directory
 end
 # FITS(fits[end])["SPALL"]
 
 const df = @time @sync let
-	f2df(f::String; n::Union{Int, String} = "SPALL") = begin
-		#! format: off
-		FITS(f -> try f[n] catch; n = 2 end, f)
-		#! format: on
+	f2df(f::String; n::IntOrStr = "SPALL") = begin
+		FITS(f -> @try(f[n], n = 2), f)
 		s_info("Reading ", length(cols), " column(s) from `$f[$n]` (t = $(nthreads()))")
 		# use `read(f[n], DataFrame)` to read all columns in f[n]
 		FITS(f -> read(f[n], DataFrame, cols.keys), f)
@@ -122,9 +121,9 @@ const programs_cats = @time @sync let
 	)
 	foreach(sort!, programs.vals)
 	x = :(any([$(f_programs_dict.vals...)]))
-	all_cats = @spawn @eval (OSet ∘ sort!)(@rsubset(df, $x).CATALOGID)
+	all_cats = @spawn @eval OSet(sort!(@rsubset(df, $x).CATALOGID))
 	for (p, x) ∈ f_programs_dict
-		programs[p] = @eval (OSet ∘ sort!)(@rsubset(df, $x).FIELD)
+		programs[p] = @eval OSet(sort!(@rsubset(df, $x).FIELD))
 	end
 	all_cats |> fetch
 end
@@ -132,7 +131,7 @@ end
 @info "Filling fieldIDs and catalogIDs with only science targets and completed epochs"
 
 const fieldIDs = @time @sync let cat_t = cols[:CATALOGID]
-	get_data_of(ids::OSet{cols[:FIELD]}) = @chain df begin
+	data_of(ids::OSet{cols[:FIELD]}) = @chain df begin
 		@select :CATALOGID :FIELD :SURVEY :OBJTYPE
 		@rsubset! :FIELD ∈ ids && :SURVEY ≡ "BHM" && :OBJTYPE ∈ ("QSO", "science")
 		@by :FIELD :CATALOGID = [:CATALOGID]
@@ -140,7 +139,7 @@ const fieldIDs = @time @sync let cat_t = cols[:CATALOGID]
 	d, init = ODict{String, Vector{cat_t}}(), cat_t[]
 	s_info("Processing ", sum(length, programs.vals), " entries of ", length(programs), " programs")
 	for (prog, opts) ∈ programs
-		data = get_data_of(opts) |> eachrow
+		data = data_of(opts) |> eachrow
 		for (k, v) ∈ data
 			(k, v) = string(k), copy(v)
 			(haskey(d, k) ? append!(d[k], v) : d[k] = v) |> u_sort!
@@ -153,7 +152,7 @@ end
 @info "Building dictionary for catalogIDs"
 
 const catalogIDs = @time @sync let
-	get_dict_of(ids::OSet{cols[:CATALOGID]}) = @chain df begin
+	dict_of(ids::OSet{cols[:CATALOGID]}) = @chain df begin
 		@rselect :CATALOGID :FIELD_MJD = cat(:FIELD, :MJD, Val(5)) :RCHI2 :Z :ZWARNING
 		@rsubset! :CATALOGID ∈ ids
 		@rorderby :CATALOGID :ZWARNING > 0 :RCHI2
@@ -164,7 +163,7 @@ const catalogIDs = @time @sync let
 		LDict(_.ks, _.vs)
 	end
 	s_info("Processing ", length(programs_cats), " entries")
-	get_dict_of(programs_cats)
+	dict_of(programs_cats)
 end
 
 @info "Dumping dictionaries to file"
