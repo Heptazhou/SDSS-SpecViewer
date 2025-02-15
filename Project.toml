@@ -8,9 +8,11 @@ DataFramesMeta = "1313f7d8-7da2-5740-9ea0-a2ca25f37964"
 Exts = "0b12d779-4123-4875-9d6c-e33c2e29e2c9"
 FITSIO = "525bcba6-941b-5504-bd06-fd0dc1a4d2eb"
 JSON5 = "275fdaeb-5887-4102-8704-6b08b28f797b"
+Match = "7eb4fadd-790c-5f42-8a69-bfa0b872bfbf"
 Pkg = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 
 [compat]
 DataFramesMeta = "≥ 0.9"
 Exts = "≥ 0.2.7"
+Match = "≥ 2"
 julia = "≥ 1.9"
