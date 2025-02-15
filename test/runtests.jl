@@ -18,5 +18,7 @@ using Test
 
 const with_temp_env = Fix2(Pkg.Operations.with_temp_env, "@stdlib")
 
+include("sdss.jl")
+
 include("misc.jl")
 

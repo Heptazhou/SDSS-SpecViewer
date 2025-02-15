@@ -14,6 +14,7 @@
 
 @testset "misc" begin
 	with_temp_env() do
+		@test isnothing(Base.active_project())
 		err = @catch include("../update.jl")
 		@test isnothing(err)
 		err = @catch include("../update_dictionaries.jl")
