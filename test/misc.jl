@@ -13,6 +13,13 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 @testset "misc" begin
-	@test true
+	with_temp_env() do
+		err = @catch include("../update.jl")
+		@test isnothing(err)
+		err = @catch include("../update_dictionaries.jl")
+		@test isa(err, LoadError)
+		err = @show err.error
+		@test isa(err, SystemError) && err.errnum ≡ Libc.ENOENT
+	end
 end
 

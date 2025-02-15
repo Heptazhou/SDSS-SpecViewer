@@ -12,7 +12,11 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+using Exts
+using Pkg: Pkg
 using Test
+
+const with_temp_env = Fix2(Pkg.Operations.with_temp_env, "@stdlib")
 
 include("misc.jl")
 

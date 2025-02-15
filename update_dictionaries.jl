@@ -12,7 +12,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-@static if dirname(Base.active_project()) ≠ @__DIR__
+@static if isnothing(Base.active_project()) ||
+		   !(dirname(Base.active_project()) == @__DIR__)
 	using Pkg: Pkg
 	Pkg.activate(@__DIR__)
 end
