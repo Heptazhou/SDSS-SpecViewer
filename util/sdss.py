@@ -1,7 +1,7 @@
-import numpy
+from typing import Union
 
 
-def SDSSV_buildURL(field: str, MJD: int, objID: str, branch: str):
+def SDSSV_buildURL(field: Union[int, str], MJD: int, objID: str, branch: str):
 	"""
 	A function to build the url that will be used to fetch the data.
 
@@ -9,7 +9,7 @@ def SDSSV_buildURL(field: str, MJD: int, objID: str, branch: str):
 	use str.zfill(6) to fix it.
 	"""
 	path = ""
-	file = f"spec-%s-{MJD}-{objID}.fits" % field.rstrip("p")
+	file = f"spec-%s-{MJD}-{objID}.fits" % str(field).rstrip("p")
 
 	if branch == "v5_4_45":
 		path = "https://data.sdss.org/sas/dr9/sdss/spectro/redux"
@@ -34,7 +34,7 @@ def SDSSV_buildURL(field: str, MJD: int, objID: str, branch: str):
 	# prior to v6_2_0
 	# url = f"{path}/{branch}/spectra/lite/{field}/{file}"
 	# v6_2_0+
-	fieldgroup = str(numpy.floor(int(field) / 1000).astype(int)).zfill(3) + "XXX"
+	fieldgroup = str(floor(int(field) / 1000)).zfill(3) + "XXX"
 	url = f"{path}/{branch}/spectra/daily/lite/{fieldgroup}/{field}/{file}"
 	# print(url)
 	return url

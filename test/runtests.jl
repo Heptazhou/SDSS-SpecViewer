@@ -13,12 +13,20 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 using Exts
+using Exts: with_temp_env
 using Pkg: Pkg
+using PythonCall
 using Test
 
-const with_temp_env = Fix2(Pkg.Operations.with_temp_env, "@stdlib")
+const Jl(x::Any) = x
+const Jl(x::Py)  = pyconvert(Any, x)
+
+let sys = pyimport("sys")
+	sys.path.append(stdpath(@__DIR__, ".."))
+end
 
 include("misc.jl")
 
 include("sdss.jl")
+include("util.jl")
 
