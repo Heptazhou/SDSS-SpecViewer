@@ -102,7 +102,7 @@ def SDSSV_fetch(username: str, password: str, field, MJD: int, objID, branch="")
 	field, objID = str(field), str(objID) # ensure type
 
 	if not branch:
-		for v in ("v6_2_0", "master", "v6_1_3", "v6_1_2"):
+		for v in ("master", "v6_2_0", "v6_1_3", "v6_1_2"):
 			try: return SDSSV_fetch(username, password, field, MJD, objID, v)
 			except: continue
 		raise HTTPError(f"SDSSV_fetch failed for {(field, MJD, objID)}")
