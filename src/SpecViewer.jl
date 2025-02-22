@@ -61,6 +61,27 @@ function sas_redux_spec(field::Integer, mjd::Integer, obj::IntOrStr, v::VersionN
 	sas_redux(v) * path * "spec-$field-$mjd-$obj.fits"
 end
 
+function sas_redux_spec(field::Symbol, mjd::Integer, obj::IntOrStr, branch::SymOrStr, variant::String = "")::String
+	sas_redux_spec(field, mjd, obj, branch2version(branch), variant)
+end
+function sas_redux_spec(field::Symbol, mjd::Integer, obj::IntOrStr, v::VersionNumber, variant::String = "")::String
+	isempty(variant) && (variant = "full")
+	path = @match v begin
+		v where v"6.1.1" ≤ v < v"6.1.2" => @match field begin
+			:allepoch => "spectra/$variant/$field/$mjd/"
+		end
+		v where v"6.1.2" ≤ v < v"6.2.0" => @match field begin
+			:allepoch     => "spectra/$variant/$field/$mjd/"
+			:allepoch_lco => "spectra/$variant/$field/$mjd/"
+		end
+		v where v"6.2.0" ≤ v < v"6.3.0" => @match field begin
+			:allepoch_apo => "spectra/allepoch/$variant/allepoch/$field/$mjd/"
+			:allepoch_lco => "spectra/allepoch/$variant/allepoch/$field/$mjd/"
+		end
+	end
+	sas_redux(v) * path * "spec-$field-$mjd-$obj.fits"
+end
+
 function sas_redux(v::VersionNumber)::String
 	@match v begin
 		v"0"     => sas_redux(:work, v)

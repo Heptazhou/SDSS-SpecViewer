@@ -129,16 +129,42 @@ end
 	@test lite(field, mjd, catid, b) ≡ "https://data.sdss5.org/sas/sdsswork/bhm/boss/spectro/redux/v6_0_9/spectra/lite/015000/59146/" * fits
 	@test spec(field, mjd, catid, b) ≡ full(field, mjd, catid, b)
 
+	b = v"6.1.1"
+	field, mjd, catid, fits = 015000, 59146, 4375786564, "spec-015000-59146-4375786564.fits"
+	@test full(field, mjd, catid, b) ≡ "https://data.sdss5.org/sas/sdsswork/bhm/boss/spectro/redux/v6_1_1/spectra/full/015000/59146/" * fits
+	@test lite(field, mjd, catid, b) ≡ "https://data.sdss5.org/sas/sdsswork/bhm/boss/spectro/redux/v6_1_1/spectra/lite/015000/59146/" * fits
+	@test spec(field, mjd, catid, b) ≡ full(field, mjd, catid, b)
+	field, mjd, catid, fits = :allepoch, 60000, 27021598054114233, "spec-allepoch-60000-27021598054114233.fits"
+	@test full(field, mjd, catid, b) ≡ "https://data.sdss5.org/sas/sdsswork/bhm/boss/spectro/redux/v6_1_1/spectra/full/allepoch/60000/" * fits
+	@test lite(field, mjd, catid, b) ≡ "https://data.sdss5.org/sas/sdsswork/bhm/boss/spectro/redux/v6_1_1/spectra/lite/allepoch/60000/" * fits
+	@test spec(field, mjd, catid, b) ≡ full(field, mjd, catid, b)
+
 	b = v"6.1.3"
 	field, mjd, catid, fits = 015000, 59146, 4375786564, "spec-015000-59146-4375786564.fits"
 	@test full(field, mjd, catid, b) ≡ "https://data.sdss5.org/sas/sdsswork/bhm/boss/spectro/redux/v6_1_3/spectra/full/015000/59146/" * fits
 	@test lite(field, mjd, catid, b) ≡ "https://data.sdss5.org/sas/sdsswork/bhm/boss/spectro/redux/v6_1_3/spectra/lite/015000/59146/" * fits
+	@test spec(field, mjd, catid, b) ≡ full(field, mjd, catid, b)
+	field, mjd, catid, fits = :allepoch, 60000, 27021598054114233, "spec-allepoch-60000-27021598054114233.fits"
+	@test full(field, mjd, catid, b) ≡ "https://data.sdss5.org/sas/sdsswork/bhm/boss/spectro/redux/v6_1_3/spectra/full/allepoch/60000/" * fits
+	@test lite(field, mjd, catid, b) ≡ "https://data.sdss5.org/sas/sdsswork/bhm/boss/spectro/redux/v6_1_3/spectra/lite/allepoch/60000/" * fits
+	@test spec(field, mjd, catid, b) ≡ full(field, mjd, catid, b)
+	field, mjd, catid, fits = :allepoch_lco, 60000, 27021598048679601, "spec-allepoch_lco-60000-27021598048679601.fits"
+	@test full(field, mjd, catid, b) ≡ "https://data.sdss5.org/sas/sdsswork/bhm/boss/spectro/redux/v6_1_3/spectra/full/allepoch_lco/60000/" * fits
+	@test lite(field, mjd, catid, b) ≡ "https://data.sdss5.org/sas/sdsswork/bhm/boss/spectro/redux/v6_1_3/spectra/lite/allepoch_lco/60000/" * fits
 	@test spec(field, mjd, catid, b) ≡ full(field, mjd, catid, b)
 
 	b = v"6.2.0"
 	field, mjd, catid, fits = 015000, 59146, 4375786564, "spec-015000-59146-4375786564.fits"
 	@test full(field, mjd, catid, b) ≡ "https://data.sdss5.org/sas/sdsswork/bhm/boss/spectro/redux/v6_2_0/spectra/daily/full/015XXX/015000/59146/" * fits
 	@test lite(field, mjd, catid, b) ≡ "https://data.sdss5.org/sas/sdsswork/bhm/boss/spectro/redux/v6_2_0/spectra/daily/lite/015XXX/015000/59146/" * fits
+	@test spec(field, mjd, catid, b) ≡ full(field, mjd, catid, b)
+	field, mjd, catid, fits = :allepoch_apo, 60000, 27021602603659704, "spec-allepoch_apo-60000-27021602603659704.fits"
+	@test full(field, mjd, catid, b) ≡ "https://data.sdss5.org/sas/sdsswork/bhm/boss/spectro/redux/v6_2_0/spectra/allepoch/full/allepoch/allepoch_apo/60000/" * fits
+	@test lite(field, mjd, catid, b) ≡ "https://data.sdss5.org/sas/sdsswork/bhm/boss/spectro/redux/v6_2_0/spectra/allepoch/lite/allepoch/allepoch_apo/60000/" * fits
+	@test spec(field, mjd, catid, b) ≡ full(field, mjd, catid, b)
+	field, mjd, catid, fits = :allepoch_lco, 60000, 63050395106956948, "spec-allepoch_lco-60000-63050395106956948.fits"
+	@test full(field, mjd, catid, b) ≡ "https://data.sdss5.org/sas/sdsswork/bhm/boss/spectro/redux/v6_2_0/spectra/allepoch/full/allepoch/allepoch_lco/60000/" * fits
+	@test lite(field, mjd, catid, b) ≡ "https://data.sdss5.org/sas/sdsswork/bhm/boss/spectro/redux/v6_2_0/spectra/allepoch/lite/allepoch/allepoch_lco/60000/" * fits
 	@test spec(field, mjd, catid, b) ≡ full(field, mjd, catid, b)
 
 	b = :master

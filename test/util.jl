@@ -95,6 +95,10 @@ end
 	field, mjd, catid = 015000, 59146, "4375786564"
 	@test spec(field, mjd, catid, b) ≡ func(field, mjd, catid, b)
 
+	b = v"6.1.1"
+	field, mjd, catid = 015000, 59146, "4375786564"
+	@test spec(field, mjd, catid, b) ≡ func(field, mjd, catid, b)
+
 	b = v"6.1.3"
 	field, mjd, catid = 015000, 59146, "4375786564"
 	@test spec(field, mjd, catid, b) ≡ func(field, mjd, catid, b)
