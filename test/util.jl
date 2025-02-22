@@ -21,9 +21,9 @@ util = pyimport("util")
 
 spec(field, mjd, obj, branch) = sas_redux_spec(field, mjd, obj, branch, "lite")
 
-function func(field::Integer, mjd::Integer, obj::String, v::VersionNumber)
-	branch::String = string(version2branch(v))
-	Jl(util.SDSSV_buildURL(field, mjd, obj, branch))
+function func(field::Union{Integer, Symbol}, mjd::Integer, obj::IntOrStr, v::VersionNumber)
+	branch::Symbol = version2branch(v)
+	Jl(util.SDSSV_buildURL(string(field), mjd, obj, string(branch)))
 end
 
 @testset "dr09" begin
@@ -98,13 +98,23 @@ end
 	b = v"6.1.1"
 	field, mjd, catid = 015000, 59146, "4375786564"
 	@test spec(field, mjd, catid, b) ≡ func(field, mjd, catid, b)
+	field, mjd, catid = :allepoch, 60000, "27021598054114233"
+	@test spec(field, mjd, catid, b) ≡ func(field, mjd, catid, b)
 
 	b = v"6.1.3"
 	field, mjd, catid = 015000, 59146, "4375786564"
 	@test spec(field, mjd, catid, b) ≡ func(field, mjd, catid, b)
+	field, mjd, catid = :allepoch, 60000, "27021598054114233"
+	@test spec(field, mjd, catid, b) ≡ func(field, mjd, catid, b)
+	field, mjd, catid = :allepoch_lco, 60000, 27021598048679601
+	@test spec(field, mjd, catid, b) ≡ func(field, mjd, catid, b)
 
 	b = v"6.2.0"
 	field, mjd, catid = 015000, 59146, "4375786564"
+	@test spec(field, mjd, catid, b) ≡ func(field, mjd, catid, b)
+	field, mjd, catid = :allepoch_apo, 60000, 27021602603659704
+	@test spec(field, mjd, catid, b) ≡ func(field, mjd, catid, b)
+	field, mjd, catid = :allepoch_lco, 60000, 63050395106956948
 	@test spec(field, mjd, catid, b) ≡ func(field, mjd, catid, b)
 
 	b = v"0" # master

@@ -15,15 +15,17 @@
 @testset "sdss" begin
 #! format: noindent
 
-using SpecViewer: branch2version, sas_redux_spec
+using SpecViewer: branch2version, sas_redux_spec, version2branch
 
 full(field, mjd, obj, branch) = sas_redux_spec(field, mjd, obj, branch, "full")
 lite(field, mjd, obj, branch) = sas_redux_spec(field, mjd, obj, branch, "lite")
 spec(field, mjd, obj, branch) = sas_redux_spec(field, mjd, obj, branch)
 
-@testset "bra2ver" begin
-	@test branch2version("v0_00_0") ≡ v"0"
-	@test branch2version("v5_13_2") ≡ v"5.13.2"
+@testset "bra ⇔ ver" begin
+	@test branch2version("master") ≡ v"0.0.0"
+	@test branch2version("v6_1_2") ≡ v"6.1.2"
+	@test version2branch(v"0.0.0") ≡ :master
+	@test version2branch(v"6.1.2") ≡ :v6_1_2
 end
 
 @testset "dr09" begin

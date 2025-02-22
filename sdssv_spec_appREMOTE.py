@@ -1,4 +1,4 @@
-### SpecViewer for Python v3.9+
+### SpecViewer for Python v3.10+
 
 """
 Excelsior!
@@ -13,7 +13,6 @@ from pathlib import Path
 from re import IGNORECASE, fullmatch
 from tempfile import TemporaryDirectory
 from traceback import print_exc
-from typing import Union
 
 import dash
 import numpy
@@ -38,9 +37,7 @@ dictionaries = json.load(open("dictionaries.txt"))
 authentication = "authentication.txt"
 programs: dict[str, list[int]] = dictionaries[0]
 fieldIDs: dict[str, list[int]] = dictionaries[1]
-# https://docs.python.org/3/library/typing.html#typing.Union
-# catalogIDs: dict[str, list[list | int]] = dictionaries[2] # require Python v3.10
-catalogIDs: dict[str, list[Union[list, int]]] = dictionaries[2]
+catalogIDs: dict[str, list[list | int]] = dictionaries[2]
 
 # for testing
 # print(programs)
@@ -371,8 +368,8 @@ spec_line_abs = numpy.asarray([
 	[1, 1, "0911.7600                    ", "Lyman limit"],
 ])
 
-# print(spec_line_emi[numpy.bool_(spec_line_emi[:, 0]), 2].tolist())
-# print(spec_line_abs[numpy.bool_(spec_line_abs[:, 0]), 3].tolist())
+# print(spec_line_emi[numpy.bool_(numpy.int_(spec_line_emi[:, 0])), 2].tolist())
+# print(spec_line_abs[numpy.bool_(numpy.int_(spec_line_abs[:, 0])), 3].tolist())
 
 ### wavelength plotting range
 wave_max = 10500.
@@ -642,7 +639,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 					# Set up emission-line active plotting dictionary with values set to the transition wavelengths
 					{"label": f"{i[2]: <10}\t(%sÅ)" % round(float(i[1])),
 					 "value": f"{i[1]}"} for i in spec_line_emi],
-					value=spec_line_emi[numpy.bool_(spec_line_emi[:, 0]), 1].tolist(), # values are wavelengths
+					value=spec_line_emi[numpy.bool_(numpy.int_(spec_line_emi[:, 0])), 1].tolist(), # values are wavelengths
 					style={"columnCount": "2"},
 					inputStyle={"marginRight": "5px"},
 					labelStyle={"whiteSpace": "pre-wrap"},
@@ -658,7 +655,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 					# Set up absorption-line active plotting dictionary with values set to the transition names
 					{"label": f"{i[3]: <10}\t(%sÅ)" % round(float(i[2].split()[0])),
 					 "value": f"{i[2].split()[0]}"} for i in spec_line_abs],
-					value=[s.split()[0] for s in spec_line_abs[numpy.bool_(spec_line_abs[:, 0]), 2]], # wavelengths
+					value=[s.split()[0] for s in spec_line_abs[numpy.bool_(numpy.int_(spec_line_abs[:, 0])), 2]], # wavelengths
 					style={"columnCount": "2"},
 					inputStyle={"marginRight": "5px"},
 					labelStyle={"whiteSpace": "pre-wrap"},

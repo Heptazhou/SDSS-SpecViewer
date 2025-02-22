@@ -1,21 +1,24 @@
-from typing import Union
+from re import fullmatch
 
 
-def SDSSV_buildURL(field: Union[int, str], MJD: int, objID: str, branch: str) -> str:
+def SDSSV_buildURL(field: int | str, mjd: int, obj: str, branch: str) -> str:
 	"""
 	A function to build the url that will be used to fetch the data.
 	"""
-	path = ""
-	try:
-		field = int(field)
-	except:
-		field = 0
+	if type(field) == str and fullmatch(r"\d+p?", field):
+		field = int(field.rstrip("p"))
 
-	field6 = f"{field}".zfill(6)
-	group6 = f"{field // 10**3}XXX".zfill(6)
+	if type(field) == int:
+		group = f"{field // 1000}XXX".zfill(6)
+	else:
+		group = f"{field}"
+	if fullmatch(r"allepoch_\w+", group):
+		group = "allepoch"
 
-	file = f"spec-{field}-{MJD}-{objID}.fits"
-	file6 = f"spec-{field6}-{MJD}-{objID}.fits"
+	def file(field: str, obj: str) -> str:
+		return f"spec-{field}-{mjd}-{obj}.fits"
+	field4 = str(field).zfill(4)
+	field6 = str(field).zfill(6)
 
 	match branch:
 		case "v5_4_45":
@@ -41,16 +44,18 @@ def SDSSV_buildURL(field: Union[int, str], MJD: int, objID: str, branch: str) ->
 		case \
 			"v5_4_45" | "v5_5_12" | "v5_6_5" | "v5_7_0" | "v5_7_2" | "v5_9_0" | \
 			"v5_10_0" | "v5_13_0" | "v5_13_2":
-			url = f"{path}/{branch}/spectra/lite/{field}/{file}"
+			url = f"{path}/{branch}/spectra/lite/{field4}/{file(field4, obj)}"
 		case \
 			"v6_0_1" | "v6_0_2" | "v6_0_3" | "v6_0_4":
-			url = f"{path}/{branch}/spectra/lite/{field}p/{MJD}/{file}"
+			url = f"{path}/{branch}/spectra/lite/{field4}p/{mjd}/{file(field4, obj)}"
 		case \
 			"v6_0_6" | "v6_0_7" | "v6_0_8" | "v6_0_9" | \
 			"v6_1_0" | "v6_1_1" | "v6_1_2" | "v6_1_3":
-			url = f"{path}/{branch}/spectra/lite/{field6}/{MJD}/{file6}"
+			url = f"{path}/{branch}/spectra/lite/{field6}/{mjd}/{file(field6, obj)}"
 		case _:
-			url = f"{path}/{branch}/spectra/daily/lite/{group6}/{field6}/{MJD}/{file6}"
+			url = f"{path}/{branch}/spectra/daily/lite/{group}/{field6}/{mjd}/{file(field6, obj)}"
+			if group == "allepoch": url \
+				= f"{path}/{branch}/spectra/{group}/lite/{group}/{field6}/{mjd}/{file(field6, obj)}"
 
 	return url
 
