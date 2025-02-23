@@ -131,9 +131,17 @@ def SDSSV_fetch(username: str, password: str, field: int | str, MJD: int, objID,
 	return r
 
 def SDSSV_fetch_allepoch(username: str, password: str, mjd: int, obj):
-	for x in ("allepoch", "allepoch_apo", "allepoch_lco"):
-		try: return SDSSV_fetch(username, password, x, mjd, obj)
-		except: continue
+	if mjd >= 59187:
+		for x in ["allepoch_apo"] if mjd < 60000 else ["allepoch_apo", "allepoch_lco"]:
+			try: return SDSSV_fetch(username, password, x, mjd, obj, branch="v6_2_0")
+			except: pass
+		for x in ["allepoch"    ] if mjd < 60000 else ["allepoch", "allepoch_lco"    ]:
+			try: return SDSSV_fetch(username, password, x, mjd, obj, branch="v6_1_3")
+			except: pass
+	if mjd >= 59164:
+		for x in ["allepoch"    ]:
+			try: return SDSSV_fetch(username, password, x, mjd, obj, branch="v6_1_1")
+			except: pass
 	field = "allepoch*"
 	raise HTTPError(f"SDSSV_fetch failed for {(field, mjd, obj)}")
 
