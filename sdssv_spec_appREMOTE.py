@@ -14,14 +14,14 @@ from re import IGNORECASE, fullmatch
 from tempfile import TemporaryDirectory
 from traceback import print_exc
 
-import dash
+import dash  # type: ignore
 import numpy
 import requests
-from astropy.convolution import Box1DKernel, convolve
-from astropy.io import fits as FITS
-from astropy.io.fits import BinTableHDU, FITS_rec
+from astropy.convolution import Box1DKernel, convolve  # type: ignore
+from astropy.io import fits as FITS  # type: ignore
+from astropy.io.fits import BinTableHDU, FITS_rec, HDUList  # type: ignore
 from dash import dcc, html
-from dash.dependencies import Input, Output, State
+from dash.dependencies import Input, Output, State  # type: ignore
 from numpy import mean, median, sqrt, std
 from numpy.typing import NDArray
 from plotly.graph_objects import Figure, Scatter
@@ -80,7 +80,7 @@ external_stylesheets = [ "https://codepen.io/chriddyp/pen/bWLwgP.css",
 ### Any necessary functions
 ###
 
-def SDSSV_fetch(username: str, password: str, field, MJD: int, objID, branch="") \
+def SDSSV_fetch(username: str, password: str, field: int | str, MJD: int, objID, branch="") \
 	-> tuple[FITS_rec, NDArray, NDArray, NDArray]:
 	"""
 	Fetch spectral data for a SDSS-RM object on a
@@ -89,17 +89,16 @@ def SDSSV_fetch(username: str, password: str, field, MJD: int, objID, branch="")
 	"""
 	if type(field) == str:
 		if fullmatch(r"\d+p", field):
+			field = field.rstrip("p")
 			branch = branch or "v6_0_4"
 	try:
 		if (field := int(field)) < 15000:
 			branch = branch or "v5_13_2"
-		else:
-			field = str(field).zfill(6)
 	except: pass
 	field, objID = str(field), str(objID) # ensure type
 
 	if not branch:
-		for v in ("master", "v6_2_0", "v6_1_3", "v6_1_2"):
+		for v in ("master", "v6_2_0", "v6_1_3"):
 			try: return SDSSV_fetch(username, password, field, MJD, objID, v)
 			except: continue
 		raise HTTPError(f"SDSSV_fetch failed for {(field, MJD, objID)}")
@@ -111,11 +110,11 @@ def SDSSV_fetch(username: str, password: str, field, MJD: int, objID, branch="")
 	# print(field)
 	url = SDSSV_buildURL(field, MJD, objID, branch)
 	# print(url)
-	r = requests.get(url, auth=(username, password) if "/sdsswork/" in url else None)
-	r.raise_for_status()
-	print(r.status_code, url)
+	rv = requests.get(url, auth=(username, password) if "/sdsswork/" in url else None)
+	rv.raise_for_status()
+	print(rv.status_code, url)
 	numpy.seterr(divide="ignore") # Python does not comply with IEEE 754 :(
-	fits = FITS.open(BytesIO(r.content))
+	fits: HDUList = FITS.open(BytesIO(rv.content))
 	hdu2: BinTableHDU = fits["COADD"]
 	hdu3: BinTableHDU = fits["SPALL"]
 	meta: FITS_rec = hdu3.data
@@ -130,6 +129,13 @@ def SDSSV_fetch(username: str, password: str, field, MJD: int, objID, branch="")
 	r = meta, wave, flux, errs
 	cache[(field, MJD, objID, branch)] = r
 	return r
+
+def SDSSV_fetch_allepoch(username: str, password: str, mjd: int, obj):
+	for x in ("allepoch", "allepoch_apo", "allepoch_lco"):
+		try: return SDSSV_fetch(username, password, x, mjd, obj)
+		except: continue
+	field = "allepoch*"
+	raise HTTPError(f"SDSSV_fetch failed for {(field, mjd, obj)}")
 
 def fetch_catID(field, catID, extra="") \
 	-> tuple[list[float], list[str], list[NDArray], list[NDArray], list[NDArray]]:
@@ -147,7 +153,7 @@ def fetch_catID(field, catID, extra="") \
 	# testval = catalogIDs[catID]
 	# print(testval)
 	data = catalogIDs.get(catID, [[]]) # [(ZWARNING, Z, RCHI2), {FIELD,MJD}...]
-	meta = list(data[0])
+	meta = list(data[0]) # type: ignore
 	meta = meta or [None, None, None] # (ZWARNING, Z, RCHI2)
 	for x in extra.split(","):
 		x, ver = [*x.split("@", 1), ""][:2]
@@ -210,7 +216,7 @@ def fetch_catID(field, catID, extra="") \
 	for mjd in mjd_list:
 		if mjd <= 59392:
 			try:
-				dat = SDSSV_fetch(username, password, "allepoch", mjd, catID)
+				dat = SDSSV_fetch_allepoch(username, password, mjd, catID)
 			except Exception as e:
 				# if str(e): print(e) if isinstance(e, HTTPError) else print_exc()
 				continue
@@ -223,7 +229,7 @@ def fetch_catID(field, catID, extra="") \
 	for mjd in mjd_list:
 		if mjd >= 59393:
 			try:
-				dat = SDSSV_fetch(username, password, "allepoch", mjd, catID)
+				dat = SDSSV_fetch_allepoch(username, password, mjd, catID)
 			except Exception as e:
 				# if str(e): print(e) if isinstance(e, HTTPError) else print_exc()
 				continue
@@ -824,7 +830,7 @@ def set_extra_obj(search: str):
 	Input("catalogid_dropdown", "value"),
 	prevent_initial_call=True)
 def reset_on_obj_change(y_max, y_min, x_max, x_min, z, z_step, hash: str, program: str, *_):
-	smooth = smooth_default
+	smooth = str(smooth_default)
 	if program != "(other)":
 		z, z_step = "", ""
 		y_min, y_max = y_min_default, y_max_default
@@ -853,13 +859,13 @@ def hide_file_upload(checklist: list[str]):
 def process_upload(sto: dict, contents: list[str], filename: list[str], timestamp: list[float]):
 	if not contents: return sto
 	if not sto: sto = dict()
-	with TemporaryDirectory(prefix="py_", ignore_cleanup_errors=True) as tmpdir:
-		tmpdir = Path(tmpdir)
+	with TemporaryDirectory(prefix="py_", ignore_cleanup_errors=True) as _tmpdir:
+		tmpdir = Path(_tmpdir)
 		# print(tmpdir)
-		for s, f, t in zip(contents, filename, timestamp):
+		for s, _f, t in zip(contents, filename, timestamp):
 			try:
-				# print((s[:100], f, t))
-				f = tmpdir / f
+				# print((s[:100], _f, t))
+				f = tmpdir / _f
 				mime, data = s.split(",", 1)
 				head, data = 0, b64decode(data).decode()
 				for line in data.splitlines():
@@ -962,12 +968,12 @@ def make_multiepoch_spectra(fieldid, catalogid, extra_obj, redshift, redshift_st
 						numpy.seterr(divide="ignore") # :(
 						errs = 1 / sqrt(errs) # σ
 				# print((name, wave, flux, errs))
-				names.append(name), waves.append(wave), fluxes.append(flux), delta.append(errs)
+				names.append(name), waves.append(wave), fluxes.append(flux), delta.append(errs) # type: ignore
 			except: print_exc()
 	noop_size = len(names)
 	try:
-		meta, name, wave, flux, errs = fetch_catID(fieldid, catalogid, extra_obj)
-		names.extend(name), waves.extend(wave), fluxes.extend(flux), delta.extend(errs)
+		meta, name, wave, flux, errs = fetch_catID(fieldid, catalogid, extra_obj) # type: ignore
+		names.extend(name), waves.extend(wave), fluxes.extend(flux), delta.extend(errs) # type: ignore
 		if meta[1] and not redshift and redshift_step == "any": redshift = meta[1]
 	except Exception as e:
 		if str(e): print(e) if isinstance(e, HTTPError) else print_exc()
@@ -991,34 +997,34 @@ def make_multiepoch_spectra(fieldid, catalogid, extra_obj, redshift, redshift_st
 
 		# For each spectrum in the list
 		for i in range(len(names)):
-			kws = dict()
+			kws = {}
 			if fullmatch(r"allplate-\d+.*", names[i], IGNORECASE):
-				kws = dict(line_color="#606060")
+				kws["line_color"] = "#606060"
 			if fullmatch(r"allFPS-\d+.*", names[i], IGNORECASE):
-				kws = dict(line_color="#000000")
+				kws["line_color"] = "#000000"
 			# create trace of smoothed spectra
 			fig.add_trace(Scatter(
 				x=waves[i] if i < noop_size else waves[i] / (1 + z),
 				y=convolve(fluxes[i], Box1DKernel(smooth)),
 				error_y_width=0, error_y_thickness=1, error_y_type="data", # σ
 				error_y_array=delta[i] if delta[i].size and "e" in checklist else None,
-				name=names[i], opacity=1 / 2, mode="lines", **kws))
+				name=names[i], opacity=1 / 2, mode="lines", **kws)) # type: ignore
 			# create "ghost trace" spanning the displayed observed wavelength range:
 			fig.add_trace(Scatter(
 				x=[x_min, x_max], y=[numpy.nan, numpy.nan], showlegend=False))
 		fig.data[1].xaxis = "x2" # assign the "ghost trace" to a new axis object
 
-		for i in spec_line_emi: # emission
-			j, x = i[2], i[1] # j is the label, x is the wavelength
+		for l in spec_line_emi: # emission
+			j, x = l[2], l[1] # j is the label, x is the wavelength
 			if x not in list_emi: continue # skip if the wavelength is not in the active plotting dictionary
 			x = float(x)
 			if (rest_x_min <= x and x <= rest_x_max):
 				fig.add_vline(x=x, line_dash="solid", opacity=1 / 4)
 				fig.add_annotation(x=x, y=y_max, text=j, hovertext=f" {j} ({x} Å)", textangle=70)
 
-		for i in spec_line_abs: # absorption
-			j, xs = i[3], i[2].split() # j is the label, xs is the wavelength list
-			# j, xs, n, b = i[3], i[2].split(), i[1], bool(i[0]) # j = label, xs = wavelength list, n = multiplicity, b = 0/1
+		for l in spec_line_abs: # absorption
+			j, xs = l[3], l[2].split() # j is the label, xs is the wavelength list
+			# j, xs, n, b = l[3], l[2].split(), l[1], bool(l[0]) # j = label, xs = wavelength list, n = multiplicity, b = 0/1
 			labeled = False # reset labeling flag
 			if xs[0] not in list_abs: continue # skip if the transition is not in the active plotting dictionary
 			for x in (xs := list(map(float, xs))): # for each wavelength in the wavelength list

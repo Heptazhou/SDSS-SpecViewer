@@ -92,25 +92,25 @@ end
 
 @testset "work" begin
 	b = v"6.0.9"
-	field, mjd, catid = 015000, 59146, "4375786564"
+	field, mjd, catid = 015000, 59146, 4375786564
 	@test spec(field, mjd, catid, b) ≡ func(field, mjd, catid, b)
 
 	b = v"6.1.1"
-	field, mjd, catid = 015000, 59146, "4375786564"
+	field, mjd, catid = 015000, 59146, 4375786564
 	@test spec(field, mjd, catid, b) ≡ func(field, mjd, catid, b)
-	field, mjd, catid = :allepoch, 60000, "27021598054114233"
+	field, mjd, catid = :allepoch, 60000, 27021598054114233
 	@test spec(field, mjd, catid, b) ≡ func(field, mjd, catid, b)
 
 	b = v"6.1.3"
-	field, mjd, catid = 015000, 59146, "4375786564"
+	field, mjd, catid = 015000, 59146, 4375786564
 	@test spec(field, mjd, catid, b) ≡ func(field, mjd, catid, b)
-	field, mjd, catid = :allepoch, 60000, "27021598054114233"
+	field, mjd, catid = :allepoch, 60000, 27021598054114233
 	@test spec(field, mjd, catid, b) ≡ func(field, mjd, catid, b)
 	field, mjd, catid = :allepoch_lco, 60000, 27021598048679601
 	@test spec(field, mjd, catid, b) ≡ func(field, mjd, catid, b)
 
 	b = v"6.2.0"
-	field, mjd, catid = 015000, 59146, "4375786564"
+	field, mjd, catid = 015000, 59146, 4375786564
 	@test spec(field, mjd, catid, b) ≡ func(field, mjd, catid, b)
 	field, mjd, catid = :allepoch_apo, 60000, 27021602603659704
 	@test spec(field, mjd, catid, b) ≡ func(field, mjd, catid, b)
@@ -118,7 +118,7 @@ end
 	@test spec(field, mjd, catid, b) ≡ func(field, mjd, catid, b)
 
 	b = v"0" # master
-	field, mjd, catid = 016199, 60606, "27021597863477824"
+	field, mjd, catid = 016199, 60606, 27021597863477824
 	@test spec(field, mjd, catid, b) ≡ func(field, mjd, catid, b)
 end
 

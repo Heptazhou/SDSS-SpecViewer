@@ -27,21 +27,21 @@ Please install the following Python packages to use this tool.
 *****
 If you are using [conda](https://docs.conda.io/)/[mamba](https://mamba.readthedocs.io/), you may run (preferably, within a separate [environment](https://docs.conda.io/projects/conda/en/latest/user-guide/getting-started.html#creating-environments)):
 ```shell
-conda install astropy dash numpy plotly requests
+conda install astropy dash numpy plotly requests types-requests
 ```
 Also, to update:
 ```shell
-conda update astropy dash numpy plotly requests
+conda update astropy dash numpy plotly requests types-requests
 ```
 
 *****
 If you are using [pip](https://pip.pypa.io/), you may run (preferably, within a separate [environment](https://packaging.python.org/en/latest/tutorials/installing-packages/#creating-virtual-environments)):
 ```shell
-pip install astropy dash numpy plotly requests
+pip install astropy dash numpy plotly plotly-stubs requests types-requests
 ```
 Also, to update:
 ```shell
-pip install -U astropy dash numpy plotly requests
+pip install -U astropy dash numpy plotly plotly-stubs requests types-requests
 ```
 
 *****

@@ -15,7 +15,7 @@
 using Exts
 using Exts: with_temp_env
 using Pkg: Pkg
-using PythonCall
+using PythonCall: GIL, Py, pyconvert, pyimport
 using Test
 
 const Jl(x::Any) = x
