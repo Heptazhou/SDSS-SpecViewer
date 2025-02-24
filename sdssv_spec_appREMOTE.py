@@ -80,7 +80,7 @@ external_stylesheets = [ "https://codepen.io/chriddyp/pen/bWLwgP.css",
 ### Any necessary functions
 ###
 
-def SDSSV_fetch(username: str, password: str, field: int | str, MJD: int, objID, branch="") \
+def SDSSV_fetch(username: str, password: str, field: int | str, mjd: int, obj: int | str, branch="") \
 	-> tuple[FITS_rec, NDArray, NDArray, NDArray]:
 	"""
 	Fetch spectral data for a SDSS-RM object on a
@@ -95,28 +95,28 @@ def SDSSV_fetch(username: str, password: str, field: int | str, MJD: int, objID,
 		if (field := int(field)) < 15000:
 			branch = branch or "v5_13_2"
 	except: pass
-	field, objID = str(field), str(objID) # ensure type
+	field, obj = str(field), str(obj) # ensure type
 
 	if not branch:
 		for v in ("master", "v6_2_0", "v6_1_3"):
-			try: return SDSSV_fetch(username, password, field, MJD, objID, v)
+			try: return SDSSV_fetch(username, password, field, mjd, obj, v)
 			except: continue
-		raise HTTPError(f"SDSSV_fetch failed for {(field, MJD, objID)}")
-	if not (field and MJD and objID):
-		raise HTTPError(f"SDSSV_fetch failed for {(field, MJD, objID, branch)}")
-	if (field, MJD, objID, branch) in cache:
-		return cache[(field, MJD, objID, branch)]
+		raise HTTPError(f"SDSSV_fetch failed for {(field, mjd, obj)}")
+	if not (field and mjd and obj):
+		raise HTTPError(f"SDSSV_fetch failed for {(field, mjd, obj, branch)}")
+	if (field, mjd, obj, branch) in cache:
+		return cache[(field, mjd, obj, branch)]
 
 	# print(field)
-	url = SDSSV_buildURL(field, MJD, objID, branch)
+	url = SDSSV_buildURL(field, mjd, obj, branch)
 	# print(url)
 	rv = requests.get(url, auth=(username, password) if "/sdsswork/" in url else None)
 	rv.raise_for_status()
 	print(rv.status_code, url)
 	numpy.seterr(divide="ignore") # Python does not comply with IEEE 754 :(
 	fits: HDUList = FITS.open(BytesIO(rv.content))
-	hdu2: BinTableHDU = fits["COADD"]
-	hdu3: BinTableHDU = fits["SPALL"]
+	hdu2: BinTableHDU = fits["COADD"] if "COADD" in fits else fits[1]
+	hdu3: BinTableHDU = fits["SPALL"] if "SPALL" in fits else fits[2]
 	meta: FITS_rec = hdu3.data
 	wave: NDArray = hdu2.data["LOGLAM"] # lg(λ)
 	flux: NDArray = hdu2.data["FLUX"]   # f_λ
@@ -127,10 +127,10 @@ def SDSSV_fetch(username: str, password: str, field: int | str, MJD: int, objID,
 	# print(f"wave: {type(wave)} = {str(wave)[:100]}")
 	# print(flux)
 	r = meta, wave, flux, errs
-	cache[(field, MJD, objID, branch)] = r
+	cache[(field, mjd, obj, branch)] = r
 	return r
 
-def SDSSV_fetch_allepoch(username: str, password: str, mjd: int, obj):
+def SDSSV_fetch_allepoch(username: str, password: str, mjd: int, obj: int | str):
 	if mjd >= 59187:
 		for x in ["allepoch_apo"] if mjd < 60000 else ["allepoch_apo", "allepoch_lco"]:
 			try: return SDSSV_fetch(username, password, x, mjd, obj, branch="v6_2_0")
@@ -145,7 +145,7 @@ def SDSSV_fetch_allepoch(username: str, password: str, mjd: int, obj):
 	field = "allepoch*"
 	raise HTTPError(f"SDSSV_fetch failed for {(field, mjd, obj)}")
 
-def fetch_catID(field, catID, extra="") \
+def fetch_catID(field: int | str, catID: int | str, extra="") \
 	-> tuple[list[float], list[str], list[NDArray], list[NDArray], list[NDArray]]:
 	#        here float is actually int & float, as float in Python contains int :(
 	if not (field and catID or extra):
@@ -282,7 +282,10 @@ try:
 	# url = SDSSV_buildURL("102236", "60477", "63050394846126565", "")
 	# print(url)
 	print("Verification succeeded.")
-	print("Try loading http://127.0.0.1:8050/?101126-60477-63050394846126565")
+	print("Try loading http://127.0.0.1:8050/?<field>-<mjd>-<catid>")
+	print("         or http://127.0.0.1:8050/?<field>-<mjd>-<catid>&prev=<plate>-<mjd>-<fiber>@<branch>")
+	print("       e.g. http://127.0.0.1:8050/?101126-60477-63050394846126565")
+	print("         or http://127.0.0.1:8050/?104623-60251-63050395075696130&prev=7670-57328-0918#m=5&y=0,16&z=2.66")
 	print("Change any setting after loading to reset redshift from z=0.")
 except:
 	print("Verification failed.")

@@ -1,7 +1,7 @@
 from re import fullmatch
 
 
-def SDSSV_buildURL(field: int | str, mjd: int, obj: str, branch: str) -> str:
+def SDSSV_buildURL(field: int | str, mjd: int, obj: int | str, branch: str) -> str:
 	"""
 	A function to build the url that will be used to fetch the data.
 	"""
@@ -17,10 +17,12 @@ def SDSSV_buildURL(field: int | str, mjd: int, obj: str, branch: str) -> str:
 	else:
 		daily = "daily"
 
-	def file(field: str, obj: str) -> str:
+	def file(field: str, obj: int | str) -> str:
 		return f"spec-{field}-{mjd}-{obj}.fits"
 	field4 = str(field).zfill(4)
 	field6 = str(field).zfill(6)
+	obj04 = str(obj).zfill( 4)
+	obj11 = str(obj).zfill(11)
 
 	match branch:
 		case "v5_4_45":
@@ -44,11 +46,11 @@ def SDSSV_buildURL(field: int | str, mjd: int, obj: str, branch: str) -> str:
 
 	match branch:
 		case branch if fullmatch(r"v5_(\d+_\d+)", branch):
-			url = f"{path}/{branch}/spectra/lite/{field4       }/{file(field4, obj)}"
+			url = f"{path}/{branch}/spectra/lite/{field4       }/{file(field4, obj04)}"
 		case branch if fullmatch(r"v6_[0]_[1-4]", branch):
-			url = f"{path}/{branch}/spectra/lite/{field4}p/{mjd}/{file(field4, obj)}"
+			url = f"{path}/{branch}/spectra/lite/{field4}p/{mjd}/{file(field4, obj11)}"
 		case branch if fullmatch(r"v6_[0-1]_\d+", branch):
-			url = f"{path}/{branch}/spectra/lite/{field6 }/{mjd}/{file(field6, obj)}"
+			url = f"{path}/{branch}/spectra/lite/{field6 }/{mjd}/{file(field6, obj  )}"
 		case _:
 			url = f"{path}/{branch}/spectra/{daily}/lite/{group}/{field6}/{mjd}/{file(field6, obj)}"
 

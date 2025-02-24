@@ -28,65 +28,65 @@ end
 
 @testset "dr09" begin
 	b = v"5.4.45"
-	plate, mjd, fiber = 3586, 55181, "0001"
+	plate, mjd, fiber = 3586, 55181, 0001
 	@test spec(plate, mjd, fiber, b) ≡ func(plate, mjd, fiber, b)
 end
 
 @testset "dr10" begin
 	b = v"5.5.12"
-	plate, mjd, fiber = 3586, 55181, "0001"
+	plate, mjd, fiber = 3586, 55181, 0001
 	@test spec(plate, mjd, fiber, b) ≡ func(plate, mjd, fiber, b)
 end
 
 @testset "dr11" begin
 	b = v"5.6.5"
-	plate, mjd, fiber = 3586, 55181, "0001"
+	plate, mjd, fiber = 3586, 55181, 0001
 	@test spec(plate, mjd, fiber, b) ≡ func(plate, mjd, fiber, b)
 end
 
 @testset "dr12" begin
 	b = v"5.7.0"
-	plate, mjd, fiber = 3586, 55181, "0001"
+	plate, mjd, fiber = 3586, 55181, 0001
 	@test spec(plate, mjd, fiber, b) ≡ func(plate, mjd, fiber, b)
 
 	b = v"5.7.2"
-	plate, mjd, fiber = 7339, 56768, "0001"
+	plate, mjd, fiber = 7339, 56768, 0001
 	@test spec(plate, mjd, fiber, b) ≡ func(plate, mjd, fiber, b)
 end
 
 @testset "dr13" begin
 	b = v"5.9.0"
-	plate, mjd, fiber = 3586, 55181, "0001"
+	plate, mjd, fiber = 3586, 55181, 0001
 	@test spec(plate, mjd, fiber, b) ≡ func(plate, mjd, fiber, b)
 end
 
 @testset "dr15" begin
 	b = v"5.10.0"
-	plate, mjd, fiber = 3586, 55181, "0001"
+	plate, mjd, fiber = 3586, 55181, 0001
 	@test spec(plate, mjd, fiber, b) ≡ func(plate, mjd, fiber, b)
-	plate, mjd, fiber = 10000, 57346, "0001"
+	plate, mjd, fiber = 10000, 57346, 0001
 	@test spec(plate, mjd, fiber, b) ≡ func(plate, mjd, fiber, b)
 end
 
 @testset "dr16" begin
 	b = v"5.13.0"
-	plate, mjd, fiber = 3586, 55181, "0001"
+	plate, mjd, fiber = 3586, 55181, 0001
 	@test spec(plate, mjd, fiber, b) ≡ func(plate, mjd, fiber, b)
 end
 
 @testset "dr17" begin
 	b = v"5.13.2"
-	plate, mjd, fiber = 3586, 55181, "0001"
+	plate, mjd, fiber = 3586, 55181, 0001
 	@test spec(plate, mjd, fiber, b) ≡ func(plate, mjd, fiber, b)
 end
 
 @testset "dr18" begin
 	b = v"5.13.2"
-	plate, mjd, fiber = 3586, 55181, "0001"
+	plate, mjd, fiber = 3586, 55181, 0001
 	@test spec(plate, mjd, fiber, b) ≡ func(plate, mjd, fiber, b)
 
 	b = v"6.0.4"
-	field, mjd, catid = 15143, 59205, "04544940698"
+	field, mjd, catid = 15143, 59205, 04544940698
 	@test spec(field, mjd, catid, b) ≡ func(field, mjd, catid, b)
 end
 
