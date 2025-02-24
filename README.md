@@ -22,7 +22,7 @@ Please install the following Python packages to use this tool.
 - numpy
 
 > [!NOTE]
-> Python v3.10 or higher is required.
+> Python v3.10 or higher is required ([versions](https://devguide.python.org/versions/)).
 
 *****
 If you are using [conda](https://docs.conda.io/)/[mamba](https://mamba.readthedocs.io/), you may run (preferably, within a separate [environment](https://docs.conda.io/projects/conda/en/latest/user-guide/getting-started.html#creating-environments)):
