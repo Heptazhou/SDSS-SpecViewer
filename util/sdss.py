@@ -5,6 +5,8 @@ def SDSSV_buildURL(field: int | str, mjd: int, obj: int | str, branch: str) -> s
 	"""
 	A function to build the url that will be used to fetch the data.
 	"""
+	if not (field and mjd and obj and branch):
+		raise Exception()
 	if type(field) == str and fullmatch(r"\d+p?", field):
 		field = int(field.rstrip("p"))
 
