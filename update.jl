@@ -23,7 +23,7 @@ using Pkg: Pkg, Registry, RegistrySpec
 let registry = getfield.(Registry.reachable_registries(), :name)
 	registry ∋ "0hjl" || Registry.add(RegistrySpec(url = "https://github.com/0h7z/0hjl.git"))
 	registry ∋ "General" || Registry.add("General")
-	cd(() -> touch(Base.manifest_names[VERSION < v"1.11" ? end : end ÷ 2]), @__DIR__)
+	cd(() -> touch(Base.manifest_names[VERSION < v"1.10.8" ? end : end ÷ 2]), @__DIR__)
 	Pkg.update()
 end
 

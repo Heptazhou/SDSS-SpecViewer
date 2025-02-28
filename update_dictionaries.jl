@@ -31,12 +31,12 @@ using FITSIO: FITS
 using JSON5: json
 using Pkg: PlatformEngines
 
-const s_info(xs...) = @static nthreads() > 1 ? @spawn(@info string(xs...)) : @info string(xs...)
+const s_info(xs...) = (@nospecialize; @info string(xs...))
 const u_sort! = unique! ∘ sort!
 
 Base.cat(x::Integer, y::Integer, ::Val{5}) = flipsign((10^5)abs(x) + mod(y, 10^5), x)
-Base.isless(::Any, ::Union{Number, VersionNumber}) = Bool(0)
-Base.isless(::Union{Number, VersionNumber}, ::Any) = Bool(1)
+Base.isless(::Any, ::Union{Number, VersionNumber}) = (@nospecialize; Bool(0))
+Base.isless(::Union{Number, VersionNumber}, ::Any) = (@nospecialize; Bool(1))
 
 @info "Looking for spAll files or archives"
 

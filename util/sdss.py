@@ -47,13 +47,13 @@ def SDSSV_buildURL(field: int | str, mjd: int, obj: int | str, branch: str) -> s
 			path = "https://data.sdss5.org/sas/sdsswork/bhm/boss/spectro/redux"
 
 	match branch:
-		case branch if fullmatch(r"v5_(\d+_\d+)", branch):
+		case branch if fullmatch(r"v5_(\d+_\d+)", branch): # v5
 			url = f"{path}/{branch}/spectra/lite/{field4       }/{file(field4, obj04)}"
-		case branch if fullmatch(r"v6_[0]_[1-4]", branch):
+		case branch if fullmatch(r"v6_[0]_[1-4]", branch): # v6.0.1 ~ v6.0.4
 			url = f"{path}/{branch}/spectra/lite/{field4}p/{mjd}/{file(field4, obj11)}"
-		case branch if fullmatch(r"v6_[0-1]_\d+", branch):
+		case branch if fullmatch(r"v6_[0-1]_\d+", branch): # v6.0.6 ~ v6.1.3
 			url = f"{path}/{branch}/spectra/lite/{field6 }/{mjd}/{file(field6, obj  )}"
-		case _:
+		case _:                                            # v6.2.0+
 			url = f"{path}/{branch}/spectra/{daily}/lite/{group}/{field6}/{mjd}/{file(field6, obj)}"
 
 	return url
