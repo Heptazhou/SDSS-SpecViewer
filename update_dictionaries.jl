@@ -18,9 +18,12 @@
 	Pkg.activate(@__DIR__)
 end
 
-let manifest = Base.project_file_manifest_path(Base.active_project())
-	if isnothing(manifest) || iszero(filesize(manifest)) ||
-	   0 < mtime(manifest) < time() - 86400(30) # 30 day
+using Dates: Month, UTC, datetime2unix, now
+
+let manifest = @something Base.project_file_manifest_path(Base.active_project()) ""
+	if (filesize(manifest) ≤ 0) ||
+	   0 < mtime(manifest) < datetime2unix(now(UTC) - Month(1))
+		basename(manifest) ≡ "Manifest.toml" && VERSION ≥ v"1.10.8" && rm(manifest)
 		include("update.jl")
 	end
 end
