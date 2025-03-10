@@ -12,18 +12,20 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+using Pkg: Pkg, Registry, RegistrySpec
+
 @static if isnothing(Base.active_project()) ||
 		   !(dirname(Base.active_project()) == @__DIR__)
-	using Pkg: Pkg
 	Pkg.activate(@__DIR__)
 end
-
-using Pkg: Pkg, Registry, RegistrySpec
 
 let registry = getfield.(Registry.reachable_registries(), :name)
 	registry ∋ "0hjl" || Registry.add(RegistrySpec(url = "https://github.com/0h7z/0hjl.git"))
 	registry ∋ "General" || Registry.add("General")
-	cd(() -> touch(Base.manifest_names[VERSION < v"1.10.8" ? end : end ÷ 2]), @__DIR__)
-	Pkg.update()
+	cd(@__DIR__) do
+		m = touch(Base.manifest_names[VERSION < v"1.10.8" ? end : end ÷ 2])
+		Pkg.update()
+		contains(readchomp(m), "julia_version =") || Pkg.upgrade_manifest()
+	end
 end
 

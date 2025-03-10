@@ -59,19 +59,16 @@ def SDSSV_buildURL(field: int | str, mjd: int, obj: int | str, branch: str) -> s
 	return url
 
 
-def SDSS_buildURL(field: int | str, mjd: int | str, fib: int | str, branch: str) -> str:
+def SDSS_buildURL(plate: int | str, mjd: int | str, fiber: int | str, branch: str) -> str:
 	"""
 	A function to build the url that will be used to fetch data from SDSS-I/II.
 	"""
-	if not (field and mjd and fib and branch):
+	if not (plate and mjd and fiber):
 		raise Exception()
 
 	# Fiber string is four digits; pad with leading zeros if needed
-	field4 = str(field).zfill( 4)
-	fib04 = str(fib).zfill( 4)
-
-	def file(field: str, mjd: int | str, fib: int | str) -> str:
-		return f"spec-{field}-{mjd}-{fib}.fits"
+	plate4 = str(plate).zfill(4)
+	fiber4 = str(fiber).zfill(4)
 
 	# PBH: the three different possible SDSS paths have nothing to do with their branch names;
 	# but using them is an easy way to try all three SDSS paths in the SDSSV_fetch function.
@@ -86,7 +83,7 @@ def SDSS_buildURL(field: int | str, mjd: int | str, fib: int | str, branch: str)
 		case _:
 			path = "https://dr18.sdss.org/sas/dr18/spectro/sdss/redux/26/spectra/lite"
 
-	url = f"{path}/{field4}/{file(field4, mjd, fib04)}"
+	url = f"{path}/{plate4}/spec-{plate4}-{mjd}-{fiber4}.fits"
 
 	return url
 

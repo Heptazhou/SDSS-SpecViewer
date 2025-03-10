@@ -27,8 +27,7 @@ from numpy.typing import NDArray
 from plotly.graph_objects import Figure, Scatter
 from requests.exceptions import HTTPError
 
-from util import SDSS_buildURL
-from util import SDSSV_buildURL
+from util import SDSS_buildURL, SDSSV_buildURL
 
 ###
 ### input the data directory path
@@ -99,7 +98,7 @@ def SDSSV_fetch(username: str, password: str, field: int | str, mjd: int, obj: i
 	field, obj = str(field), str(obj) # ensure type
 
 	if not branch:
-	# PBH: try different branches for SDSS-V spectra past 15000, and for SDSS-I/II spectra
+		# PBH: try different branches for SDSS-V spectra past 15000, and for SDSS-I/II spectra
 		for v in ("master", "v6_2_0", "v6_1_3"):
 			try: return SDSSV_fetch(username, password, field, mjd, obj, v)
 			except: continue
@@ -112,9 +111,9 @@ def SDSSV_fetch(username: str, password: str, field: int | str, mjd: int, obj: i
 	# print(field)
 	# PBH: field numbers 1 to 3509 (and 8015 & 8033) indicate SDSS-I/II data, but 00000 reserved for eFEDS
 	if (0 < (field := int(field)) < 3510 or (field := int(field)) == 8015 or (field := int(field)) == 8033):
-		#print(branch)
+		# print(branch)
 		url = SDSS_buildURL(field, mjd, obj, branch)
-		#print(url)
+		# print(url)
 	else:
 		url = SDSSV_buildURL(field, mjd, obj, branch)
 	# print(url)

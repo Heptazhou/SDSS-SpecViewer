@@ -12,17 +12,16 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+using Pkg: Pkg, Types.Context
+
 @static if isnothing(Base.active_project()) ||
 		   !(dirname(Base.active_project()) == @__DIR__)
-	using Pkg: Pkg
 	Pkg.activate(@__DIR__)
 end
 
-using Dates: Month, UTC, datetime2unix, now
-
 let manifest = @something Base.project_file_manifest_path(Base.active_project()) ""
-	if (filesize(manifest) ≤ 0) ||
-	   0 < mtime(manifest) < datetime2unix(now(UTC) - Month(1))
+	if (filesize(manifest) ≤ 0) || !(Pkg.is_manifest_current(Context()) == true) ||
+	   0 < mtime(manifest) < time() - 86400(30) # 30 day
 		basename(manifest) ≡ "Manifest.toml" && VERSION ≥ v"1.10.8" && rm(manifest)
 		include("update.jl")
 	end
@@ -65,7 +64,7 @@ const fits = try
 	is_arc = endswith(r"\.([7gx]z|rar|zip)")
 	is_tmp = endswith(r"\.tmp")
 	d = ODict{String, String}()
-	for x ∈ getfirst(!isempty, map(filter(isfile), (ARGS, readdir())))
+	for x ∈ getfirst(!isempty, filter(isfile).([ARGS, readdir()]))
 		f = is_arc(x) ? filename(x) : x
 		contains(f, r"\bspall\b"i) || continue
 		contains(f, r"\ballepoch\b"i) && continue
@@ -93,7 +92,7 @@ const df = @time @sync let
 	df = unique!(mapreduce(f2df, vcat, fits))
 	df = @rsubset(df, :FIELDQUALITY ≡ "good")
 end
-# LDict(propertynames(df), map(eltype, eachcol(df)))
+# LDict(propertynames(df), eltype.(eachcol(df)))
 
 @info "Setting up dictionary for fieldIDs with each RM_field"
 

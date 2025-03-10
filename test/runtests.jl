@@ -12,14 +12,16 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+@static if isinteractive()
+	using Pkg: Pkg
+	Pkg.update()
+end
+
 using Exts
-using Exts: with_temp_env
+using Exts: Jl, with_temp_env
 using Pkg: Pkg
 using PythonCall: GIL, Py, pyconvert, pyimport
 using Test
-
-const Jl(x::Any) = x
-const Jl(x::Py)  = pyconvert(Any, x)
 
 let sys = pyimport("sys")
 	sys.path.append(stdpath(@__DIR__, ".."))
