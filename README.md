@@ -76,16 +76,17 @@ PS: The filename(s) shall match the pattern `/\bspall\b.*\.fits(\.tmp)?$/i` and 
 
 
 ## Features to be added
+- DONE: optimize the loading speed
+- DONE: smoothing of spectra
 - DONE: include previous spectra from SDSS I-IV
 - DONE-ISH (in text output if run from command line, but not on webpage yet): provide downloadable links to all data
-- include quick links to other databases (Simbad, Ned, etc...)
 - include source information summary (RA, Dec, z, source types...)
+- include at least option for log x axis
+- include quick links to other databases (Simbad, Ned, etc...)
 - search with RA/Dec for objects
 - renormalization of spectra (based on specific wavelength or line)
-- DONE: smoothing of spectra
 - show the residual spectra in greyscale (could add as a second figure)
-- DONE: optimize the loading speed
 - add session history
 - S/N selection slider bar
 - Fix colors
-
+- Convert TAIHMS to fractional MJD and add to MJD to get MJD_FINAL for SDSS-I/IV for display
