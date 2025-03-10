@@ -27,6 +27,7 @@ from numpy.typing import NDArray
 from plotly.graph_objects import Figure, Scatter
 from requests.exceptions import HTTPError
 
+from util import SDSS_buildURL
 from util import SDSSV_buildURL
 
 ###
@@ -91,13 +92,14 @@ def SDSSV_fetch(username: str, password: str, field: int | str, mjd: int, obj: i
 		if fullmatch(r"\d+p", field):
 			field = field.rstrip("p")
 			branch = branch or "v6_0_4"
-	try:
-		if (field := int(field)) < 15000:
+	try: # SDSS-III and IV spectra
+		if (3510 <= (field := int(field)) < 15000):
 			branch = branch or "v5_13_2"
 	except: pass
 	field, obj = str(field), str(obj) # ensure type
 
 	if not branch:
+	# PBH: try different branches for SDSS-V spectra past 15000, and for SDSS-I/II spectra
 		for v in ("master", "v6_2_0", "v6_1_3"):
 			try: return SDSSV_fetch(username, password, field, mjd, obj, v)
 			except: continue
@@ -108,7 +110,12 @@ def SDSSV_fetch(username: str, password: str, field: int | str, mjd: int, obj: i
 		return cache[(field, mjd, obj, branch)]
 
 	# print(field)
-	url = SDSSV_buildURL(field, mjd, obj, branch)
+	# PBH: field numbers 1 to 3509 (and 8015 & 8033) indicate SDSS-I/II data, but 00000 reserved for eFEDS
+	if (0 < (field := int(field)) < 3510 or (field := int(field)) == 8015 or (field := int(field)) == 8033):
+		#print(branch)
+		url = SDSS_buildURL(field, mjd, obj, branch)
+	else:
+		url = SDSSV_buildURL(field, mjd, obj, branch)
 	# print(url)
 	rv = requests.get(url, auth=(username, password) if "/sdsswork/" in url else None)
 	rv.raise_for_status()
@@ -118,9 +125,11 @@ def SDSSV_fetch(username: str, password: str, field: int | str, mjd: int, obj: i
 	hdu2: BinTableHDU = fits["COADD"] if "COADD" in fits else fits[1]
 	hdu3: BinTableHDU = fits["SPALL"] if "SPALL" in fits else fits[2]
 	meta: FITS_rec = hdu3.data
+	# PBH: wavelength is read in as logarithmic
 	wave: NDArray = hdu2.data["LOGLAM"] # lg(λ)
 	flux: NDArray = hdu2.data["FLUX"]   # f_λ
 	errs: NDArray = hdu2.data["IVAR"]   # τ = σ⁻²
+	# PBH: wavelength is set to linear
 	wave = 10**wave                     # λ
 	errs = 1 / sqrt(errs)               # σ
 	# print(f"meta: {type(meta)} = {str(meta)[:100]}")
@@ -809,6 +818,7 @@ def set_redshift_stepping(z, step):
 	return z, type, step
 
 # set extra object(s) list to plot for comparison
+# syntax example: http://127.0.0.1:8050/?100701-59719-27021597909876068&extra=1163-52669-0597
 @app.callback(
 	Output("extra_obj_input", "value"),
 	Input("window_location", "search"))
@@ -1046,7 +1056,9 @@ def make_multiepoch_spectra(fieldid, catalogid, extra_obj, redshift, redshift_st
 					labeled = True
 
 		fig.update_layout( # Rest wavelengths on top axis; observed wavelengths on bottom axis
+			# The xaxis1 command just displays the rest-frame axis numbers and title.
 			xaxis1=dict(side="top", title_text="Rest-Frame Wavelength (Å)"),
+			# The xaxis2 command displays the DATA and the observed-frame axis title, but the numbers are already there.
 			xaxis2=dict(anchor="y", overlaying="x", title_text="Observed Wavelength (Å)"),
 		)
 
