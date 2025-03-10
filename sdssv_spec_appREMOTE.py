@@ -114,6 +114,7 @@ def SDSSV_fetch(username: str, password: str, field: int | str, mjd: int, obj: i
 	if (0 < (field := int(field)) < 3510 or (field := int(field)) == 8015 or (field := int(field)) == 8033):
 		#print(branch)
 		url = SDSS_buildURL(field, mjd, obj, branch)
+		#print(url)
 	else:
 		url = SDSSV_buildURL(field, mjd, obj, branch)
 	# print(url)

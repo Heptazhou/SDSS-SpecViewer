@@ -82,9 +82,10 @@ PS: The filename(s) shall match the pattern `/\bspall\b.*\.fits(\.tmp)?$/i` and 
 - DONE-ISH (in text output if run from command line, but not on webpage yet): provide downloadable links to all data
 - include source information summary (RA, Dec, z, source types...)
 - include at least option for log x axis
+- renormalization of spectra/spectrum (based on specific wavelength or line, or input value)
+- add APO/LCO to MJDs for display? Or elsewhere in display for SDSS-V spectra only?
 - include quick links to other databases (Simbad, Ned, etc...)
 - search with RA/Dec for objects
-- renormalization of spectra (based on specific wavelength or line)
 - show the residual spectra in greyscale (could add as a second figure)
 - add session history
 - S/N selection slider bar

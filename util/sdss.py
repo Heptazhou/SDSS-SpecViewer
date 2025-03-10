@@ -67,6 +67,7 @@ def SDSS_buildURL(field: int | str, mjd: int | str, fib: int | str, branch: str)
 		raise Exception()
 
 	# Fiber string is four digits; pad with leading zeros if needed
+	field4 = str(field).zfill( 4)
 	fib04 = str(fib).zfill( 4)
 
 	def file(field: str, mjd: int | str, fib: int | str) -> str:
@@ -85,7 +86,7 @@ def SDSS_buildURL(field: int | str, mjd: int | str, fib: int | str, branch: str)
 		case _:
 			path = "https://dr18.sdss.org/sas/dr18/spectro/sdss/redux/26/spectra/lite"
 
-	url = f"{path}/{field}/{file(field, mjd, fib04)}"
+	url = f"{path}/{field4}/{file(field4, mjd, fib04)}"
 
 	return url
 
