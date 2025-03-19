@@ -24,7 +24,7 @@ let registry = getfield.(Registry.reachable_registries(), :name)
 	registry ∋ "General" || Registry.add("General")
 	cd(@__DIR__) do
 		m = touch(sort([Base.manifest_names...], by = contains("-v"))[end])
-		(un_v -> (un_v !== m) && isfile(un_v) && rm(un_v))("Manifest.toml")
+		(un_v -> (un_v) ≠ (m) && isfile(un_v) && rm(un_v))("Manifest.toml")
 		Pkg.update()
 		contains(readchomp(m), "julia_version =") || Pkg.upgrade_manifest()
 	end
