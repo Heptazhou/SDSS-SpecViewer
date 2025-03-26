@@ -650,8 +650,8 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 				dcc.Input(
 					id="smooth_input", type="number", step=2, min=1, value=smooth_default, placeholder="SmoothWidth",
 					style={"height": "36px", "width": "100%"}, max=smooth_max,
-				),
-			]),
+				), # PBH: closes dcc.Input
+			]), # PBH: closes html.Div
 
 		]),
 		html.Div(className="col-lg-8 col-xs-12", style={"padding": "0"}, children=[
@@ -966,6 +966,7 @@ def line_list_abs_select_all(clk: int, val: list, opt: list):
 	Input("smooth_input", "value"),
 	Input("extra_func_list", "value"),
 	Input("dash-user-upload", "data"))
+# The list of inputs above applies to the following function
 def make_multiepoch_spectra(fieldid, catalogid, extra_obj, redshift, redshift_step,
                             y_max, y_min, x_max, x_min, list_emi, list_abs, smooth,
                             checklist: list[str], user_data: dict):
