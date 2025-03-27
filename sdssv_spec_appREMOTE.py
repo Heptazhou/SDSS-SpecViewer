@@ -81,237 +81,237 @@ external_stylesheets = [ "https://codepen.io/chriddyp/pen/bWLwgP.css",
 ###
 
 def SDSSV_fetch(username: str, password: str, field: int | str, mjd: int, obj: int | str, branch="") \
-    -> tuple[FITS_rec, NDArray, NDArray, NDArray, float, float]:
-    """
-    Fetch spectral data for a SDSS-RM object on a
-    specific field on a specific MJD, using the user
-    supplied authentication.
-    """
-    if type(field) == str:
-        if fullmatch(r"\d+p", field):
-            field = field.rstrip("p")
-            branch = branch or "v6_0_4"
-    
-    try:  # SDSS-III and IV spectra
-        if (3510 <= (field := int(field)) < 15000):
-            branch = branch or "v5_13_2"
-    except:
-        pass
+	-> tuple[FITS_rec, NDArray, NDArray, NDArray, float, float]:
+	"""
+	Fetch spectral data for a SDSS-RM object on a
+	specific field on a specific MJD, using the user
+	supplied authentication.
+	"""
+	if type(field) == str:
+		if fullmatch(r"\d+p", field):
+			field = field.rstrip("p")
+			branch = branch or "v6_0_4"
 
-    field, obj = str(field), str(obj)  # Ensure type consistency
+	try:  # SDSS-III and IV spectra
+		if (3510 <= (field := int(field)) < 15000):
+			branch = branch or "v5_13_2"
+	except:
+		pass
 
-    if not branch:
-        # PBH: try different branches for SDSS-V spectra past 15000, and for SDSS-I/II spectra
-        for v in ("master", "v6_2_0", "v6_1_3"):
-            try:
-                return SDSSV_fetch(username, password, field, mjd, obj, v)
-            except:
-                continue
-        raise HTTPError(f"SDSSV_fetch failed for {(field, mjd, obj)}")
+	field, obj = str(field), str(obj)  # Ensure type consistency
 
-    if not (field and mjd and obj):
-        raise HTTPError(f"SDSSV_fetch failed for {(field, mjd, obj, branch)}")
+	if not branch:
+		# PBH: try different branches for SDSS-V spectra past 15000, and for SDSS-I/II spectra
+		for v in ("master", "v6_2_0", "v6_1_3"):
+			try:
+				return SDSSV_fetch(username, password, field, mjd, obj, v)
+			except:
+				continue
+		raise HTTPError(f"SDSSV_fetch failed for {(field, mjd, obj)}")
 
-    if (field, mjd, obj, branch) in cache:
-        return cache[(field, mjd, obj, branch)]
+	if not (field and mjd and obj):
+		raise HTTPError(f"SDSSV_fetch failed for {(field, mjd, obj, branch)}")
 
-    # Determine the correct URL for fetching data
-    if 0 < (field := int(field)) < 3510 or field in {8015, 8033}:  # SDSS-I/II fields
-        url = SDSS_buildURL(field, mjd, obj, branch)
-    else:
-        url = SDSSV_buildURL(field, mjd, obj, branch)
+	if (field, mjd, obj, branch) in cache:
+		return cache[(field, mjd, obj, branch)]
 
-    rv = requests.get(url, auth=(username, password) if "/sdsswork/" in url else None)
-    rv.raise_for_status()
-    print(rv.status_code, url)
+	# Determine the correct URL for fetching data
+	if 0 < (field := int(field)) < 3510 or field in {8015, 8033}:  # SDSS-I/II fields
+		url = SDSS_buildURL(field, mjd, obj, branch)
+	else:
+		url = SDSSV_buildURL(field, mjd, obj, branch)
 
-    numpy.seterr(divide="ignore")  # Prevent division errors
+	rv = requests.get(url, auth=(username, password) if "/sdsswork/" in url else None)
+	rv.raise_for_status()
+	print(rv.status_code, url)
 
-    fits: HDUList = FITS.open(BytesIO(rv.content))
-    hdu2: BinTableHDU = fits["COADD"] if "COADD" in fits else fits[1]
-    hdu3: BinTableHDU = fits["SPALL"] if "SPALL" in fits else fits[2]
+	numpy.seterr(divide="ignore")  # Prevent division errors
 
-    meta: FITS_rec = hdu3.data
+	fits: HDUList = FITS.open(BytesIO(rv.content))
+	hdu2: BinTableHDU = fits["COADD"] if "COADD" in fits else fits[1]
+	hdu3: BinTableHDU = fits["SPALL"] if "SPALL" in fits else fits[2]
 
-    # Extract spectral data
-    wave: NDArray = hdu2.data["LOGLAM"]  # log(λ)
-    flux: NDArray = hdu2.data["FLUX"]    # f_λ
-    errs: NDArray = hdu2.data["IVAR"]    # τ = σ⁻²
+	meta: FITS_rec = hdu3.data
 
-    # Convert logarithmic wavelength to linear
-    wave = 10 ** wave  # λ
-    errs = 1 / sqrt(errs)  # Convert inverse variance to standard deviation (σ)
+	# Extract spectral data
+	wave: NDArray = hdu2.data["LOGLAM"]  # log(λ)
+	flux: NDArray = hdu2.data["FLUX"]    # f_λ
+	errs: NDArray = hdu2.data["IVAR"]    # τ = σ⁻²
 
-    # Extract RA and DEC from metadata
-    try:
-        ra = float(meta["RACAT"][0]) if "RACAT" in meta.columns.names else None
-        dec = float(meta["DECCAT"][0]) if "DECCAT" in meta.columns.names else None
-    except Exception as e:
-        print(f"Warning: Could not extract RA/DEC. Error: {e}")
-        ra, dec = None, None  # If missing, return None
+	# Convert logarithmic wavelength to linear
+	wave = 10 ** wave  # λ
+	errs = 1 / sqrt(errs)  # Convert inverse variance to standard deviation (σ)
 
-    # Store results in cache
-    r = meta, wave, flux, errs, ra, dec
-    cache[(field, mjd, obj, branch)] = r
+	# Extract RA and DEC from metadata
+	try:
+		ra = float(meta["RACAT"][0]) if "RACAT" in meta.columns.names else None
+		dec = float(meta["DECCAT"][0]) if "DECCAT" in meta.columns.names else None
+	except Exception as e:
+		print(f"Warning: Could not extract RA/DEC. Error: {e}")
+		ra, dec = None, None  # If missing, return None
 
-    return r
+	# Store results in cache
+	r = meta, wave, flux, errs, ra, dec
+	cache[(field, mjd, obj, branch)] = r
+
+	return r
 def SDSSV_fetch_allepoch(username: str, password: str, mjd: int, obj: int | str) \
-    -> tuple[FITS_rec, NDArray, NDArray, NDArray, float, float]:  # Updated return type
-    """
-    Fetch all epoch spectral data for a given MJD and object using authentication.
-    """
+	-> tuple[FITS_rec, NDArray, NDArray, NDArray, float, float]:  # Updated return type
+	"""
+	Fetch all epoch spectral data for a given MJD and object using authentication.
+	"""
 
-    if mjd >= 59187:
-        for x in ["allepoch_apo"] if mjd < 60000 else ["allepoch_apo", "allepoch_lco"]:
-            try:
-                meta, wave, flux, errs, ra, dec = SDSSV_fetch(username, password, x, mjd, obj, branch="v6_2_0")
-                return meta, wave, flux, errs, ra, dec  # Ensure full return tuple
-            except:
-                pass
+	if mjd >= 59187:
+		for x in ["allepoch_apo"] if mjd < 60000 else ["allepoch_apo", "allepoch_lco"]:
+			try:
+				meta, wave, flux, errs, ra, dec = SDSSV_fetch(username, password, x, mjd, obj, branch="v6_2_0")
+				return meta, wave, flux, errs, ra, dec  # Ensure full return tuple
+			except:
+				pass
 
-        for x in ["allepoch"] if mjd < 60000 else ["allepoch", "allepoch_lco"]:
-            try:
-                meta, wave, flux, errs, ra, dec = SDSSV_fetch(username, password, x, mjd, obj, branch="v6_1_3")
-                return meta, wave, flux, errs, ra, dec
-            except:
-                pass
+		for x in ["allepoch"] if mjd < 60000 else ["allepoch", "allepoch_lco"]:
+			try:
+				meta, wave, flux, errs, ra, dec = SDSSV_fetch(username, password, x, mjd, obj, branch="v6_1_3")
+				return meta, wave, flux, errs, ra, dec
+			except:
+				pass
 
-    if mjd >= 59164:
-        for x in ["allepoch"]:
-            try:
-                meta, wave, flux, errs, ra, dec = SDSSV_fetch(username, password, x, mjd, obj, branch="v6_1_1")
-                return meta, wave, flux, errs, ra, dec
-            except:
-                pass
+	if mjd >= 59164:
+		for x in ["allepoch"]:
+			try:
+				meta, wave, flux, errs, ra, dec = SDSSV_fetch(username, password, x, mjd, obj, branch="v6_1_1")
+				return meta, wave, flux, errs, ra, dec
+			except:
+				pass
 
-    field = "allepoch*"
-    raise HTTPError(f"SDSSV_fetch_allepoch failed for {(field, mjd, obj)}")
+	field = "allepoch*"
+	raise HTTPError(f"SDSSV_fetch_allepoch failed for {(field, mjd, obj)}")
 
 def fetch_catID(field: int | str, catID: int | str, extra="") \
-    -> tuple[list[float], list[str], list[NDArray], list[NDArray], list[NDArray], list[float], list[float]]:  
+	-> tuple[list[float], list[str], list[NDArray], list[NDArray], list[NDArray], list[float], list[float]]:
 
-    if not (field and catID or extra):
-        raise Exception("Invalid field or catID input.")
+	if not (field and catID or extra):
+		raise Exception("Invalid field or catID input.")
 
-    field = str(field).replace(" ", "")
-    catID = str(catID).replace(" ", "")
-    extra = str(extra).replace(" ", "")
+	field = str(field).replace(" ", "")
+	catID = str(catID).replace(" ", "")
+	extra = str(extra).replace(" ", "")
 
-    if (field, catID, extra) in cache:
-        return cache[(field, catID, extra)]
+	if (field, catID, extra) in cache:
+		return cache[(field, catID, extra)]
 
-    name, wave, flux, errs = [], [], [], []
-    ra_list, dec_list = [], []  # Collect all RA/DEC values
+	name, wave, flux, errs = [], [], [], []
+	ra_list, dec_list = [], []  # Collect all RA/DEC values
 
-    # Retrieve catalog information
-    data = catalogIDs.get(catID, [[]])  # [(ZWARNING, Z, RCHI2, RACAT, DECCAT), {FIELD,MJD}...]
-    meta = list(data[0]) if data else []
-    meta = meta or [None, None, None, None, None]  # (ZWARNING, Z, RCHI2, RACAT, DECCAT)
+	# Retrieve catalog information
+	data = catalogIDs.get(catID, [[]])  # [(ZWARNING, Z, RCHI2, RACAT, DECCAT), {FIELD,MJD}...]
+	meta = list(data[0]) if data else []
+	meta = meta or [None, None, None, None, None]  # (ZWARNING, Z, RCHI2, RACAT, DECCAT)
 
-    for x in extra.split(","):
-        x, ver = [*x.split("@", 1), ""][:2]
-        if not fullmatch(r"\d+p?-\d+-[^-](.*[^-])?", x):
-            continue
-        fid, mjd, obj = x.split("-", 2)
-        mjd = int(mjd)
+	for x in extra.split(","):
+		x, ver = [*x.split("@", 1), ""][:2]
+		if not fullmatch(r"\d+p?-\d+-[^-](.*[^-])?", x):
+			continue
+		fid, mjd, obj = x.split("-", 2)
+		mjd = int(mjd)
 
-        try:
-            dat = SDSSV_fetch(username, password, fid, mjd, obj, ver)
-            mjd_final = str(dat[0]["MJD_FINAL"][0]) if "MJD_FINAL" in dat[0].columns.names else str(dat[0]["MJD"][0])
-            name.append(mjd_final)
-            wave.append(dat[1])
-            flux.append(dat[2])
-            errs.append(dat[3])
-            ra_list.append(dat[4] if dat[4] is not None else None)  # Ensure proper RA extraction
-            dec_list.append(dat[5] if dat[5] is not None else None)  # Ensure proper DEC extraction
-        except Exception as e:
-            print(f"Error fetching data for {fid}-{mjd}-{obj}: {e}")
-            continue
+		try:
+			dat = SDSSV_fetch(username, password, fid, mjd, obj, ver)
+			mjd_final = str(dat[0]["MJD_FINAL"][0]) if "MJD_FINAL" in dat[0].columns.names else str(dat[0]["MJD"][0])
+			name.append(mjd_final)
+			wave.append(dat[1])
+			flux.append(dat[2])
+			errs.append(dat[3])
+			ra_list.append(dat[4] if dat[4] is not None else None)  # Ensure proper RA extraction
+			dec_list.append(dat[5] if dat[5] is not None else None)  # Ensure proper DEC extraction
+		except Exception as e:
+			print(f"Error fetching data for {fid}-{mjd}-{obj}: {e}")
+			continue
 
-    if fullmatch(r"\d+p?-\d+", field):
-        obj, ver = [*catID.split("@", 1), ""][:2]
-        fid, mjd = field.split("-", 1)
-        mjd = int(mjd)
+	if fullmatch(r"\d+p?-\d+", field):
+		obj, ver = [*catID.split("@", 1), ""][:2]
+		fid, mjd = field.split("-", 1)
+		mjd = int(mjd)
 
-        try:
-            dat = SDSSV_fetch(username, password, fid, mjd, obj, ver)
-            meta = [
-                dat[0]["ZWARNING"][0] if meta[0] is None else meta[0],
-                dat[0]["Z"][0] if meta[1] is None else meta[1],
-                dat[0]["RCHI2"][0] if meta[2] is None else meta[2],
-                dat[0]["RACAT"][0] if "RACAT" in dat[0].columns.names else meta[3],  # Fetch RA from "RACAT"
-                dat[0]["DECCAT"][0] if "DECCAT" in dat[0].columns.names else meta[4],  # Fetch DEC from "DECCAT"
-            ]
-            mjd_final = str(dat[0]["MJD_FINAL"][0]) if "MJD_FINAL" in dat[0].columns.names else str(dat[0]["MJD"][0])
-            name.append(mjd_final)
-            wave.append(dat[1])
-            flux.append(dat[2])
-            errs.append(dat[3])
-            ra_list.append(dat[4] if dat[4] is not None else None)
-            dec_list.append(dat[5] if dat[5] is not None else None)
-        except Exception as e:
-            print(f"Error fetching data for {fid}-{mjd}-{obj}: {e}")
-            raise  
+		try:
+			dat = SDSSV_fetch(username, password, fid, mjd, obj, ver)
+			meta = [
+				dat[0]["ZWARNING"][0] if meta[0] is None else meta[0],
+				dat[0]["Z"][0] if meta[1] is None else meta[1],
+				dat[0]["RCHI2"][0] if meta[2] is None else meta[2],
+				dat[0]["RACAT"][0] if "RACAT" in dat[0].columns.names else meta[3],  # Fetch RA from "RACAT"
+				dat[0]["DECCAT"][0] if "DECCAT" in dat[0].columns.names else meta[4],  # Fetch DEC from "DECCAT"
+			]
+			mjd_final = str(dat[0]["MJD_FINAL"][0]) if "MJD_FINAL" in dat[0].columns.names else str(dat[0]["MJD"][0])
+			name.append(mjd_final)
+			wave.append(dat[1])
+			flux.append(dat[2])
+			errs.append(dat[3])
+			ra_list.append(dat[4] if dat[4] is not None else None)
+			dec_list.append(dat[5] if dat[5] is not None else None)
+		except Exception as e:
+			print(f"Error fetching data for {fid}-{mjd}-{obj}: {e}")
+			raise
 
-    else:
-        mjd_list = []
-        for x in data[1:]:  
-            x = int(x)
-            fid, mjd = divmod(abs(x), 10**5)
-            if field == "all" or int(field) == fid:
-                try:
-                    dat = SDSSV_fetch(username, password, fid, mjd, catID)
-                    mjd_final = str(dat[0]["MJD_FINAL"][0]) if "MJD_FINAL" in dat[0].columns.names else str(dat[0]["MJD"][0])
-                    name.append(mjd_final)
-                    wave.append(dat[1])
-                    flux.append(dat[2])
-                    errs.append(dat[3])
-                    ra_list.append(dat[4] if dat[4] is not None else None)
-                    dec_list.append(dat[5] if dat[5] is not None else None)
-                    if mjd not in mjd_list:
-                        mjd_list.append(mjd)
-                except Exception as e:
-                    print(f"Error fetching data for {fid}-{mjd}-{catID}: {e}")
-                    continue
-        mjd_list.sort(reverse=True)
+	else:
+		mjd_list = []
+		for x in data[1:]:
+			x = int(x)
+			fid, mjd = divmod(abs(x), 10**5)
+			if field == "all" or int(field) == fid:
+				try:
+					dat = SDSSV_fetch(username, password, fid, mjd, catID)
+					mjd_final = str(dat[0]["MJD_FINAL"][0]) if "MJD_FINAL" in dat[0].columns.names else str(dat[0]["MJD"][0])
+					name.append(mjd_final)
+					wave.append(dat[1])
+					flux.append(dat[2])
+					errs.append(dat[3])
+					ra_list.append(dat[4] if dat[4] is not None else None)
+					dec_list.append(dat[5] if dat[5] is not None else None)
+					if mjd not in mjd_list:
+						mjd_list.append(mjd)
+				except Exception as e:
+					print(f"Error fetching data for {fid}-{mjd}-{catID}: {e}")
+					continue
+		mjd_list.sort(reverse=True)
 
-    # Handle all epoch cases
-    for mjd in mjd_list:
-        if mjd <= 59392:
-            try:
-                dat = SDSSV_fetch_allepoch(username, password, mjd, catID)
-                name.append(f"allplate-{mjd}")
-                wave.append(dat[1])
-                flux.append(dat[2])
-                errs.append(dat[3])
-                ra_list.append(dat[4] if dat[4] is not None else None)
-                dec_list.append(dat[5] if dat[5] is not None else None)
-                break
-            except Exception as e:
-                print(f"Error fetching allepoch (allplate) for {mjd}: {e}")
-                continue
+	# Handle all epoch cases
+	for mjd in mjd_list:
+		if mjd <= 59392:
+			try:
+				dat = SDSSV_fetch_allepoch(username, password, mjd, catID)
+				name.append(f"allplate-{mjd}")
+				wave.append(dat[1])
+				flux.append(dat[2])
+				errs.append(dat[3])
+				ra_list.append(dat[4] if dat[4] is not None else None)
+				dec_list.append(dat[5] if dat[5] is not None else None)
+				break
+			except Exception as e:
+				print(f"Error fetching allepoch (allplate) for {mjd}: {e}")
+				continue
 
-    for mjd in mjd_list:
-        if mjd >= 59393:
-            try:
-                dat = SDSSV_fetch_allepoch(username, password, mjd, catID)
-                name.append(f"allFPS-{mjd}")
-                wave.append(dat[1])
-                flux.append(dat[2])
-                errs.append(dat[3])
-                ra_list.append(dat[4] if dat[4] is not None else None)
-                dec_list.append(dat[5] if dat[5] is not None else None)
-                break
-            except Exception as e:
-                print(f"Error fetching allepoch (allFPS) for {mjd}: {e}")
-                continue
+	for mjd in mjd_list:
+		if mjd >= 59393:
+			try:
+				dat = SDSSV_fetch_allepoch(username, password, mjd, catID)
+				name.append(f"allFPS-{mjd}")
+				wave.append(dat[1])
+				flux.append(dat[2])
+				errs.append(dat[3])
+				ra_list.append(dat[4] if dat[4] is not None else None)
+				dec_list.append(dat[5] if dat[5] is not None else None)
+				break
+			except Exception as e:
+				print(f"Error fetching allepoch (allFPS) for {mjd}: {e}")
+				continue
 
-    if not (meta and name and wave and flux):
-        raise HTTPError(f"fetch_catID failed for {(field, catID, extra)}")
+	if not (meta and name and wave and flux):
+		raise HTTPError(f"fetch_catID failed for {(field, catID, extra)}")
 
-    r = meta, name, wave, flux, errs, ra_list, dec_list
-    cache[(field, catID, extra)] = r
-    return r
+	r = meta, name, wave, flux, errs, ra_list, dec_list
+	cache[(field, catID, extra)] = r
+	return r
 
 ###
 ### Authentication
@@ -602,55 +602,55 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 
 	html.Div(className="row", id="pipeline_redshift", children=[
 
-    	## Pipeline info - redshift
-    	html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
-        	html.Label(
-            	html.H4("Z", style={"color": "grey"}),
-        	),
-        	dcc.Input(
-            	id="redshift_sdss_z", placeholder="N/A", value="", readOnly=True,
-            	style={"height": "36px", "width": "100%"}, inputMode="numeric",
-        	)], title="Read only"),
+		## Pipeline info - redshift
+		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
+			html.Label(
+				html.H4("Z", style={"color": "grey"}),
+			),
+			dcc.Input(
+				id="redshift_sdss_z", placeholder="N/A", value="", readOnly=True,
+				style={"height": "36px", "width": "100%"}, inputMode="numeric",
+			)], title="Read only"),
 
-    	## Pipeline info - reduced χ²
-    	html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
-        	html.Label(
-            	html.H4("RCHI2", style={"color": "grey"}),
-        	),
-        	dcc.Input(
-            	id="redshift_sdss_rchi2", placeholder="N/A", value="", readOnly=True,
-            	style={"height": "36px", "width": "100%"}, inputMode="numeric",
-        	)], title="Read only"),
+		## Pipeline info - reduced χ²
+		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
+			html.Label(
+				html.H4("RCHI2", style={"color": "grey"}),
+			),
+			dcc.Input(
+				id="redshift_sdss_rchi2", placeholder="N/A", value="", readOnly=True,
+				style={"height": "36px", "width": "100%"}, inputMode="numeric",
+			)], title="Read only"),
 
-    	## Pipeline info - bad redshift fits
-    	html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
-        	html.Label(
-            	html.H4("ZWARNING", style={"color": "grey"}),
-        	),
-        	dcc.Input(
-            	id="redshift_sdss_zwarning", placeholder="N/A", value="", readOnly=True,
-            	style={"height": "36px", "width": "100%"}, inputMode="numeric",
-        	)], title="Read only"),
+		## Pipeline info - bad redshift fits
+		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
+			html.Label(
+				html.H4("ZWARNING", style={"color": "grey"}),
+			),
+			dcc.Input(
+				id="redshift_sdss_zwarning", placeholder="N/A", value="", readOnly=True,
+				style={"height": "36px", "width": "100%"}, inputMode="numeric",
+			)], title="Read only"),
 
-    	## New: Right Ascension (RA)
-    	html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
-        	html.Label(
-            	html.H4("RA (deg)", style={"color": "grey"}),
-       		),
-        	dcc.Input(
-            	id="redshift_sdss_ra", placeholder="N/A", value="", readOnly=True,
-            	style={"height": "36px", "width": "100%"}, inputMode="numeric",
-        	)], title="Read only"),
+		## New: Right Ascension (RA)
+		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
+			html.Label(
+				html.H4("RA (deg)", style={"color": "grey"}),
+			),
+			dcc.Input(
+				id="redshift_sdss_ra", placeholder="N/A", value="", readOnly=True,
+				style={"height": "36px", "width": "100%"}, inputMode="numeric",
+			)], title="Read only"),
 
-    	## New: Declination (DEC)
-    	html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
-        	html.Label(
-            	html.H4("DEC (deg)", style={"color": "grey"}),
-        	),
-        	dcc.Input(
-            	id="redshift_sdss_dec", placeholder="N/A", value="", readOnly=True,
-            	style={"height": "36px", "width": "100%"}, inputMode="numeric",
-        	)], title="Read only"),
+		## New: Declination (DEC)
+		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
+			html.Label(
+				html.H4("DEC (deg)", style={"color": "grey"}),
+			),
+			dcc.Input(
+				id="redshift_sdss_dec", placeholder="N/A", value="", readOnly=True,
+				style={"height": "36px", "width": "100%"}, inputMode="numeric",
+			)], title="Read only"),
 
 	]),
 
@@ -722,7 +722,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 				), # PBH: closes dcc.Input
 			]), # PBH: closes html.Div
 
-			# Div for displaying generated links 
+			# Div for displaying generated links
 			html.Div(id="generated_links", className="row", style={"marginTop": "10px"}),
 
 		]),
@@ -979,22 +979,22 @@ def process_upload(sto: dict, contents: list[str], filename: list[str], timestam
 def hide_pipeline_redshift(checklist: list[str]):
 	return "z" not in checklist
 @app.callback(
-    Output("redshift_sdss_zwarning", "value"),
-    Output("redshift_sdss_z", "value"),
-    Output("redshift_sdss_rchi2", "value"),
-    Output("redshift_sdss_ra", "value"),  # RA
-    Output("redshift_sdss_dec", "value"),  # DEC
-    Input("fieldid_dropdown", "value"),
-    Input("catalogid_dropdown", "value"))
+	Output("redshift_sdss_zwarning", "value"),
+	Output("redshift_sdss_z", "value"),
+	Output("redshift_sdss_rchi2", "value"),
+	Output("redshift_sdss_ra", "value"),  # RA
+	Output("redshift_sdss_dec", "value"),  # DEC
+	Input("fieldid_dropdown", "value"),
+	Input("catalogid_dropdown", "value"))
 def show_pipeline_redshift(fieldid, catalogid):
-    try:
-        meta, _, _, _, _, ra_list, dec_list = fetch_catID(fieldid, catalogid)
-        ra = ra_list[0] if ra_list else None  # ✅ Get first RA value
-        dec = dec_list[0] if dec_list else None  # ✅ Get first DEC value
-        return meta[0], meta[1], meta[2], ra, dec
-    except Exception as e:
-        if str(e): print(e) if isinstance(e, HTTPError) else print_exc()
-        return None, None, None, None, None  # Default values if fetching fails
+	try:
+		meta, _, _, _, _, ra_list, dec_list = fetch_catID(fieldid, catalogid)
+		ra = ra_list[0] if ra_list else None  # ✅ Get first RA value
+		dec = dec_list[0] if dec_list else None  # ✅ Get first DEC value
+		return meta[0], meta[1], meta[2], ra, dec
+	except Exception as e:
+		if str(e): print(e) if isinstance(e, HTTPError) else print_exc()
+		return None, None, None, None, None  # Default values if fetching fails
 
 @app.callback(
 	Output("line_list_emi_h4", "n_clicks"),
@@ -1148,35 +1148,35 @@ def make_multiepoch_spectra(fieldid, catalogid, extra_obj, redshift, redshift_st
 	return fig, redshift
 
 @app.callback(
-    Output("generated_links", "children"),
-    Input("redshift_sdss_ra", "value"),
-    Input("redshift_sdss_dec", "value"),
+	Output("generated_links", "children"),
+	Input("redshift_sdss_ra", "value"),
+	Input("redshift_sdss_dec", "value"),
 )
 def display_generated_links(ra, dec):
-    """ Generate and display useful object links based on RA & DEC with clean labels """
-    if ra is None or dec is None:
-        return html.P("No object selected", style={"color": "grey"})
+	""" Generate and display useful object links based on RA & DEC with clean labels """
+	if ra is None or dec is None:
+		return html.P("No object selected", style={"color": "grey"})
 
-    try:
-        links = link_central(float(ra), float(dec))  # Call the function
-        
-        link_labels = {
-            "Legacy Survey": "Legacy Survey Viewer",
-            "SDSS SkyServer": "SDSS Explore Summary",
-            "SIMBAD": "SIMBAD Object Lookup"
-        }
+	try:
+		links = link_central(float(ra), float(dec))  # Call the function
 
-        return html.Div([
-            html.H4("Object Links:", style={"marginBottom": "10px", "marginLeft": "20px"}),
-            html.Ul([
-                html.Li(html.A(link_labels[label], href=url, target="_blank"))
-                for link in links
-                for label, url in [link.split(": ", 1)]
-            ])
-        ], style={"marginTop": "118px", "marginLeft": "200px"})
-    
-    except Exception as e:
-        return html.P(f"Error generating links: {e}", style={"color": "red"})
+		link_labels = {
+			"Legacy Survey": "Legacy Survey Viewer",
+			"SDSS SkyServer": "SDSS Explore Summary",
+			"SIMBAD": "SIMBAD Object Lookup"
+		}
+
+		return html.Div([
+			html.H4("Object Links:", style={"marginBottom": "10px", "marginLeft": "20px"}),
+			html.Ul([
+				html.Li(html.A(link_labels[label], href=url, target="_blank"))
+				for link in links
+				for label, url in [link.split(": ", 1)]
+			])
+		], style={"marginTop": "118px", "marginLeft": "200px"})
+
+	except Exception as e:
+		return html.P(f"Error generating links: {e}", style={"color": "red"})
 
 if __name__ == "__main__":
 	# app.run(threaded=True, debug=True)
