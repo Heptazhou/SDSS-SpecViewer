@@ -102,7 +102,7 @@ def SDSSV_fetch(username: str, password: str, field: int | str, mjd: int, obj: i
 
 	if not branch:
 		# PBH: try different branches for SDSS-V spectra past 15000, and for SDSS-I/II spectra
-		for v in ("master", "v6_2_0", "v6_1_3"):
+		for v in ("master", "v6_2_0", "v6_1_3", "dr18"):
 			try:
 				return SDSSV_fetch(username, password, field, mjd, obj, v)
 			except:
@@ -116,6 +116,7 @@ def SDSSV_fetch(username: str, password: str, field: int | str, mjd: int, obj: i
 		return cache[(field, mjd, obj, branch)]
 
 	# Determine the correct URL for fetching data
+	# PBH: field numbers 1 to 3509 (and 8015 & 8033) indicate SDSS-I/II data, but 00000 reserved for eFEDS
 	if 0 < (field := int(field)) < 3510 or field in {8015, 8033}:  # SDSS-I/II fields
 		url = SDSS_buildURL(field, mjd, obj, branch)
 	else:
@@ -155,6 +156,7 @@ def SDSSV_fetch(username: str, password: str, field: int | str, mjd: int, obj: i
 	cache[(field, mjd, obj, branch)] = r
 
 	return r
+
 def SDSSV_fetch_allepoch(username: str, password: str, mjd: int, obj: int | str) \
 	-> tuple[FITS_rec, NDArray, NDArray, NDArray, float, float]:  # Updated return type
 	"""
@@ -243,6 +245,7 @@ def fetch_catID(field: int | str, catID: int | str, extra="") \
 				dat[0]["DECCAT"][0] if "DECCAT" in dat[0].columns.names else meta[4],  # Fetch DEC from "DECCAT"
 			]
 			mjd_final = str(dat[0]["MJD_FINAL"][0]) if "MJD_FINAL" in dat[0].columns.names else str(dat[0]["MJD"][0])
+			mjd_list = [mjd] # one possible start of mjd_list; waves[i] list index out of range error
 			name.append(mjd_final)
 			wave.append(dat[1])
 			flux.append(dat[2])
@@ -254,7 +257,7 @@ def fetch_catID(field: int | str, catID: int | str, extra="") \
 			raise
 
 	else:
-		mjd_list = []
+		mjd_list = [] # another possible start of mjd_list
 		for x in data[1:]:
 			x = int(x)
 			fid, mjd = divmod(abs(x), 10**5)
@@ -287,8 +290,9 @@ def fetch_catID(field: int | str, catID: int | str, extra="") \
 				ra_list.append(dat[4] if dat[4] is not None else None)
 				dec_list.append(dat[5] if dat[5] is not None else None)
 				break
-			except Exception as e:
-				print(f"Error fetching allepoch (allplate) for {mjd}: {e}")
+			except Exception as e: # PBH: Prefer shorter allepoch error message
+				#print(f"Error fetching allepoch (allplate) for {mjd}: {e}")
+				print(f"allplate Error: {e}")
 				continue
 
 	for mjd in mjd_list:
@@ -302,8 +306,9 @@ def fetch_catID(field: int | str, catID: int | str, extra="") \
 				ra_list.append(dat[4] if dat[4] is not None else None)
 				dec_list.append(dat[5] if dat[5] is not None else None)
 				break
-			except Exception as e:
-				print(f"Error fetching allepoch (allFPS) for {mjd}: {e}")
+			except Exception as e: # PBH: Prefer shorter allepoch error message
+				#print(f"Error fetching allepoch (allFPS) for {mjd}: {e}")
+				print(f"allFPS error: {e}")
 				continue
 
 	if not (meta and name and wave and flux):
@@ -1065,10 +1070,11 @@ def make_multiepoch_spectra(fieldid, catalogid, extra_obj, redshift, redshift_st
 					else:
 						numpy.seterr(divide="ignore") # :(
 						errs = 1 / sqrt(errs) # σ
-				# print((name, wave, flux, errs))
+				#print((name, wave, flux, errs))
 				names.append(name), waves.append(wave), fluxes.append(flux), delta.append(errs) # type: ignore
 			except: print_exc()
 	noop_size = len(names)
+	
 	try:
 		meta, name, wave, flux, errs, ra, dec = fetch_catID(fieldid, catalogid, extra_obj) # type: ignore
 		names.extend(name), waves.extend(wave), fluxes.extend(flux), delta.extend(errs) # type: ignore
@@ -1095,6 +1101,7 @@ def make_multiepoch_spectra(fieldid, catalogid, extra_obj, redshift, redshift_st
 
 		# For each spectrum in the list
 		for i in range(len(names)):
+			print(i,names[i])
 			kws = {}
 			if fullmatch(r"allplate-\d+.*", names[i], IGNORECASE):
 				kws["line_color"] = "#606060"

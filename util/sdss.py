@@ -83,6 +83,8 @@ def SDSS_buildURL(plate: int | str, mjd: int | str, fiber: int | str, branch: st
 			path = "https://data.sdss.org/sas/dr18/spectro/sdss/redux/103/spectra/lite"
 		case "v6_1_3":
 			path = "https://data.sdss.org/sas/dr18/spectro/sdss/redux/104/spectra/lite"
+		case "dr18":
+			path = "https://dr18.sdss.org/sas/dr18/spectro/sdss/redux/26/spectra/lite"
 		case _:
 			path = "https://dr18.sdss.org/sas/dr18/spectro/sdss/redux/26/spectra/lite"
 
