@@ -6,7 +6,7 @@ def SDSSV_buildURL(field: int | str, mjd: int, obj: int | str, branch: str) -> s
 	A function to build the url that will be used to fetch the data.
 	"""
 	if not (field and mjd and obj and branch):
-		raise Exception()
+		raise Exception((field, mjd, obj, branch))
 	if type(field) == str and fullmatch(r"\d+p?", field):
 		field = int(field.rstrip("p"))
 
@@ -67,7 +67,7 @@ def SDSS_buildURL(plate: int | str, mjd: int | str, fiber: int | str, branch: st
 	A function to build the url that will be used to fetch data from SDSS-I/II.
 	"""
 	if not (plate and mjd and fiber):
-		raise Exception()
+		raise Exception((plate, mjd, fiber, branch))
 
 	# Fiber string is four digits; pad with leading zeros if needed
 	plate4 = str(plate).zfill(4)
@@ -83,8 +83,6 @@ def SDSS_buildURL(plate: int | str, mjd: int | str, fiber: int | str, branch: st
 			path = "https://data.sdss.org/sas/dr18/spectro/sdss/redux/103/spectra/lite"
 		case "v6_1_3":
 			path = "https://data.sdss.org/sas/dr18/spectro/sdss/redux/104/spectra/lite"
-		case "dr18":
-			path = "https://dr18.sdss.org/sas/dr18/spectro/sdss/redux/26/spectra/lite"
 		case _:
 			path = "https://dr18.sdss.org/sas/dr18/spectro/sdss/redux/26/spectra/lite"
 

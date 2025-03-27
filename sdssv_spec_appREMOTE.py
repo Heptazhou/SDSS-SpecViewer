@@ -50,14 +50,14 @@ catalogIDs: dict[str, list[list | int]] = dictionaries[2]
 # print("field17049", fieldIDs["17049"])
 
 # the redshift and stepping to easily adjust redshift using arrow keys or mouse wheel, disabled by default
-# because unfortunately, setting a numeric step attribute for an input element also means the value of
+# because unfortunately, setting a numeric `step` attribute for an `input` element also means the value of
 # it must adhere such granularity (specified by the HTML specification, no way to bypass this behavior),
 # making an arbitrary input to be invalid, but we always want to accept redshift of any precision
 redshift_default = 0
 redshift = None
 stepping = None
 
-# global dict to save results of SDSSV_fetch and fetch_catID
+# global dict to save results of `SDSSV_fetch` and `fetch_catID`
 cache: dict[tuple, tuple] = {}
 
 # default y-axis range of spectrum plots
@@ -81,7 +81,7 @@ external_stylesheets = [ "https://codepen.io/chriddyp/pen/bWLwgP.css",
 ###
 
 def SDSSV_fetch(username: str, password: str, field: int | str, mjd: int, obj: int | str, branch="") \
-	-> tuple[FITS_rec, NDArray, NDArray, NDArray, float, float]:
+	-> tuple[FITS_rec, NDArray, NDArray, NDArray]:
 	"""
 	Fetch spectral data for a SDSS-RM object on a
 	specific field on a specific MJD, using the user
@@ -91,230 +91,177 @@ def SDSSV_fetch(username: str, password: str, field: int | str, mjd: int, obj: i
 		if fullmatch(r"\d+p", field):
 			field = field.rstrip("p")
 			branch = branch or "v6_0_4"
-
-	try:  # SDSS-III and IV spectra
+	try: # SDSS-III and IV spectra
 		if (3510 <= (field := int(field)) < 15000):
 			branch = branch or "v5_13_2"
-	except:
-		pass
-
-	field, obj = str(field), str(obj)  # Ensure type consistency
+	except: pass
+	field, obj = str(field), str(obj) # ensure type
 
 	if not branch:
 		# PBH: try different branches for SDSS-V spectra past 15000, and for SDSS-I/II spectra
-		for v in ("master", "v6_2_0", "v6_1_3", "dr18"):
-			try:
-				return SDSSV_fetch(username, password, field, mjd, obj, v)
-			except:
-				continue
+		for v in ("master", "v6_2_0", "v6_1_3"):
+			try: return SDSSV_fetch(username, password, field, mjd, obj, v)
+			except: continue
 		raise HTTPError(f"SDSSV_fetch failed for {(field, mjd, obj)}")
-
 	if not (field and mjd and obj):
 		raise HTTPError(f"SDSSV_fetch failed for {(field, mjd, obj, branch)}")
-
 	if (field, mjd, obj, branch) in cache:
 		return cache[(field, mjd, obj, branch)]
 
-	# Determine the correct URL for fetching data
-	# PBH: field numbers 1 to 3509 (and 8015 & 8033) indicate SDSS-I/II data, but 00000 reserved for eFEDS
-	if 0 < (field := int(field)) < 3510 or field in {8015, 8033}:  # SDSS-I/II fields
-		url = SDSS_buildURL(field, mjd, obj, branch)
-	else:
-		url = SDSSV_buildURL(field, mjd, obj, branch)
+	url = SDSSV_buildURL(field, mjd, obj, branch)
+	# print(url)
 
 	rv = requests.get(url, auth=(username, password) if "/sdsswork/" in url else None)
 	rv.raise_for_status()
 	print(rv.status_code, url)
-
-	numpy.seterr(divide="ignore")  # Prevent division errors
-
+	numpy.seterr(divide="ignore") # Python does not comply with IEEE 754 :(
 	fits: HDUList = FITS.open(BytesIO(rv.content))
 	hdu2: BinTableHDU = fits["COADD"] if "COADD" in fits else fits[1]
 	hdu3: BinTableHDU = fits["SPALL"] if "SPALL" in fits else fits[2]
-
 	meta: FITS_rec = hdu3.data
-
-	# Extract spectral data
-	wave: NDArray = hdu2.data["LOGLAM"]  # log(λ)
-	flux: NDArray = hdu2.data["FLUX"]    # f_λ
-	errs: NDArray = hdu2.data["IVAR"]    # τ = σ⁻²
-
-	# Convert logarithmic wavelength to linear
-	wave = 10 ** wave  # λ
-	errs = 1 / sqrt(errs)  # Convert inverse variance to standard deviation (σ)
-
-	# Extract RA and DEC from metadata
-	try:
-		ra = float(meta["RACAT"][0]) if "RACAT" in meta.columns.names else None
-		dec = float(meta["DECCAT"][0]) if "DECCAT" in meta.columns.names else None
-	except Exception as e:
-		print(f"Warning: Could not extract RA/DEC. Error: {e}")
-		ra, dec = None, None  # If missing, return None
-
-	# Store results in cache
-	r = meta, wave, flux, errs, ra, dec
+	wave: NDArray = hdu2.data["LOGLAM"] # lg(λ)
+	flux: NDArray = hdu2.data["FLUX"]   # f_λ
+	errs: NDArray = hdu2.data["IVAR"]   # τ = σ⁻²
+	wave = 10**wave                     # λ
+	errs = 1 / sqrt(errs)               # σ
+	# print(f"meta: {type(meta)} = {str(meta)[:100]}")
+	# print(f"wave: {type(wave)} = {str(wave)[:100]}")
+	# print(f"flux: {type(flux)} = {str(flux)[:100]}")
+	r = meta, wave, flux, errs
 	cache[(field, mjd, obj, branch)] = r
-
 	return r
 
-def SDSSV_fetch_allepoch(username: str, password: str, mjd: int, obj: int | str) \
-	-> tuple[FITS_rec, NDArray, NDArray, NDArray, float, float]:  # Updated return type
+def SDSSV_fetch_allepoch(username: str, password: str, mjd: int, obj: int | str):
 	"""
 	Fetch all epoch spectral data for a given MJD and object using authentication.
 	"""
-
 	if mjd >= 59187:
 		for x in ["allepoch_apo"] if mjd < 60000 else ["allepoch_apo", "allepoch_lco"]:
-			try:
-				meta, wave, flux, errs, ra, dec = SDSSV_fetch(username, password, x, mjd, obj, branch="v6_2_0")
-				return meta, wave, flux, errs, ra, dec  # Ensure full return tuple
-			except:
-				pass
-
-		for x in ["allepoch"] if mjd < 60000 else ["allepoch", "allepoch_lco"]:
-			try:
-				meta, wave, flux, errs, ra, dec = SDSSV_fetch(username, password, x, mjd, obj, branch="v6_1_3")
-				return meta, wave, flux, errs, ra, dec
-			except:
-				pass
-
+			try: return SDSSV_fetch(username, password, x, mjd, obj, branch="v6_2_0")
+			except: pass
+		for x in ["allepoch"    ] if mjd < 60000 else ["allepoch", "allepoch_lco"    ]:
+			try: return SDSSV_fetch(username, password, x, mjd, obj, branch="v6_1_3")
+			except: pass
 	if mjd >= 59164:
-		for x in ["allepoch"]:
-			try:
-				meta, wave, flux, errs, ra, dec = SDSSV_fetch(username, password, x, mjd, obj, branch="v6_1_1")
-				return meta, wave, flux, errs, ra, dec
-			except:
-				pass
-
+		for x in ["allepoch"    ]:
+			try: return SDSSV_fetch(username, password, x, mjd, obj, branch="v6_1_1")
+			except: pass
 	field = "allepoch*"
-	raise HTTPError(f"SDSSV_fetch_allepoch failed for {(field, mjd, obj)}")
+	raise HTTPError(f"SDSSV_fetch failed for {(field, mjd, obj)}")
 
 def fetch_catID(field: int | str, catID: int | str, extra="") \
-	-> tuple[list[float], list[str], list[NDArray], list[NDArray], list[NDArray], list[float], list[float]]:
-
+	-> tuple[list[int | float], list[str], list[NDArray], list[NDArray], list[NDArray]]:
+	if not (field or catID or extra):
+		raise Exception()
 	if not (field and catID or extra):
-		raise Exception("Invalid field or catID input.")
-
+		raise Exception((field, catID, extra))
 	field = str(field).replace(" ", "")
 	catID = str(catID).replace(" ", "")
 	extra = str(extra).replace(" ", "")
-
 	if (field, catID, extra) in cache:
 		return cache[(field, catID, extra)]
 
-	name, wave, flux, errs = [], [], [], []
-	ra_list, dec_list = [], []  # Collect all RA/DEC values
+	name, wave, flux, errs = list[str](), list[NDArray](), list[NDArray](), list[NDArray]()
 
-	# Retrieve catalog information
-	data = catalogIDs.get(catID, [[]])  # [(ZWARNING, Z, RCHI2, RACAT, DECCAT), {FIELD,MJD}...]
-	meta = list(data[0]) if data else []
-	meta = meta or [None, None, None, None, None]  # (ZWARNING, Z, RCHI2, RACAT, DECCAT)
+	data = catalogIDs.get(catID, [[]]) # [(ZWARNING, Z, RCHI2), {FIELD,MJD}...]
+	meta = list(data[0]) # type: ignore
+	meta = meta or [None, None, None] # (ZWARNING, Z, RCHI2)
+	meta.extend([None, None]) # RACAT, DECCAT
 
 	for x in extra.split(","):
 		x, ver = [*x.split("@", 1), ""][:2]
-		if not fullmatch(r"\d+p?-\d+-[^-](.*[^-])?", x):
-			continue
+		if not fullmatch(r"\d+p?-\d+-[^-](.*[^-])?", x): continue
 		fid, mjd, obj = x.split("-", 2)
 		mjd = int(mjd)
-
 		try:
 			dat = SDSSV_fetch(username, password, fid, mjd, obj, ver)
-			mjd_final = str(dat[0]["MJD_FINAL"][0]) if "MJD_FINAL" in dat[0].columns.names else str(dat[0]["MJD"][0])
-			name.append(mjd_final)
-			wave.append(dat[1])
-			flux.append(dat[2])
-			errs.append(dat[3])
-			ra_list.append(dat[4] if dat[4] is not None else None)  # Ensure proper RA extraction
-			dec_list.append(dat[5] if dat[5] is not None else None)  # Ensure proper DEC extraction
 		except Exception as e:
-			print(f"Error fetching data for {fid}-{mjd}-{obj}: {e}")
+			if str(e): print(e) if isinstance(e, HTTPError) else print_exc()
 			continue
-
+		try:
+			mjd_final = str(dat[0]["MJD_FINAL"][0])
+		except:
+			mjd_final = str(dat[0]["MJD"][0])
+		name.append(mjd_final)
+		wave.append(dat[1])
+		flux.append(dat[2])
+		errs.append(dat[3])
 	if fullmatch(r"\d+p?-\d+", field):
 		obj, ver = [*catID.split("@", 1), ""][:2]
 		fid, mjd = field.split("-", 1)
 		mjd = int(mjd)
-
 		try:
 			dat = SDSSV_fetch(username, password, fid, mjd, obj, ver)
-			meta = [
-				dat[0]["ZWARNING"][0] if meta[0] is None else meta[0],
-				dat[0]["Z"][0] if meta[1] is None else meta[1],
-				dat[0]["RCHI2"][0] if meta[2] is None else meta[2],
-				dat[0]["RACAT"][0] if "RACAT" in dat[0].columns.names else meta[3],  # Fetch RA from "RACAT"
-				dat[0]["DECCAT"][0] if "DECCAT" in dat[0].columns.names else meta[4],  # Fetch DEC from "DECCAT"
-			]
-			mjd_final = str(dat[0]["MJD_FINAL"][0]) if "MJD_FINAL" in dat[0].columns.names else str(dat[0]["MJD"][0])
-			mjd_list = [mjd] # one possible start of mjd_list; waves[i] list index out of range error
-			name.append(mjd_final)
-			wave.append(dat[1])
-			flux.append(dat[2])
-			errs.append(dat[3])
-			ra_list.append(dat[4] if dat[4] is not None else None)
-			dec_list.append(dat[5] if dat[5] is not None else None)
 		except Exception as e:
-			print(f"Error fetching data for {fid}-{mjd}-{obj}: {e}")
-			raise
-
+			if str(e): print(e) if isinstance(e, HTTPError) else print_exc()
+			raise # re-raise
+		if not meta[0]: meta[0] = dat[0]["ZWARNING"][0]
+		if not meta[1]: meta[1] = dat[0]["Z"][0]
+		if not meta[2]: meta[2] = dat[0]["RCHI2"][0]
+		if not meta[3]: meta[3] = dat[0]["RACAT"][0]
+		if not meta[4]: meta[4] = dat[0]["DECCAT"][0]
+		try:
+			mjd_final = str(dat[0]["MJD_FINAL"][0])
+		except:
+			mjd_final = str(dat[0]["MJD"][0])
+		mjd_list = [mjd]
+		name.append(mjd_final)
+		wave.append(dat[1])
+		flux.append(dat[2])
+		errs.append(dat[3])
 	else:
-		mjd_list = [] # another possible start of mjd_list
-		for x in data[1:]:
+		mjd_list = []
+		for x in data[1:]: # {13'FIELD,5'MJD}
 			x = int(x)
 			fid, mjd = divmod(abs(x), 10**5)
 			if field == "all" or int(field) == fid:
+				dat = SDSSV_fetch(username, password, fid, mjd, catID)
+				if not meta[0]: meta[0] = dat[0]["ZWARNING"][0]
+				if not meta[1]: meta[1] = dat[0]["Z"][0]
+				if not meta[2]: meta[2] = dat[0]["RCHI2"][0]
+				if not meta[3]: meta[3] = dat[0]["RACAT"][0]
+				if not meta[4]: meta[4] = dat[0]["DECCAT"][0]
 				try:
-					dat = SDSSV_fetch(username, password, fid, mjd, catID)
-					mjd_final = str(dat[0]["MJD_FINAL"][0]) if "MJD_FINAL" in dat[0].columns.names else str(dat[0]["MJD"][0])
-					name.append(mjd_final)
-					wave.append(dat[1])
-					flux.append(dat[2])
-					errs.append(dat[3])
-					ra_list.append(dat[4] if dat[4] is not None else None)
-					dec_list.append(dat[5] if dat[5] is not None else None)
-					if mjd not in mjd_list:
-						mjd_list.append(mjd)
-				except Exception as e:
-					print(f"Error fetching data for {fid}-{mjd}-{catID}: {e}")
-					continue
+					mjd_final = str(dat[0]["MJD_FINAL"][0])
+				except:
+					mjd_final = str(dat[0]["MJD"][0])
+				name.append(mjd_final)
+				wave.append(dat[1])
+				flux.append(dat[2])
+				errs.append(dat[3])
+				if mjd not in mjd_list: mjd_list.append(mjd)
 		mjd_list.sort(reverse=True)
+	# print(mjd_list)
 
-	# Handle all epoch cases
+	# allplate
 	for mjd in mjd_list:
 		if mjd <= 59392:
 			try:
 				dat = SDSSV_fetch_allepoch(username, password, mjd, catID)
-				name.append(f"allplate-{mjd}")
-				wave.append(dat[1])
-				flux.append(dat[2])
-				errs.append(dat[3])
-				ra_list.append(dat[4] if dat[4] is not None else None)
-				dec_list.append(dat[5] if dat[5] is not None else None)
-				break
-			except Exception as e: # PBH: Prefer shorter allepoch error message
-				#print(f"Error fetching allepoch (allplate) for {mjd}: {e}")
-				print(f"allplate Error: {e}")
+			except Exception as e:
+				# if str(e): print(e) if isinstance(e, HTTPError) else print_exc()
 				continue
-
+			name.append(f"allplate-{mjd}")
+			wave.append(dat[1])
+			flux.append(dat[2])
+			errs.append(dat[3])
+			break
+	# allFPS
 	for mjd in mjd_list:
 		if mjd >= 59393:
 			try:
 				dat = SDSSV_fetch_allepoch(username, password, mjd, catID)
-				name.append(f"allFPS-{mjd}")
-				wave.append(dat[1])
-				flux.append(dat[2])
-				errs.append(dat[3])
-				ra_list.append(dat[4] if dat[4] is not None else None)
-				dec_list.append(dat[5] if dat[5] is not None else None)
-				break
-			except Exception as e: # PBH: Prefer shorter allepoch error message
-				#print(f"Error fetching allepoch (allFPS) for {mjd}: {e}")
-				print(f"allFPS error: {e}")
+			except Exception as e:
+				# if str(e): print(e) if isinstance(e, HTTPError) else print_exc()
 				continue
-
+			name.append(f"allFPS-{mjd}")
+			wave.append(dat[1])
+			flux.append(dat[2])
+			errs.append(dat[3])
+			break
 	if not (meta and name and wave and flux):
 		raise HTTPError(f"fetch_catID failed for {(field, catID, extra)}")
-
-	r = meta, name, wave, flux, errs, ra_list, dec_list
+	r = meta, name, wave, flux, errs
 	cache[(field, catID, extra)] = r
 	return r
 
@@ -607,7 +554,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 
 	html.Div(className="row", id="pipeline_redshift", children=[
 
-		## Pipeline info - redshift
+		## pipeline info - redshift
 		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
 			html.Label(
 				html.H4("Z", style={"color": "grey"}),
@@ -617,7 +564,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 				style={"height": "36px", "width": "100%"}, inputMode="numeric",
 			)], title="Read only"),
 
-		## Pipeline info - reduced χ²
+		## pipeline info - reduced χ²
 		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
 			html.Label(
 				html.H4("RCHI2", style={"color": "grey"}),
@@ -627,7 +574,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 				style={"height": "36px", "width": "100%"}, inputMode="numeric",
 			)], title="Read only"),
 
-		## Pipeline info - bad redshift fits
+		## pipeline info - bad redshift fits
 		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
 			html.Label(
 				html.H4("ZWARNING", style={"color": "grey"}),
@@ -637,7 +584,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 				style={"height": "36px", "width": "100%"}, inputMode="numeric",
 			)], title="Read only"),
 
-		## New: Right Ascension (RA)
+		## right ascension
 		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
 			html.Label(
 				html.H4("RA (deg)", style={"color": "grey"}),
@@ -647,7 +594,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 				style={"height": "36px", "width": "100%"}, inputMode="numeric",
 			)], title="Read only"),
 
-		## New: Declination (DEC)
+		## declination
 		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
 			html.Label(
 				html.H4("DEC (deg)", style={"color": "grey"}),
@@ -727,7 +674,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 				), # PBH: closes dcc.Input
 			]), # PBH: closes html.Div
 
-			# Div for displaying generated links
+			# links
 			html.Div(id="generated_links", className="row", style={"marginTop": "10px"}),
 
 		]),
@@ -781,7 +728,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 ###
 
 ## switch between known program(s) or manual input
-# use values specified through search and hash if applicable
+# use values specified through `search` and `hash` if applicable
 # see https://developer.mozilla.org/docs/Web/API/Location for definition
 @app.callback(
 	Output("fieldid_input_div", "hidden"),
@@ -816,6 +763,7 @@ def set_input_or_dropdown(search: str, program: str, checklist: list[str]):
 
 	tt, ff = (True, True), (False, False)
 	ret = search, program, fid_mjd, catalog, redshift
+	# return *ff, *ff, *ret
 	if program == "(other)":
 		return *ff, *tt, *ret
 	else:
@@ -987,19 +935,18 @@ def hide_pipeline_redshift(checklist: list[str]):
 	Output("redshift_sdss_zwarning", "value"),
 	Output("redshift_sdss_z", "value"),
 	Output("redshift_sdss_rchi2", "value"),
-	Output("redshift_sdss_ra", "value"),  # RA
-	Output("redshift_sdss_dec", "value"),  # DEC
+	Output("redshift_sdss_ra", "value"),
+	Output("redshift_sdss_dec", "value"),
 	Input("fieldid_dropdown", "value"),
 	Input("catalogid_dropdown", "value"))
 def show_pipeline_redshift(fieldid, catalogid):
 	try:
-		meta, _, _, _, _, ra_list, dec_list = fetch_catID(fieldid, catalogid)
-		ra = ra_list[0] if ra_list else None  # ✅ Get first RA value
-		dec = dec_list[0] if dec_list else None  # ✅ Get first DEC value
-		return meta[0], meta[1], meta[2], ra, dec
+		# print(f"show_pipeline_redshift  :  fetch_catID{(fieldid, catalogid)}")
+		meta = fetch_catID(fieldid, catalogid)[0]
+		return meta[0], meta[1], meta[2], meta[3], meta[4]
 	except Exception as e:
 		if str(e): print(e) if isinstance(e, HTTPError) else print_exc()
-		return None, None, None, None, None  # Default values if fetching fails
+		return None, None, None, None, None
 
 @app.callback(
 	Output("line_list_emi_h4", "n_clicks"),
@@ -1070,13 +1017,14 @@ def make_multiepoch_spectra(fieldid, catalogid, extra_obj, redshift, redshift_st
 					else:
 						numpy.seterr(divide="ignore") # :(
 						errs = 1 / sqrt(errs) # σ
-				#print((name, wave, flux, errs))
+				# print((name, wave, flux, errs))
 				names.append(name), waves.append(wave), fluxes.append(flux), delta.append(errs) # type: ignore
 			except: print_exc()
 	noop_size = len(names)
-	
+
 	try:
-		meta, name, wave, flux, errs, ra, dec = fetch_catID(fieldid, catalogid, extra_obj) # type: ignore
+		# print(f"make_multiepoch_spectra :  fetch_catID{(fieldid, catalogid, extra_obj)}")
+		meta, name, wave, flux, errs = fetch_catID(fieldid, catalogid, extra_obj) # type: ignore
 		names.extend(name), waves.extend(wave), fluxes.extend(flux), delta.extend(errs) # type: ignore
 		if meta[1] and not redshift and redshift_step == "any": redshift = meta[1]
 	except Exception as e:
@@ -1101,7 +1049,6 @@ def make_multiepoch_spectra(fieldid, catalogid, extra_obj, redshift, redshift_st
 
 		# For each spectrum in the list
 		for i in range(len(names)):
-			print(i,names[i])
 			kws = {}
 			if fullmatch(r"allplate-\d+.*", names[i], IGNORECASE):
 				kws["line_color"] = "#606060"
@@ -1163,16 +1110,13 @@ def display_generated_links(ra, dec):
 	""" Generate and display useful object links based on RA & DEC with clean labels """
 	if ra is None or dec is None:
 		return html.P("No object selected", style={"color": "grey"})
-
 	try:
-		links = link_central(float(ra), float(dec))  # Call the function
-
+		links = link_central(float(ra), float(dec))
 		link_labels = {
 			"Legacy Survey": "Legacy Survey Viewer",
 			"SDSS SkyServer": "SDSS Explore Summary",
-			"SIMBAD": "SIMBAD Object Lookup"
+			"SIMBAD": "SIMBAD Object Lookup",
 		}
-
 		return html.Div([
 			html.H4("Object Links:", style={"marginBottom": "10px", "marginLeft": "20px"}),
 			html.Ul([
@@ -1181,7 +1125,6 @@ def display_generated_links(ra, dec):
 				for label, url in [link.split(": ", 1)]
 			])
 		], style={"marginTop": "118px", "marginLeft": "200px"})
-
 	except Exception as e:
 		return html.P(f"Error generating links: {e}", style={"color": "red"})
 
