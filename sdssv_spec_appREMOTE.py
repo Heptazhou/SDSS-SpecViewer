@@ -14,8 +14,6 @@ from re import IGNORECASE, fullmatch
 from tempfile import TemporaryDirectory
 from traceback import print_exc
 
-
-from link_creator import link_central  # Import link function
 import dash  # type: ignore
 import numpy
 import requests
@@ -29,7 +27,7 @@ from numpy.typing import NDArray
 from plotly.graph_objects import Figure, Scatter
 from requests.exceptions import HTTPError
 
-from util import SDSSV_buildURL
+from util import SDSSV_buildURL, link_central
 
 ###
 ### input the data directory path
