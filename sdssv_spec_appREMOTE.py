@@ -27,7 +27,7 @@ from numpy.typing import NDArray
 from plotly.graph_objects import Figure, Scatter
 from requests.exceptions import HTTPError
 
-from util import SDSS_buildURL, SDSSV_buildURL
+from util import SDSSV_buildURL
 
 ###
 ### input the data directory path
@@ -109,13 +109,7 @@ def SDSSV_fetch(username: str, password: str, field: int | str, mjd: int, obj: i
 		return cache[(field, mjd, obj, branch)]
 
 	# print(field)
-	# PBH: field numbers 1 to 3509 (and 8015 & 8033) indicate SDSS-I/II data, but 00000 reserved for eFEDS
-	if (0 < (field := int(field)) < 3510 or (field := int(field)) == 8015 or (field := int(field)) == 8033):
-		# print(branch)
-		url = SDSS_buildURL(field, mjd, obj, branch)
-		# print(url)
-	else:
-		url = SDSSV_buildURL(field, mjd, obj, branch)
+	url = SDSSV_buildURL(field, mjd, obj, branch)
 	# print(url)
 	rv = requests.get(url, auth=(username, password) if "/sdsswork/" in url else None)
 	rv.raise_for_status()

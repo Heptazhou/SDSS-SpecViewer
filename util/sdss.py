@@ -11,6 +11,9 @@ def SDSSV_buildURL(field: int | str, mjd: int, obj: int | str, branch: str) -> s
 		field = int(field.rstrip("p"))
 
 	if type(field) == int:
+		# PBH: field numbers 1 to 3509 (and 8015 & 8033) indicate SDSS-I/II data, but 00000 reserved for eFEDS
+		if 1 <= field <= 3509 or field in (8015, 8033):
+			return SDSS_buildURL(field, mjd, obj, branch)
 		group = f"{field // 1000}XXX".zfill(6)
 	else:
 		group = f"{field}"
