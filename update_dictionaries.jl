@@ -22,7 +22,6 @@ end
 let manifest = @something Base.project_file_manifest_path(Base.active_project()) ""
 	if (filesize(manifest) ≤ 0) || !(Pkg.is_manifest_current(Context()) == true) ||
 	   0 < mtime(manifest) < time() - 86400(30) # 30 day
-		basename(manifest) ≡ "Manifest.toml" && VERSION ≥ v"1.10.8" && rm(manifest)
 		include("update.jl")
 	end
 end
@@ -33,7 +32,7 @@ using FITSIO: FITS
 using JSON5: json
 using Pkg: PlatformEngines
 
-const s_info(xs...) = (@nospecialize; @info string(xs...))
+const s_info(xs...) = (@inline; @info string(xs...))
 const u_sort! = unique! ∘ sort!
 
 Base.cat(x::Integer, y::Integer, ::Val{5}) = flipsign((10^5)abs(x) + mod(y, 10^5), x)
@@ -83,14 +82,14 @@ end
 # FITS(fits[end])["SPALL"]
 
 const df = @time @sync let
-	f2df(f::String; n::IntOrStr = "SPALL") = begin
-		FITS(f -> @try(f[n], n = 2), f)
+	_read(f::String) = begin
+		n = FITS(f -> get(f, "SPALL", 2).ext, f)
 		s_info("Reading ", length(cols), " column(s) from `$f[$n]` (t = $(nthreads()))")
-		# use `read(f[n], DataFrame)` to read all columns in f[n]
-		FITS(f -> read(f[n], DataFrame, cols.keys), f)
+		# see https://0h7z.com/Exts.jl/stable/FITSIO/#Base.read
+		FITS(f -> read(f[n], Vector, cols.keys), f)
 	end
-	df = unique!(mapreduce(f2df, vcat, fits))
-	df = @rsubset(df, :FIELDQUALITY ≡ "good")
+	df = DataFrame(mapreduce(_read, vcat, fits), cols.keys, copycols = false)
+	df = unique!(@rsubset df :FIELDQUALITY ≡ "good")
 end
 # LDict(propertynames(df), eltype.(eachcol(df)))
 

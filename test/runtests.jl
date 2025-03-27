@@ -20,12 +20,15 @@ end
 using Exts
 using Exts: Jl, with_temp_env
 using Pkg: Pkg
-using PythonCall: GIL, Py, pyconvert, pyimport
+using PythonCall: pyimport
 using Test
 
-let sys = pyimport("sys")
+const py_sys = let sys = pyimport("sys")
 	sys.path.append(stdpath(@__DIR__, ".."))
+	sys
 end
+
+const py_util = pyimport("util")
 
 include("misc.jl")
 

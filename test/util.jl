@@ -17,13 +17,13 @@
 
 using SpecViewer: sas_redux_spec, version2branch
 
-util = pyimport("util")
+SDSSV_buildURL(xs...) = Jl(py_util.SDSSV_buildURL(xs...))
 
 spec(field, mjd, obj, branch) = sas_redux_spec(field, mjd, obj, branch, "lite")
 
 function func(field::Union{Integer, Symbol}, mjd::Integer, obj::IntOrStr, v::VersionNumber)
 	branch::Symbol = version2branch(v)
-	Jl(util.SDSSV_buildURL(string(field), mjd, obj, string(branch)))
+	SDSSV_buildURL(string(field), mjd, obj, string(branch))
 end
 
 @testset "dr09" begin
