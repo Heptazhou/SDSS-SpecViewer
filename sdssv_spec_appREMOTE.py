@@ -151,9 +151,9 @@ def SDSSV_fetch_allepoch(username: str, password: str, mjd: int, obj: int | str)
 
 def fetch_catID(field: int | str, catID: int | str, extra="") \
 	-> tuple[list[int | float], list[str], list[NDArray], list[NDArray], list[NDArray]]:
-	if not (field or catID or extra):
-		raise Exception()
-	if not (field and catID or extra):
+	if not (extra or catID): # consider as incomplete user input
+		raise Exception()    # so abort quietly
+	if not (extra or catID and field):
 		raise Exception((field, catID, extra))
 	field = str(field).replace(" ", "")
 	catID = str(catID).replace(" ", "")
@@ -587,7 +587,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 		## right ascension
 		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
 			html.Label(
-				html.H4("RA (deg)", style={"color": "grey"}),
+				html.H4("RA (°)", style={"color": "grey"}),
 			),
 			dcc.Input(
 				id="redshift_sdss_ra", placeholder="N/A", value="", readOnly=True,
@@ -597,7 +597,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 		## declination
 		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
 			html.Label(
-				html.H4("DEC (deg)", style={"color": "grey"}),
+				html.H4("DEC (°)", style={"color": "grey"}),
 			),
 			dcc.Input(
 				id="redshift_sdss_dec", placeholder="N/A", value="", readOnly=True,
@@ -661,6 +661,12 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 						)]),
 				]),
 
+				# links
+				html.Div(className="row", children=[
+					html.Div(className="col-xs-12", children=[
+					], id="generated_links", hidden=False),
+				]),
+
 			]),
 
 			## spectral smoothing
@@ -673,9 +679,6 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 					style={"height": "36px", "width": "100%"}, max=smooth_max,
 				), # PBH: closes dcc.Input
 			]), # PBH: closes html.Div
-
-			# links
-			html.Div(id="generated_links", className="row", style={"marginTop": "10px"}),
 
 		]),
 		html.Div(className="col-lg-8 col-xs-12", style={"padding": "0"}, children=[
@@ -792,20 +795,19 @@ def set_catalogid_options(selected_fieldid, selected_program):
 		xs = fieldIDs.get(f"{selected_fieldid}", [])
 	return [{"label": str(x), "value": str(x)} for x in xs]
 
-# set_fieldid_value is only run when program is switched
 @app.callback(
 	Output("fieldid_dropdown", "value"),
 	Input("fieldid_dropdown", "options"),
 	Input("fieldid_input", "value"),
 	State("program_dropdown", "value"))
-def set_fieldid_value(available_fieldid_options, input: str, program: str):
+def set_fieldid_value(options, input: str, program: str):
 	try:
 		if input and program == "(other)":
 			return input
 		if input and program and fullmatch(r"\d+(-.*)?", input):
 			return input.split("-", 1)[0]
 		# uncomment the following line to automatically choose the first field in the program
-		# return available_fieldid_options[0]["value"]
+		# return options[0]["value"]
 	except Exception as e:
 		if str(e): print_exc()
 	return ""
@@ -815,12 +817,12 @@ def set_fieldid_value(available_fieldid_options, input: str, program: str):
 	Input("catalogid_dropdown", "options"),
 	Input("catalogid_input", "value"),
 	State("program_dropdown", "value"))
-def set_catalogid_value(available_catalogid_options, input: str, program: str):
+def set_catalogid_value(options, input: str, program: str):
 	try:
 		if input and program:
 			return input
 		# uncomment the following line to automatically choose the first catid in the field
-		# return available_catalogid_options[0]["value"]
+		# return options[0]["value"]
 	except Exception as e:
 		if str(e): print_exc()
 	return ""
@@ -938,15 +940,32 @@ def hide_pipeline_redshift(checklist: list[str]):
 	Output("redshift_sdss_ra", "value"),
 	Output("redshift_sdss_dec", "value"),
 	Input("fieldid_dropdown", "value"),
-	Input("catalogid_dropdown", "value"))
-def show_pipeline_redshift(fieldid, catalogid):
+	Input("catalogid_dropdown", "value"),
+	Input("fieldid_input", "value"),
+	Input("catalogid_input", "value"))
+def show_pipeline_redshift(field_d, cat_d, field_i, cat_i):
 	try:
-		# print(f"show_pipeline_redshift  :  fetch_catID{(fieldid, catalogid)}")
-		meta = fetch_catID(fieldid, catalogid)[0]
+		meta = fetch_catID(field_d or field_i, cat_d or cat_i)[0]
 		return meta[0], meta[1], meta[2], meta[3], meta[4]
 	except Exception as e:
+		if str(e): print(f"[show_pipeline_redshift]  fetch_catID{([field_d, field_i], [cat_d, cat_i])}")
 		if str(e): print(e) if isinstance(e, HTTPError) else print_exc()
 		return None, None, None, None, None
+
+@app.callback(
+	Output("generated_links", "children"),
+	Input("redshift_sdss_ra", "value"),
+	Input("redshift_sdss_dec", "value"),
+)
+def display_generated_links(ra: float, dec: float):
+	if not (ra and dec): return []
+	return [
+		html.H4("Object links"),
+		html.Ul([
+			html.Li(html.A(id, href=url, target="_blank"))
+			for id, url in [link.split(": ", 1) for link in link_central(ra, dec)]
+		])
+	]
 
 @app.callback(
 	Output("line_list_emi_h4", "n_clicks"),
@@ -982,6 +1001,8 @@ def line_list_abs_select_all(clk: int, val: list, opt: list):
 	Output("redshift_input", "value"),
 	Input("fieldid_dropdown", "value"),
 	Input("catalogid_dropdown", "value"),
+	Input("fieldid_input", "value"),
+	Input("catalogid_input", "value"),
 	Input("extra_obj_input", "value"),
 	Input("redshift_input", "value"), # redshift_dropdown
 	Input("redshift_input", "step"),
@@ -995,12 +1016,13 @@ def line_list_abs_select_all(clk: int, val: list, opt: list):
 	Input("extra_func_list", "value"),
 	Input("dash-user-upload", "data"))
 # The list of inputs above applies to the following function
-def make_multiepoch_spectra(fieldid, catalogid, extra_obj, redshift, redshift_step,
+def make_multiepoch_spectra(field_d, cat_d, field_i, cat_i, extra_obj, redshift, redshift_step,
                             y_max, y_min, x_max, x_min, list_emi, list_abs, smooth,
                             checklist: list[str], user_data: dict):
 	layout_axis = dict(fixedrange=True)
 	layout = dict(yaxis=layout_axis, xaxis=layout_axis, xaxis2=layout_axis)
 
+	fieldid, catalogid = str(field_d or field_i), str(cat_d or cat_i)
 	smooth, z = int(smooth or smooth_default), float(redshift or redshift_default)
 	if (1 + z) <= 0: z = math.nextafter(-1, 0) # z ∈ (-1, +∞)
 
@@ -1023,11 +1045,11 @@ def make_multiepoch_spectra(fieldid, catalogid, extra_obj, redshift, redshift_st
 	noop_size = len(names)
 
 	try:
-		# print(f"make_multiepoch_spectra :  fetch_catID{(fieldid, catalogid, extra_obj)}")
 		meta, name, wave, flux, errs = fetch_catID(fieldid, catalogid, extra_obj) # type: ignore
 		names.extend(name), waves.extend(wave), fluxes.extend(flux), delta.extend(errs) # type: ignore
 		if meta[1] and not redshift and redshift_step == "any": redshift = meta[1]
 	except Exception as e:
+		if str(e): print(f"[make_multiepoch_spectra] fetch_catID{([field_d, field_i], [cat_d, cat_i], extra_obj)}")
 		if str(e): print(e) if isinstance(e, HTTPError) else print_exc()
 		return Figure(layout=layout), redshift
 
@@ -1101,36 +1123,9 @@ def make_multiepoch_spectra(fieldid, catalogid, extra_obj, redshift, redshift_st
 
 	return fig, redshift
 
-@app.callback(
-	Output("generated_links", "children"),
-	Input("redshift_sdss_ra", "value"),
-	Input("redshift_sdss_dec", "value"),
-)
-def display_generated_links(ra, dec):
-	""" Generate and display useful object links based on RA & DEC with clean labels """
-	if ra is None or dec is None:
-		return html.P("No object selected", style={"color": "grey"})
-	try:
-		links = link_central(float(ra), float(dec))
-		link_labels = {
-			"Legacy Survey": "Legacy Survey Viewer",
-			"SDSS SkyServer": "SDSS Explore Summary",
-			"SIMBAD": "SIMBAD Object Lookup",
-		}
-		return html.Div([
-			html.H4("Object Links:", style={"marginBottom": "10px", "marginLeft": "20px"}),
-			html.Ul([
-				html.Li(html.A(link_labels[label], href=url, target="_blank"))
-				for link in links
-				for label, url in [link.split(": ", 1)]
-			])
-		], style={"marginTop": "118px", "marginLeft": "200px"})
-	except Exception as e:
-		return html.P(f"Error generating links: {e}", style={"color": "red"})
 
 if __name__ == "__main__":
 	# app.run(threaded=True, debug=True)
 	# app.run(host="0.0.0.0", port="8050", threaded=True, debug=True)
 	app.run(host="127.0.0.1", port="8050", threaded=True, debug=True)
-
 
