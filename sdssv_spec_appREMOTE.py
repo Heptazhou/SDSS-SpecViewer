@@ -664,7 +664,9 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 				# links
 				html.Div(className="row", children=[
 					html.Div(className="col-xs-12", children=[
-					], id="generated_links", hidden=False),
+						html.H4("Object links"),
+						html.Ul(id="generated_links_list"),
+					], id="generated_links", hidden=True),
 				]),
 
 			]),
@@ -953,19 +955,17 @@ def show_pipeline_redshift(field_d, cat_d, field_i, cat_i):
 		return None, None, None, None, None
 
 @app.callback(
-	Output("generated_links", "children"),
+	Output("generated_links_list", "children"),
+	Output("generated_links", "hidden"),
 	Input("redshift_sdss_ra", "value"),
 	Input("redshift_sdss_dec", "value"),
 )
 def display_generated_links(ra: float, dec: float):
-	if not (ra and dec): return []
+	links = link_central(ra, dec)
 	return [
-		html.H4("Object links"),
-		html.Ul([
-			html.Li(html.A(id, href=url, target="_blank"))
-			for id, url in [link.split(": ", 1) for link in link_central(ra, dec)]
-		])
-	]
+		html.Li(html.A(id, href=url, target="_blank"))
+		for id, url in [s.split(": ", 1) for s in links]
+	], (not links)
 
 @app.callback(
 	Output("line_list_emi_h4", "n_clicks"),
