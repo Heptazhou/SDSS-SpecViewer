@@ -34,6 +34,16 @@ function version2branch(v::VersionNumber)::Symbol
 	end
 end
 
+function sas_redux_spec(plate::Integer, mjd::Integer, fiber::Integer, v::Integer, variant::String = "")::String
+	path = begin
+		plate = string(plate, pad = 04)
+		fiber = string(fiber, pad = 04)
+		isempty(variant) ? "spectra/$plate/" :
+		"spectra/$variant/$plate/"
+	end
+	sas_redux(v) * path * "spec-$plate-$mjd-$fiber.fits"
+end
+
 function sas_redux_spec(field::Integer, mjd::Integer, obj::IntOrStr, branch::SymOrStr, variant::String = "")::String
 	sas_redux_spec(field, mjd, obj, branch2version(branch), variant)
 end
@@ -88,7 +98,7 @@ function sas_redux(v::VersionNumber)::String
 		v"6.0.1" => sas_redux(:work, v)
 		v"6.0.2" => sas_redux(:work, v)
 		v"6.0.3" => sas_redux(:work, v)
-		v"6.0.4" => @match_fail sas_redux(:work, v) # dr18
+		v"6.0.4" => @match_fail sas_redux(:work, v) # -> dr18
 		v"6.0.6" => sas_redux(:work, v)
 		v"6.0.7" => sas_redux(:work, v)
 		v"6.0.8" => sas_redux(:work, v)
@@ -106,17 +116,25 @@ function sas_redux(v::VersionNumber)::String
 		v"5.7.2"  => sas_redux(:dr12, v)
 		v"5.9.0"  => sas_redux(:dr13, v)
 		#
-		v"5.10.0" => @match_fail sas_redux(:dr14, v) # dr15
+		v"5.10.0" => @match_fail sas_redux(:dr14, v) # -> dr15
 		v"5.10.0" => sas_redux(:dr15, v)
 		v"5.13.0" => sas_redux(:dr16, v)
-		v"5.13.2" => @match_fail sas_redux(:dr17, v) # dr18
+		v"5.13.2" => @match_fail sas_redux(:dr17, v) # -> dr18
 		v"5.13.2" => sas_redux(:dr18, v)
 		v"6.0.4"  => sas_redux(:dr18, v)
+	end
+end
+function sas_redux(v::Integer)::String
+	@match v begin
+		026 || 103 || 104 => sas_redux(:dr18, v)
 	end
 end
 
 function sas_redux(s::Symbol, v::VersionNumber)::String
 	string(sas_redux(s), version2branch(v), :/)
+end
+function sas_redux(s::Symbol, v::Integer)::String
+	string(sas_redux(s), v, :/)
 end
 function sas_redux(s::Symbol)::String
 	@match s begin

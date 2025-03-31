@@ -21,9 +21,9 @@ SDSSV_buildURL(xs...) = Jl(py_util.SDSSV_buildURL(xs...))
 
 spec(field, mjd, obj, branch) = sas_redux_spec(field, mjd, obj, branch, "lite")
 
-function func(field::Union{Integer, Symbol}, mjd::Integer, obj::IntOrStr, v::VersionNumber)
-	branch::Symbol = version2branch(v)
-	SDSSV_buildURL(string(field), mjd, obj, string(branch))
+function func(field, mjd::Integer, obj::IntOrStr, v)
+	v isa VersionNumber && (v = version2branch(v)::Symbol)
+	SDSSV_buildURL(string(field), mjd, obj, string(v))
 end
 
 @testset "dr09" begin
@@ -85,6 +85,18 @@ end
 	plate, mjd, fiber = 3586, 55181, 0001
 	@test spec(plate, mjd, fiber, b) ≡ func(plate, mjd, fiber, b)
 
+	b = 26
+	plate, mjd, fiber = 0266, 51602, 0001
+	@test spec(plate, mjd, fiber, b) ≡ func(plate, mjd, fiber, b)
+
+	b = 103
+	plate, mjd, fiber = 1960, 53289, 0001
+	@test spec(plate, mjd, fiber, b) ≡ func(plate, mjd, fiber, b)
+
+	b = 104
+	plate, mjd, fiber = 2640, 54806, 0001
+	@test spec(plate, mjd, fiber, b) ≡ func(plate, mjd, fiber, b)
+
 	b = v"6.0.4"
 	field, mjd, catid = 15143, 59205, 04544940698
 	@test spec(field, mjd, catid, b) ≡ func(field, mjd, catid, b)
@@ -117,8 +129,8 @@ end
 	field, mjd, catid = :allepoch_lco, 60000, 63050395106956948
 	@test spec(field, mjd, catid, b) ≡ func(field, mjd, catid, b)
 
-	b = v"0" # master
-	field, mjd, catid = 016199, 60606, 27021597863477824
+	b = :master
+	field, mjd, catid = 015000, 59146, 4375786564
 	@test spec(field, mjd, catid, b) ≡ func(field, mjd, catid, b)
 end
 

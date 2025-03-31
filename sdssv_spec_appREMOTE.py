@@ -91,20 +91,27 @@ def SDSSV_fetch(username: str, password: str, field: int | str, mjd: int, obj: i
 		if fullmatch(r"\d+p", field):
 			field = field.rstrip("p")
 			branch = branch or "v6_0_4"
-	try: # SDSS-III and IV spectra
-		if (3510 <= (field := int(field)) < 15000):
-			branch = branch or "v5_13_2"
-	except: pass
+		if fullmatch(r"\d+", field):
+			field = int(field)
+	if type(field) == int:
+		# PBH: field numbers 1 to 3509 (and 8015 & 8033) indicate SDSS-I/II data, but 00000 reserved for eFEDS
+		match field:
+			case n if n <= 0:
+				pass
+			case n if n <= 3509 or n in (8015, 8033): # SDSS-I/II
+				branch = branch or "legacy" # SDSS Legacy & SEGUE programs
+			case n if n < 15000: # SDSS-III/IV
+				branch = branch or "v5_13_2"
 	field, obj = str(field), str(obj) # ensure type
 
-	if not branch:
-		# PBH: try different branches for SDSS-V spectra past 15000, and for SDSS-I/II spectra
-		for v in ("master", "v6_2_0", "v6_1_3"):
+	if not branch or branch == "legacy":
+		for v in ("26", "104", "103") if branch == "legacy" \
+			else ("master", "v6_2_0", "v6_1_3"):
 			try: return SDSSV_fetch(username, password, field, mjd, obj, v)
 			except: continue
-		raise HTTPError(f"SDSSV_fetch failed for {(field, mjd, obj)}")
+		raise HTTPError(f"[SDSSV_fetch] {(field, mjd, obj)}")
 	if not (field and mjd and obj):
-		raise HTTPError(f"SDSSV_fetch failed for {(field, mjd, obj, branch)}")
+		raise HTTPError(f"[SDSSV_fetch] {(field, mjd, obj, branch)}")
 	if (field, mjd, obj, branch) in cache:
 		return cache[(field, mjd, obj, branch)]
 
@@ -147,7 +154,7 @@ def SDSSV_fetch_allepoch(username: str, password: str, mjd: int, obj: int | str)
 			try: return SDSSV_fetch(username, password, x, mjd, obj, branch="v6_1_1")
 			except: pass
 	field = "allepoch*"
-	raise HTTPError(f"SDSSV_fetch failed for {(field, mjd, obj)}")
+	raise HTTPError(f"[SDSSV_fetch] {(field, mjd, obj)}")
 
 def fetch_catID(field: int | str, catID: int | str, extra="") \
 	-> tuple[list[int | float], list[str], list[NDArray], list[NDArray], list[NDArray]]:
@@ -260,7 +267,7 @@ def fetch_catID(field: int | str, catID: int | str, extra="") \
 			errs.append(dat[3])
 			break
 	if not (meta and name and wave and flux):
-		raise HTTPError(f"fetch_catID failed for {(field, catID, extra)}")
+		raise HTTPError(f"[fetch_catID] {(field, catID, extra)}")
 	r = meta, name, wave, flux, errs
 	cache[(field, catID, extra)] = r
 	return r

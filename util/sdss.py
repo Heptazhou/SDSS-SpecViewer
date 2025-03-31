@@ -11,9 +11,6 @@ def SDSSV_buildURL(field: int | str, mjd: int, obj: int | str, branch: str) -> s
 		field = int(field.rstrip("p"))
 
 	if type(field) == int:
-		# PBH: field numbers 1 to 3509 (and 8015 & 8033) indicate SDSS-I/II data, but 00000 reserved for eFEDS
-		if 1 <= field <= 3509 or field in (8015, 8033):
-			return SDSS_buildURL(field, mjd, obj, branch)
 		group = f"{field // 1000}XXX".zfill(6)
 	else:
 		group = f"{field}"
@@ -46,47 +43,20 @@ def SDSSV_buildURL(field: int | str, mjd: int, obj: int | str, branch: str) -> s
 			path = "https://data.sdss.org/sas/dr16/sdss/spectro/redux"
 		case "v5_13_2" | "v6_0_4":
 			path = "https://data.sdss.org/sas/dr18/spectro/sdss/redux"
+		case "26" | "103" | "104":
+			path = "https://data.sdss.org/sas/dr18/spectro/sdss/redux"
 		case _:
 			path = "https://data.sdss5.org/sas/sdsswork/bhm/boss/spectro/redux"
 
 	match branch:
-		case branch if fullmatch(r"v5_(\d+_\d+)", branch): # v5
+		case v if fullmatch(r"v5_(\d+_\d+)", v) or v in ("26", "103", "104"):
 			url = f"{path}/{branch}/spectra/lite/{field4       }/{file(field4, obj04)}"
-		case branch if fullmatch(r"v6_[0]_[1-4]", branch): # v6.0.1 ~ v6.0.4
+		case v if fullmatch(r"v6_[0]_[1-4]", v): # v6.0.1 ~ v6.0.4
 			url = f"{path}/{branch}/spectra/lite/{field4}p/{mjd}/{file(field4, obj11)}"
-		case branch if fullmatch(r"v6_[0-1]_\d+", branch): # v6.0.6 ~ v6.1.3
+		case v if fullmatch(r"v6_[0-1]_\d+", v): # v6.0.6 ~ v6.1.3
 			url = f"{path}/{branch}/spectra/lite/{field6 }/{mjd}/{file(field6, obj  )}"
-		case _:                                            # v6.2.0+
+		case _:                                  # v6.2.0+
 			url = f"{path}/{branch}/spectra/{daily}/lite/{group}/{field6}/{mjd}/{file(field6, obj)}"
-
-	return url
-
-
-def SDSS_buildURL(plate: int | str, mjd: int | str, fiber: int | str, branch: str) -> str:
-	"""
-	A function to build the url that will be used to fetch data from SDSS-I/II.
-	"""
-	if not (plate and mjd and fiber):
-		raise Exception((plate, mjd, fiber, branch))
-
-	# Fiber string is four digits; pad with leading zeros if needed
-	plate4 = str(plate).zfill(4)
-	fiber4 = str(fiber).zfill(4)
-
-	# PBH: the three different possible SDSS paths have nothing to do with their branch names;
-	# but using them is an easy way to try all three SDSS paths in the SDSSV_fetch function.
-	# Both data.sdss.org and dr18.sdss.org work as of March 2025.
-	match branch:
-		case "master":
-			path = "https://data.sdss.org/sas/dr18/spectro/sdss/redux/26/spectra/lite"
-		case "v6_2_0":
-			path = "https://data.sdss.org/sas/dr18/spectro/sdss/redux/103/spectra/lite"
-		case "v6_1_3":
-			path = "https://data.sdss.org/sas/dr18/spectro/sdss/redux/104/spectra/lite"
-		case _:
-			path = "https://dr18.sdss.org/sas/dr18/spectro/sdss/redux/26/spectra/lite"
-
-	url = f"{path}/{plate4}/spec-{plate4}-{mjd}-{fiber4}.fits"
 
 	return url
 
