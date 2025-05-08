@@ -12,11 +12,13 @@ defaults:
   run:
     shell: bash
 env:
-  JULIA_NUM_THREADS: auto
+  JULIA_NUM_THREADS: auto,auto
+  JULIA_PKG_USE_CLI_GIT: true
 jobs:
   test:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
+    continue-on-error: ${{ matrix.experimental }}
     strategy:
       fail-fast: false
       matrix:
@@ -30,9 +32,10 @@ jobs:
           - "1"
           - "pre"
           - "nightly"
-        exclude:
-          - os: macos-latest
-            julia-version: "min"
+        include:
+          - { experimental: false }
+          - { experimental: true, julia-version: "pre" }
+          - { experimental: true, julia-version: "nightly" }
     steps:
       - uses: actions/checkout@v4
         with:
@@ -46,7 +49,28 @@ jobs:
           ignore-no-cache: true
           localregistry: https://github.com/0h7z/0hjl.git
       - uses: julia-actions/julia-runtest@v1
+        with:
+          # https://github.com/JuliaLang/julia/issues/58227
+          coverage: ${{ !matrix.experimental }}
       - uses: heptazhou/julia-codecov@v1
       - uses: codecov/codecov-action@v3.1.5
         with:
           file: lcov.info
+        if: ${{ !matrix.experimental }}
+  pixi:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - windows-latest
+          - ubuntu-latest
+          - macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: prefix-dev/setup-pixi@v0
+      - run: pixi ls -x --color always
+      - run: pixi run test --color yes

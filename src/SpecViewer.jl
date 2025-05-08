@@ -108,6 +108,7 @@ function sas_redux(v::VersionNumber)::String
 		v"6.1.2" => sas_redux(:work, v)
 		v"6.1.3" => sas_redux(:work, v)
 		v"6.2.0" => sas_redux(:work, v)
+		v"6.2.1" => sas_redux(:work, v)
 		#
 		v"5.4.45" => sas_redux(:dr09, v)
 		v"5.5.12" => sas_redux(:dr10, v)
@@ -149,6 +150,7 @@ function sas_redux(s::Symbol)::String
 		:dr16 => SAS_REDUX_DR16
 		:dr17 => SAS_REDUX_DR17
 		:dr18 => SAS_REDUX_DR18
+		:dr19 => SAS_REDUX_DR19
 		:work => SAS_REDUX_WORK
 	end
 end

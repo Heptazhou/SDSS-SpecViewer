@@ -1,24 +1,30 @@
-def link_central(RA: float, DEC: float, ZOOM: int = 16):
+def link_central(RA: float, DEC: float) -> list[str]:
 	"""
-	Generate useful object links given RA, DEC, and zoom level.
+	Generate useful object links given RA and DEC.
 	"""
 
-	if None in (RA, DEC, ZOOM):
+	if None in (RA, DEC):
 		return []
-	if (0 <= RA <= 360) and (-90 <= DEC <= 90) and (1 <= ZOOM <= 16):
+	if (0 <= RA <= 360) and (-90 <= DEC <= 90):
 		link_list = []
 	else:
-		print(f"[link_central] {(RA, DEC, ZOOM)}")
+		print(f"[link_central] {(RA, DEC)}")
 		return []
 
-	legacy_link = f"https://www.legacysurvey.org/viewer?ra={RA}&dec={DEC}&zoom={ZOOM}&mark={RA},{DEC}"
-	link_list.append(f"Legacy Survey Viewer: {legacy_link}")
+	url = f"https://www.legacysurvey.org/viewer?layer=ls-dr10&zoom=16.0&ra={RA}&dec={DEC}&mark={RA},{DEC}"
+	link_list.append(f"Legacy Survey Viewer: {url}")
 
-	skyserver_link = f"https://skyserver.sdss.org/dr18/VisualTools/explore/summary?ra={RA}&dec={DEC}"
-	link_list.append(f"SDSS Explore Summary: {skyserver_link}")
+	url = f"https://skyserver.sdss.org/dr18/SkyServerWS/ImgCutout/getjpeg?$ic&ra={RA}&dec={DEC}"
+	link_list.append(f"SDSS Image Cutout: {url}")
 
-	simbad_link = f"https://simbad.u-strasbg.fr/simbad/sim-coo?Coord={RA}d{DEC}d&CooFrame=ICRS&CooEpoch=2000&CooEqui=2000&Radius=2&Radius.unit=arcmin&submit=submit+query&CoordList="
-	link_list.append(f"SIMBAD Object Lookup: {simbad_link}")
+	url = f"https://skyserver.sdss.org/dr18/VisualTools/navi?scale=0.09&ra={RA}&dec={DEC}"
+	link_list.append(f"SDSS Explore Navi: {url}")
+
+	url = f"https://skyserver.sdss.org/dr18/VisualTools/explore/summary?ra={RA}&dec={DEC}"
+	link_list.append(f"SDSS Explore Summary: {url}")
+
+	url = f"https://simbad.cds.unistra.fr/simbad/sim-coo?Radius=6.00&Coord={RA}d{DEC}d"
+	link_list.append(f"SIMBAD Object Lookup: {url}")
 
 	return link_list
 

@@ -14,14 +14,14 @@ from re import IGNORECASE, fullmatch
 from tempfile import TemporaryDirectory
 from traceback import print_exc
 
-import dash  # type: ignore
+import dash
 import numpy
 import requests
 from astropy.convolution import Box1DKernel, convolve  # type: ignore
 from astropy.io import fits as FITS  # type: ignore
 from astropy.io.fits import BinTableHDU, FITS_rec, HDUList  # type: ignore
 from dash import dcc, html
-from dash.dependencies import Input, Output, State  # type: ignore
+from dash.dependencies import Input, Output, State
 from numpy import mean, median, sqrt, std
 from numpy.typing import NDArray
 from plotly.graph_objects import Figure, Scatter
@@ -185,10 +185,7 @@ def fetch_catID(field: int | str, catID: int | str, extra="") \
 		except Exception as e:
 			if str(e): print(e) if isinstance(e, HTTPError) else print_exc()
 			continue
-		try:
-			mjd_final = str(dat[0]["MJD_FINAL"][0])
-		except:
-			mjd_final = str(dat[0]["MJD"][0])
+		mjd_final = str((dat[0]["MJD_FINAL"] if hasattr(dat[0], "MJD_FINAL") else dat[0]["MJD"])[0])
 		name.append(mjd_final)
 		wave.append(dat[1])
 		flux.append(dat[2])
@@ -202,15 +199,15 @@ def fetch_catID(field: int | str, catID: int | str, extra="") \
 		except Exception as e:
 			if str(e): print(e) if isinstance(e, HTTPError) else print_exc()
 			raise # re-raise
+		# print(f"{dat[0].columns=}")
 		if not meta[0]: meta[0] = dat[0]["ZWARNING"][0]
-		if not meta[1]: meta[1] = dat[0]["Z"][0]
-		if not meta[2]: meta[2] = dat[0]["RCHI2"][0]
-		if not meta[3]: meta[3] = dat[0]["RACAT"][0]
-		if not meta[4]: meta[4] = dat[0]["DECCAT"][0]
-		try:
-			mjd_final = str(dat[0]["MJD_FINAL"][0])
-		except:
-			mjd_final = str(dat[0]["MJD"][0])
+		if not meta[1]: meta[1] = dat[0]["Z"       ][0]
+		if not meta[2]: meta[2] = dat[0]["RCHI2"   ][0]
+		if not meta[3]: meta[3] = dat[0]["RACAT"   ][0] if hasattr(dat[0], "RACAT" ) else None
+		if not meta[3]: meta[3] = dat[0]["RA"      ][0] if hasattr(dat[0], "RA"    ) else None
+		if not meta[4]: meta[4] = dat[0]["DECCAT"  ][0] if hasattr(dat[0], "DECCAT") else None
+		if not meta[4]: meta[4] = dat[0]["DEC"     ][0] if hasattr(dat[0], "DEC"   ) else None
+		mjd_final = str((dat[0]["MJD_FINAL"] if hasattr(dat[0], "MJD_FINAL") else dat[0]["MJD"])[0])
 		mjd_list = [mjd]
 		name.append(mjd_final)
 		wave.append(dat[1])
@@ -224,14 +221,13 @@ def fetch_catID(field: int | str, catID: int | str, extra="") \
 			if field == "all" or int(field) == fid:
 				dat = SDSSV_fetch(username, password, fid, mjd, catID)
 				if not meta[0]: meta[0] = dat[0]["ZWARNING"][0]
-				if not meta[1]: meta[1] = dat[0]["Z"][0]
-				if not meta[2]: meta[2] = dat[0]["RCHI2"][0]
-				if not meta[3]: meta[3] = dat[0]["RACAT"][0]
-				if not meta[4]: meta[4] = dat[0]["DECCAT"][0]
-				try:
-					mjd_final = str(dat[0]["MJD_FINAL"][0])
-				except:
-					mjd_final = str(dat[0]["MJD"][0])
+				if not meta[1]: meta[1] = dat[0]["Z"       ][0]
+				if not meta[2]: meta[2] = dat[0]["RCHI2"   ][0]
+				if not meta[3]: meta[3] = dat[0]["RACAT"   ][0] if hasattr(dat[0], "RACAT" ) else None
+				if not meta[3]: meta[3] = dat[0]["RA"      ][0] if hasattr(dat[0], "RA"    ) else None
+				if not meta[4]: meta[4] = dat[0]["DECCAT"  ][0] if hasattr(dat[0], "DECCAT") else None
+				if not meta[4]: meta[4] = dat[0]["DEC"     ][0] if hasattr(dat[0], "DEC"   ) else None
+				mjd_final = str((dat[0]["MJD_FINAL"] if hasattr(dat[0], "MJD_FINAL") else dat[0]["MJD"])[0])
 				name.append(mjd_final)
 				wave.append(dat[1])
 				flux.append(dat[2])
