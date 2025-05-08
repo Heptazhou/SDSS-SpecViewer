@@ -14,14 +14,14 @@ from re import IGNORECASE, fullmatch
 from tempfile import TemporaryDirectory
 from traceback import print_exc
 
-import dash  # type: ignore
+import dash
 import numpy
 import requests
 from astropy.convolution import Box1DKernel, convolve  # type: ignore
 from astropy.io import fits as FITS  # type: ignore
 from astropy.io.fits import BinTableHDU, FITS_rec, HDUList  # type: ignore
 from dash import dcc, html
-from dash.dependencies import Input, Output, State  # type: ignore
+from dash.dependencies import Input, Output, State
 from numpy import mean, median, sqrt, std
 from numpy.typing import NDArray
 from plotly.graph_objects import Figure, Scatter
