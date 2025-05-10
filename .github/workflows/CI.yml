@@ -49,10 +49,28 @@ jobs:
           ignore-no-cache: true
           localregistry: https://github.com/0h7z/0hjl.git
       - uses: julia-actions/julia-runtest@v1
-        with:
-          coverage: ${{ !matrix.experimental }}
+        # with:
+        #   # https://github.com/JuliaLang/julia/issues/58227
+        #   coverage: ${{ !matrix.experimental }}
       - uses: heptazhou/julia-codecov@v1
       - uses: codecov/codecov-action@v3.1.5
         with:
           file: lcov.info
-        if: ${{ !matrix.experimental }}
+        # if: ${{ !matrix.experimental }}
+  pixi:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - windows-latest
+          - ubuntu-latest
+          - macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: prefix-dev/setup-pixi@v0
+      - run: pixi ls -x --color always
+      - run: pixi run test --color yes

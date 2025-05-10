@@ -1,3 +1,5 @@
 {
-	"copyrightInserter.useLineComment": true
+	"copyrightInserter.useLineComment": true,
+	"evenBetterToml.formatter.alignEntries": false,
+	"evenBetterToml.formatter.reorderKeys": true
 }
