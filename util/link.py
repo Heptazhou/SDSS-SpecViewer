@@ -1,6 +1,6 @@
-def link_central(RA: float, DEC: float):
+def link_central(RA: float, DEC: float) -> list[str]:
 	"""
-	Generate useful object links given RA, DEC, and zoom level.
+	Generate useful object links given RA and DEC.
 	"""
 
 	if None in (RA, DEC):
@@ -11,20 +11,20 @@ def link_central(RA: float, DEC: float):
 		print(f"[link_central] {(RA, DEC)}")
 		return []
 
-	legacy_link = f"https://www.legacysurvey.org/viewer?layer=ls-dr10&zoom=16.0&ra={RA}&dec={DEC}&mark={RA},{DEC}"
-	link_list.append(f"Legacy Survey Viewer: {legacy_link}")
+	url = f"https://www.legacysurvey.org/viewer?layer=ls-dr10&zoom=16.0&ra={RA}&dec={DEC}&mark={RA},{DEC}"
+	link_list.append(f"Legacy Survey Viewer: {url}")
 
-	skyserver_link = f"https://skyserver.sdss.org/dr18/SkyServerWS/ImgCutout/getjpeg?$ic&ra={RA}&dec={DEC}"
-	link_list.append(f"SDSS Image Cutout: {skyserver_link}")
+	url = f"https://skyserver.sdss.org/dr18/SkyServerWS/ImgCutout/getjpeg?$ic&ra={RA}&dec={DEC}"
+	link_list.append(f"SDSS Image Cutout: {url}")
 
-	skyserver_link = f"https://skyserver.sdss.org/dr18/VisualTools/navi?scale=0.09&ra={RA}&dec={DEC}"
-	link_list.append(f"SDSS Explore Navi: {skyserver_link}")
+	url = f"https://skyserver.sdss.org/dr18/VisualTools/navi?scale=0.09&ra={RA}&dec={DEC}"
+	link_list.append(f"SDSS Explore Navi: {url}")
 
-	skyserver_link = f"https://skyserver.sdss.org/dr18/VisualTools/explore/summary?ra={RA}&dec={DEC}"
-	link_list.append(f"SDSS Explore Summary: {skyserver_link}")
+	url = f"https://skyserver.sdss.org/dr18/VisualTools/explore/summary?ra={RA}&dec={DEC}"
+	link_list.append(f"SDSS Explore Summary: {url}")
 
-	simbad_link = f"https://simbad.cds.unistra.fr/simbad/sim-coo?Radius=6.00&Coord={RA}d{DEC}d"
-	link_list.append(f"SIMBAD Object Lookup: {simbad_link}")
+	url = f"https://simbad.cds.unistra.fr/simbad/sim-coo?Radius=6.00&Coord={RA}d{DEC}d"
+	link_list.append(f"SIMBAD Object Lookup: {url}")
 
 	return link_list
 
