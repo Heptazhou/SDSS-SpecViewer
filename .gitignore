@@ -2,9 +2,9 @@
 *.7z
 *.fits
 *.fits.*
+*.zst
 /Manifest.toml
 authentication.txt
 dictionaries.txt.*
 lcov.info
 Manifest-v*.toml
-pixi.lock

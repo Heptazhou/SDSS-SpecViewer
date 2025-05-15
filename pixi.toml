@@ -5,18 +5,18 @@ platforms = ["linux-64", "osx-64", "osx-arm64", "win-64"]
 
 [tasks]
 main = "python sdssv_spec_appREMOTE.py"
-sync = "git pull -ptr && pixi update"
+sync = "git pull -ptr && pixi install"
 test = "pytest --rootdir util -v"
 
 [dependencies]
-astropy = ">=7.0.1,<8"
+astropy = ">=7.1.0,<8"
 dash = ">=3.0.4,<4"
-numpy = ">=2.2.5,<3"
-plotly = ">=6.0.1,<7"
-pytest = ">=8.3.5,<9"
-python = ">=3.12.10,<3.14"
+numpy = ">=2.2.6,<3"
+plotly = ">=6.1.2,<7"
+pytest = ">=8.4.0,<9"
+python = ">=3.12.11,<3.14"
 requests = ">=2.32.3,<3"
-types-requests = ">=2.32.0.20250306,<3"
+types-requests = ">=2.32.0.20250602,<3"
 
 [pypi-dependencies]
 plotly-stubs = ">=0.0.5, <0.0.6"

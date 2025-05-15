@@ -27,38 +27,88 @@ let manifest = @something Base.project_file_manifest_path(Base.active_project())
 end
 
 using DataFramesMeta
+using Dates: DateTime, Second, UTC, now, unix2datetime
 using Exts
-using FITSIO: FITS
-using JSON5: json
+using FITSIO: FITS, colnames, fits_read_table_header
+using JSON5: JSON5, json
 using Pkg: PlatformEngines
+using Serialization: deserialize, serialize
+using Zstd_jll: Zstd_jll
 
-const s_info(xs...) = (@inline; @info string(xs...))
+const dropfirst(v) = @view v[2:end]
+const exe_7z = @try PlatformEngines.find7z() PlatformEngines.exe7z().exec[1]
+const hdu2_nrow(fn) = FITS(f -> fits_read_table_header(get(f, "SPALL", 2), 0)[1], fn)
+const projecthash() = @try Context().env.manifest.other["project_hash"] ""
+const s_info(xs...) = @info string(xs...)
 const u_sort! = unique! ∘ sort!
+const u_sorted(x) = issorted(x) & allunique(x)
+const zstdmt = `$(Zstd_jll.zstdmt().exec[1]) -1 --long --zstd=strat=7,tlen=4096`
 
+@kwdef struct File
+	name::String
+	nrow::Int64
+	size::Int64
+	time::DateTime
+end
+File(path) = File((basename, hdu2_nrow, filesize, unix2datetime ∘ mtime)(path)...)
+
+@kwdef struct Header
+	date::DateTime             = trunc(now(UTC), Second)
+	dims::VTuple{Int64}        = ()
+	frmt::VTuple{Int64}        = (1, 0, 0)
+	nrow::ODict{Symbol, Int64} = LDict()
+	proj::String               = projecthash()
+	size::Int64                = -1
+	source::Vector{File}       = []
+end
+Header(dims, nrow, size, source) = Header(; dims, nrow, size, source)
+
+Base.:(==)(a::Header, b::Header) = all((i -> @eval $a.$i==$b.$i), setdiff(fieldnames(Header), [:date]))
 Base.cat(x::Integer, y::Integer, ::Val{5}) = flipsign((10^5)abs(x) + mod(y, 10^5), x)
 Base.isless(::Any, ::Union{Number, VersionNumber}) = (@nospecialize; Bool(0))
 Base.isless(::Union{Number, VersionNumber}, ::Any) = (@nospecialize; Bool(1))
 
-@info "Looking for spAll files or archives"
+function deser_json(::Type{T}, f::String) where T
+	deser_json(T, JSON5.parse(readstr(f), dicttype = ODict{Symbol, Any}))
+end
+function deser_json(::Type{File}, d::ODict)
+	d[:time] = DateTime(d[:time]::String)
+	File(; d...)
+end
+function deser_json(::Type{Header}, d::ODict)
+	d[:date]   = (d[:date]::String) |> DateTime
+	d[:dims]   = (d[:dims]::Vector...,)
+	d[:frmt]   = (d[:frmt]::Vector...,)
+	d[:source] = (d[:source]::Vector) .|> Fix1(deser_json, File)
+	Header(; d...)
+end
+
+@info "Looking for spAll files or archives (t = $(nthreads()))"
 
 # https://data.sdss.org/datamodel/files/BOSS_SPECTRO_REDUX/RUN2D/spAll.html
 # https://github.com/sciserver/sqlloader/blob/master/schema/sql/SpectroTables.sql
+# https://github.com/sdss/idlspec2d/blob/master/datamodel/spall_dm.par
 # https://www.sdss.org/dr18/data_access/bitmasks/
-const cols = LDict{Symbol, DataType}(
+const cols = ODict{Symbol, DataType}(
 	:CATALOGID    => Int64,   # SDSS-V CatalogID
 	:FIELD        => Int64,   # Field number
-	:FIELDQUALITY => String,  # Quality of field ("good" | "bad")
-	:MJD          => Int64,   # Modified Julian date of observation
-	:OBJTYPE      => String,  # Why this object was targetted; see spZbest
+	:FIELDQUALITY => String,  # Characterization of field quality ("good" | "bad")
+	:MJD          => Int64,   # Modified Julian date of combined Spectra
+	:OBJTYPE      => String,  # Why this object was targetted; QSO=SCIENCE; see spZbest
 	:PROGRAMNAME  => String,  # Program name within a given survey
-	:RCHI2        => Float32, # Reduced χ² for best fit
-	:SURVEY       => String,  # Survey that plate is part of
-	:Z            => Float32, # Redshift; assume incorrect if ZWARNING is nonzero
-	:ZWARNING     => Int64,   # A flag set for bad redshift fits; see bitmasks
+	:SDSS_ID      => Int64,   # Unified SDSS-V Target Identifier; UInt32 / -999
+	:SPECPRIMARY  => Int64,   # Best version of spectrum at this location; Bool / -999; see platemerge.pro
+	:SURVEY       => String,  # Survey that field is part of
+	# :DECCAT       => Float64, # Catalog DEC in ICRS coordinates at coord_epoch
+	# :PRIMTARGET   => Int64,   # Primary target flags
+	# :RACAT        => Float64, # Catalog RA in ICRS coordinates at coord_epoch
+	# :RCHI2        => Float32, # Reduced χ² for best fit
+	# :SPECOBJID    => Int128,  # Unique ID from SDSSID, Field, MJD, Coadd, RUN2D; Int64 / String since v6.2
+	# :Z            => Float32, # Redshift; assume incorrect if ZWARNING is nonzero
+	# :ZWARNING     => Int64,   # A flag for bad z fits in place of CLASS=UNKNOWN; see bitmasks
 )
-const fits = try
-	exe_7z = @try PlatformEngines.find7z() PlatformEngines.exe7z()
-	extracts(arc::String) = run(`$exe_7z x $arc`)
+const fits = let
+	extracts(arc::String) = run(`$exe_7z x $arc`, devnull)
 	filename(arc::String) = readlines(`$exe_7z l -ba -slt $arc`)[1][8:end]
 	is_arc = endswith(r"\.([7gx]z|rar|zip)")
 	is_tmp = endswith(r"\.tmp")
@@ -73,29 +123,54 @@ const fits = try
 		is_arc(v) && (d[k] = filename(v); isfile(d[k]) || extracts(v); v = d[k])
 		is_tmp(v) && (d[k] = replace(v, r"\.tmp$" => ""); isfile(d[k]) || mv(v, d[k]))
 	end
-	@assert !isempty(d)
+	isempty(d) && systemerror("*spAll*.(fits|[7gx]z)", Libc.ENOENT) # 2 No such file or directory
 	u_sort!(d.vals, by = s -> (m = match(r"\bv\d+[._]\d+[._]\d+\b", s)) |> isnothing ?
 							  "master" : VersionNumber(replace(m.match, "_" => ".")))
-catch
-	systemerror("*spAll*.(fits|[7gx]z)", Libc.ENOENT) # 2 No such file or directory
 end
 # FITS(fits[end])["SPALL"]
 
-const df = @time @sync let
-	_read(f::String) = begin
-		n = FITS(f -> get(f, "SPALL", 2).ext, f)
-		s_info("Reading ", length(cols), " column(s) from `$f[$n]` (t = $(nthreads()))")
-		# see https://0h7z.com/Exts.jl/stable/FITSIO/#Base.read
-		FITS(f -> read(f[n], Vector, cols.keys), f)
+const df = @time let
+	function _read(fn::String)
+		r, f = nothing, File(fn)
+		if f == @try deser_json(File, "temp/$(f.name).json")
+			c = setdiff(cols.keys, [:FIELDQUALITY])
+			@info "Loading `$fn` from cache (try)"
+			r = deserialize("temp/$(f.name).dat")
+			r = c ⊈ propertynames(r) ? nothing : @select! r $c
+		end
+		if isnothing(r)
+			n = FITS(f -> get(f, "SPALL", 2).ext, fn)
+			s_info("Reading `$fn[$n]` for ", length(cols), " columns")
+			# see https://0h7z.com/Exts.jl/stable/FITSIO/#Base.read
+			v = FITS(f -> let all_cols = Symbol.(colnames(f[n]))
+					@assert all_cols ⊇ cols.keys "column(s) not exist: $(setdiff(cols.keys, all_cols))"
+					@time read(f[n], Vector, cols.keys)
+				end, fn)
+			r = @chain DataFrame(v, cols.keys, copycols = false) begin
+				@subset! :FIELDQUALITY .≡ "good" :CATALOGID .> 0
+				@rselect! Not(:FIELDQUALITY)
+			end
+			serialize("temp/$(f.name).dat", r)
+			write("temp/$(f.name).json", json(f, 4))
+		end
+		# write("temp/$(f.name).tsv", r)
+		r
 	end
-	df = DataFrame(mapreduce(_read, vcat, fits), cols.keys, copycols = false)
-	df = unique!(@rsubset df :FIELDQUALITY ≡ "good")
+	df = mapreduce(_read, vcat, fits)
+	df.SPECPRIMARY = Int16[df.SPECPRIMARY;]
+	replace!(df.SDSS_ID, -999 => 0)
+	replace!(df.SPECPRIMARY, -999 => 0)
+	@assert all(!signbit, df.SDSS_ID) &
+			all(!signbit, df.SPECPRIMARY)
+	unique!(df)
+	# write("temp/df.tsv", df)
+	df
 end
-# LDict(propertynames(df), eltype.(eachcol(df)))
+# ODict(propertynames(df), eltype.(eachcol(df)))
 
 @info "Setting up dictionary for fieldIDs with each RM_field"
 
-const programs = LDict{String, OSet{cols[:FIELD]}}(
+const dict_prg = ODict{String, OSet{cols[:FIELD]}}(
 	"SDSS-RM"   => [15171, 15172, 15173, 15290, 16169, 20867, 112359],
 	"XMMLSS-RM" => [15000, 15002, 23175, 112361],
 	"COSMOS-RM" => [15038, 15070, 15071, 15252, 15253, 16163, 16164, 16165, 20868, 23288, 112360],
@@ -103,44 +178,45 @@ const programs = LDict{String, OSet{cols[:FIELD]}}(
 
 @info "Sorting out the fields (including the `all` option if instructed to do so)"
 
-const programs_cats = @time @sync let
-	f_programs_dict = LDict{String, Expr}(
-		"eFEDS1"       => :(:SURVEY ≡ "BHM" && :OBJTYPE ≡ "QSO" && :PROGRAMNAME ≡ "eFEDS1"),
-		"eFEDS2"       => :(:SURVEY ≡ "BHM" && :OBJTYPE ≡ "QSO" && :PROGRAMNAME ≡ "eFEDS2"),
-		"eFEDS3"       => :(:SURVEY ≡ "BHM" && :OBJTYPE ≡ "QSO" && :PROGRAMNAME ≡ "eFEDS3"),
-		"MWM3"         => :(:SURVEY ≡ "BHM" && :OBJTYPE ≡ "QSO" && :PROGRAMNAME ≡ "MWM3"),
-		"MWM4"         => :(:SURVEY ≡ "BHM" && :OBJTYPE ≡ "QSO" && :PROGRAMNAME ≡ "MWM4"),
-		"AQMES-Bonus"  => :(:SURVEY ≡ "BHM" && :OBJTYPE ≡ "QSO" && :PROGRAMNAME ≡ "AQMES-Bonus"),
-		"AQMES-Wide"   => :(:SURVEY ≡ "BHM" && :OBJTYPE ≡ "QSO" && :PROGRAMNAME ≡ "AQMES-Wide"),
-		"AQMES-Medium" => :(:SURVEY ≡ "BHM" && :OBJTYPE ≡ "QSO" && :PROGRAMNAME ≡ "AQMES-Medium"),
-		"RM-Plates"    => :(:SURVEY ≡ "BHM" && :OBJTYPE ≡ "QSO" && :PROGRAMNAME ∈ ("RM", "RMv2", "RMv2-fewMWM")),
-		"RM-Fibers"    => :(:SURVEY ≡ "BHM" && :OBJTYPE ≡ "science" && :PROGRAMNAME ≡ "bhm_rm"),
-		"bhm_aqmes"    => :(:SURVEY ≡ "BHM" && :OBJTYPE ≡ "science" && :PROGRAMNAME ≡ "bhm_aqmes"),
-		"bhm_csc"      => :(:SURVEY ≡ "BHM" && :OBJTYPE ≡ "science" && :PROGRAMNAME ≡ "bhm_csc"),
-		"bhm_filler"   => :(:SURVEY ≡ "BHM" && :OBJTYPE ≡ "science" && :PROGRAMNAME ≡ "bhm_filler"),
-		"bhm_spiders"  => :(:SURVEY ≡ "BHM" && :OBJTYPE ≡ "science" && :PROGRAMNAME ≡ "bhm_spiders"),
-		"open_fiber"   => :(:SURVEY ≡ "open_fiber" && :OBJTYPE ≡ "science" && :PROGRAMNAME ≡ "open_fiber"),
+const programs_cats = @time let
+	f_programs_dict = ODict{String, Expr}(
+		"eFEDS1"       => :(:SURVEY≡"BHM"&&:OBJTYPE≡"QSO"&&:PROGRAMNAME≡"eFEDS1"),
+		"eFEDS2"       => :(:SURVEY≡"BHM"&&:OBJTYPE≡"QSO"&&:PROGRAMNAME≡"eFEDS2"),
+		"eFEDS3"       => :(:SURVEY≡"BHM"&&:OBJTYPE≡"QSO"&&:PROGRAMNAME≡"eFEDS3"),
+		"MWM3"         => :(:SURVEY≡"BHM"&&:OBJTYPE≡"QSO"&&:PROGRAMNAME≡"MWM3"),
+		"MWM4"         => :(:SURVEY≡"BHM"&&:OBJTYPE≡"QSO"&&:PROGRAMNAME≡"MWM4"),
+		"AQMES-Bonus"  => :(:SURVEY≡"BHM"&&:OBJTYPE≡"QSO"&&:PROGRAMNAME≡"AQMES-Bonus"),
+		"AQMES-Wide"   => :(:SURVEY≡"BHM"&&:OBJTYPE≡"QSO"&&:PROGRAMNAME≡"AQMES-Wide"),
+		"AQMES-Medium" => :(:SURVEY≡"BHM"&&:OBJTYPE≡"QSO"&&:PROGRAMNAME≡"AQMES-Medium"),
+		"RM-Plates"    => :(:SURVEY≡"BHM"&&:OBJTYPE≡"QSO"&&:PROGRAMNAME∈("RM", "RMv2", "RMv2-fewMWM")),
+		"RM-Fibers"    => :(:SURVEY≡"BHM"&&:OBJTYPE≡"science"&&:PROGRAMNAME≡"bhm_rm"),
+		"bhm_aqmes"    => :(:SURVEY≡"BHM"&&:OBJTYPE≡"science"&&:PROGRAMNAME≡"bhm_aqmes"),
+		"bhm_csc"      => :(:SURVEY≡"BHM"&&:OBJTYPE≡"science"&&:PROGRAMNAME≡"bhm_csc"),
+		"bhm_filler"   => :(:SURVEY≡"BHM"&&:OBJTYPE≡"science"&&:PROGRAMNAME≡"bhm_filler"),
+		"bhm_spiders"  => :(:SURVEY≡"BHM"&&:OBJTYPE≡"science"&&:PROGRAMNAME≡"bhm_spiders"),
+		"open_fiber"   => :(:SURVEY≡"open_fiber"&&:OBJTYPE≡"science"&&:PROGRAMNAME≡"open_fiber"),
 	)
-	foreach(sort!, programs.vals)
+	foreach(sort!, dict_prg.vals)
 	x = :(any([$(f_programs_dict.vals...)]))
 	all_cats = @spawn @eval OSet(sort!(@rsubset(df, $x).CATALOGID))
 	for (p, x) ∈ f_programs_dict
-		programs[p] = @eval OSet(sort!(@rsubset(df, $x).FIELD))
+		dict_prg[p] = @eval OSet(sort!(@rsubset(df, $x).FIELD))
 	end
+	dict_prg |> sort!
 	all_cats |> fetch
 end
 
 @info "Filling fieldIDs and catalogIDs with only science targets and completed epochs"
 
-const fieldIDs = @time @sync let cat_t = cols[:CATALOGID]
+const dict_fld = @time let cat_t = cols[:CATALOGID]
 	data_of(ids::OSet{cols[:FIELD]}) = @chain df begin
 		@select :CATALOGID :FIELD :SURVEY :OBJTYPE
 		@rsubset! :FIELD ∈ ids && :SURVEY ≡ "BHM" && :OBJTYPE ∈ ("QSO", "science")
 		@by :FIELD :CATALOGID = [:CATALOGID]
 	end
 	d, init = ODict{String, Vector{cat_t}}(), cat_t[]
-	s_info("Processing ", sum(length, programs.vals), " entries of ", length(programs), " programs")
-	for (prog, opts) ∈ programs
+	s_info("Processing ", sum(length, dict_prg.vals), " entries of ", length(dict_prg), " programs")
+	for (prog, opts) ∈ dict_prg
 		data = data_of(opts) |> eachrow
 		for (k, v) ∈ data
 			(k, v) = string(k), copy(v)
@@ -150,31 +226,68 @@ const fieldIDs = @time @sync let cat_t = cols[:CATALOGID]
 	end
 	sort!(d, by = s -> @something tryparse(cat_t, s) s)
 end
+# @assert all(u_sorted, dict_fld.vals)
 
-@info "Building dictionary for catalogIDs"
+@info "Building dictionary for CATALOGID"
 
-const catalogIDs = @time @sync let
+const dict_cat = @time let
 	dict_of(ids::OSet{cols[:CATALOGID]}) = @chain df begin
-		@rselect :CATALOGID :FIELD_MJD = cat(:FIELD, :MJD, Val(5)) :RCHI2 :Z :ZWARNING
+		@rselect :CATALOGID :FIELD_MJD = cat(:FIELD, :MJD, Val(5)) :SDSS_ID
 		@rsubset! :CATALOGID ∈ ids
-		@rorderby :CATALOGID :ZWARNING > 0 :RCHI2
-		@by :CATALOGID begin
-			:ks = string(:CATALOGID[1])
-			:vs = (Real[:ZWARNING :Z :RCHI2][1, :], u_sort!([:FIELD_MJD;])...)
-		end
-		LDict(_.ks, _.vs)
+		@rorderby :CATALOGID unsigned(:SDSS_ID - 1)
+		@distinct! :CATALOGID :FIELD_MJD # ensure SDSS_ID is unique; error in v6.1.1
+		innerjoin(on = :CATALOGID,
+			(@chain _ begin
+				@by :CATALOGID :SDSS_ID = get(:SDSS_ID, 1, 0) # least positive value
+			end),
+			(@chain _ begin
+				@rorderby :CATALOGID :FIELD_MJD
+				@by :CATALOGID :FIELD_MJD = [:FIELD_MJD]
+			end),
+		)
+		LDict(_.CATALOGID, vcat.(_.SDSS_ID, _.FIELD_MJD)) |> ODict
 	end
 	s_info("Processing ", length(programs_cats), " entries")
 	dict_of(programs_cats)
 end
+# @assert u_sorted(dict_cat.keys) & all(u_sorted ∘ dropfirst, dict_cat.vals)
+# @show extrema(length, dict_cat.vals) # (2, 49)
+
+@info "Building dictionary for SDSS_ID"
+
+const dict_sid = @time let
+	dict_of(ids::OSet{cols[:CATALOGID]}) = @chain df begin
+		@rselect :CATALOGID :SDSS_ID
+		@rsubset! :SDSS_ID > 0 :CATALOGID ∈ ids
+		@rorderby :SDSS_ID :CATALOGID
+		@distinct! :CATALOGID # ensure SDSS_ID is unique; error in v6.1.1
+		@by :SDSS_ID :CATALOGID = [:CATALOGID]
+		LDict(_.SDSS_ID, _.CATALOGID) |> ODict
+	end
+	s_info("Processing ", length(programs_cats), " entries")
+	dict_of(programs_cats)
+end
+# @assert u_sorted(dict_sid.keys) & all(u_sorted, dict_sid.vals)
+# @show extrema(length, dict_sid.vals) # (1, 3)
 
 @info "Dumping dictionaries to file"
-write("dictionaries.txt",
-	"""
-	[
-		$(json(programs)),
-		$(json(fieldIDs)),
-		$(json(catalogIDs))
+
+@time let
+	data = [
+		:prg => dict_prg,
+		:fld => dict_fld,
+		:sid => dict_sid,
+		:cat => dict_cat,
 	]
-	""")
+	meta = let old = deser_json(Header, "data/bhm.meta.json")
+		row = ODict(k => length(v) for (k, v) ∈ data)
+		len = length(json(ODict(data), ~0))
+		new = Header(size(df), row, len, File.(fits))
+		new == old ? old : new
+	end
+	# foreach((k, v)::Pair -> write("temp/bhm-$k.json", json(v, ~0)), data)
+	write("data/bhm.meta.json", json(meta, 4))
+	write("data/bhm.json", json(ODict([:hdr => meta; data]), ~0))
+	run(`$zstdmt data/bhm.json -o data/bhm.json.zst -f`, devnull)
+end
 

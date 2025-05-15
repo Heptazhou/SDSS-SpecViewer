@@ -1,4 +1,5 @@
 {
+	"code-runner.executorMapByGlob": { "sdssv_spec_appREMOTE.py": "pixi run main # $fileName" },
 	"copyrightInserter.useLineComment": true,
 	"evenBetterToml.formatter.alignEntries": false,
 	"evenBetterToml.formatter.reorderKeys": true

@@ -17,9 +17,14 @@
 		err = @catch include("../update.jl")
 		@test isnothing(err)
 		err = @catch include("../update_dictionaries.jl")
-		@test isa(err, LoadError)
-		err = @show err.error
-		@test isa(err, SystemError) && err.errnum ≡ Libc.ENOENT
+		@test isa(@show(err), LoadError)
+		err = err.error
+		@test isa(@show(err), SystemError) && err.errnum ≡ Libc.ENOENT
+
+		hdr = @invokelatest Header()
+		@test length(hdr.frmt) === 3
+		@test length(hdr.proj) === 40
+		@test VersionNumber(hdr.frmt...) === v"1.0"
 	end
 end
 

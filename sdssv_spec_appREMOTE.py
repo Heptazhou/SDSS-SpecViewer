@@ -29,24 +29,37 @@ from requests.exceptions import HTTPError
 
 from util import SDSSV_buildURL, link_central
 
+# https://docs.python.org/3/library/tomllib.html
+# https://peps.python.org/pep-0680/
+# if sys.version_info < (3, 11): import tomli as tomllib
+# if sys.version_info > (3, 11): import tomllib
+
 ###
 ### input the data directory path
 ###
 
-dictionaries = json.load(open("dictionaries.txt"))
+# dictionaries = json.load(open("dictionaries.txt"))
 authentication = "authentication.txt"
-programs: dict[str, list[int]] = dictionaries[0]
-fieldIDs: dict[str, list[int]] = dictionaries[1]
-catalogIDs: dict[str, list[list | int]] = dictionaries[2]
+# programs: dict[str, list[int]] = dictionaries[0]
+# fieldIDs: dict[str, list[int]] = dictionaries[1]
+# catalogs: dict[str, list[list | int]] = dictionaries[2]
+
+bhm_meta = json.load(open("data/bhm.meta.json"))
+bhm_data = json.load(open("data/bhm.json"))
+
+programs: dict[str, list[int]] = bhm_data["prg"]
+fieldIDs: dict[str, list[int]] = bhm_data["fld"]
+sdss_IDs: dict[str, list[int]] = bhm_data["sid"]
+catalogs: dict[str, list[int]] = bhm_data["cat"]
 
 # for testing
 # print(programs)
 # print("those were programs")
 # print(fieldIDs)
 # print("those were fieldIDs")
-# print(catalogIDs)
-# print("those were catalogIDs")
-# print("catalog*5", catalogIDs["27021598109009995"])
+# print(catalogs)
+# print("those were catalogs")
+# print("catalog*5", catalogs["27021598109009995"])
 # print("field17049", fieldIDs["17049"])
 
 # the redshift and stepping to easily adjust redshift using arrow keys or mouse wheel, disabled by default
@@ -109,7 +122,8 @@ def SDSSV_fetch(username: str, password: str, field: int | str, mjd: int, obj: i
 		for v in ("26", "104", "103") if branch == "legacy" \
 			else ("master", "v6_2_0", "v6_1_3", "v6_1_0"):
 			try: return SDSSV_fetch(username, password, field, mjd, obj, v)
-			except: continue
+			except HTTPError: pass
+			except Exception: print_exc()
 		raise HTTPError(f"[SDSSV_fetch] {(field, mjd, obj)}")
 	if not (field and mjd and obj):
 		raise HTTPError(f"[SDSSV_fetch] {(field, mjd, obj, branch)}")
@@ -157,24 +171,33 @@ def SDSSV_fetch_allepoch(username: str, password: str, mjd: int, obj: int | str)
 	field = "allepoch*"
 	raise HTTPError(f"[SDSSV_fetch] {(field, mjd, obj)}")
 
-def fetch_catID(field: int | str, catID: int | str, extra="") \
-	-> tuple[list[int | float], list[str], list[NDArray], list[NDArray], list[NDArray]]:
+def fetch_catID(field: int | str, catID: int | str, extra="", match_sdss_id=True) \
+	-> tuple[dict[str, int | float], list[str], list[NDArray], list[NDArray], list[NDArray]]:
 	if not (extra or catID): # consider as incomplete user input
 		raise Exception()    # so abort quietly
 	if not (extra or catID and field):
 		raise Exception((field, catID, extra))
-	field = str(field).replace(" ", "")
+	field = str(field).replace(" ", "") if not match_sdss_id else "all"
 	catID = str(catID).replace(" ", "")
 	extra = str(extra).replace(" ", "")
-	if (field, catID, extra) in cache:
-		return cache[(field, catID, extra)]
+	if (field, catID, extra, match_sdss_id) in cache:
+		return cache[(field, catID, extra, match_sdss_id)]
 
 	name, wave, flux, errs = list[str](), list[NDArray](), list[NDArray](), list[NDArray]()
 
-	data = catalogIDs.get(catID, [[]]) # [(ZWARNING, Z, RCHI2), {FIELD,MJD}...]
-	meta = list(data[0]) # type: ignore
-	meta = meta or [None, None, None] # (ZWARNING, Z, RCHI2)
-	meta.extend([None, None]) # RACAT, DECCAT
+	cats: list[int] = [int(catID)]
+	meta: dict[str, list] = {
+		"DEC": [],
+		"RA": [],
+		"RCHI2": [],
+		"Z": [],
+		"ZWARNING": [],
+	}
+	if (sdss_id := catalogs.get(catID, [0])[0]) > 0 and match_sdss_id:
+		for cat in sdss_IDs.get(f"{sdss_id}", []):
+			if not cat in cats: cats.append(cat)
+		cats = sorted(cats)
+	# print(f"[sdss_id] {catID} => {sdss_id} => {cats} # {match_sdss_id}")
 
 	for x in extra.split(","):
 		x, ver = [*x.split("@", 1), ""][:2]
@@ -201,13 +224,13 @@ def fetch_catID(field: int | str, catID: int | str, extra="") \
 			if str(e): print(e) if isinstance(e, HTTPError) else print_exc()
 			raise # re-raise
 		# print(f"{dat[0].columns=}")
-		if not meta[0]: meta[0] = dat[0]["ZWARNING"][0]
-		if not meta[1]: meta[1] = dat[0]["Z"       ][0]
-		if not meta[2]: meta[2] = dat[0]["RCHI2"   ][0]
-		if not meta[3]: meta[3] = dat[0]["RACAT"   ][0] if hasattr(dat[0], "RACAT" ) else None
-		if not meta[3]: meta[3] = dat[0]["RA"      ][0] if hasattr(dat[0], "RA"    ) else None
-		if not meta[4]: meta[4] = dat[0]["DECCAT"  ][0] if hasattr(dat[0], "DECCAT") else None
-		if not meta[4]: meta[4] = dat[0]["DEC"     ][0] if hasattr(dat[0], "DEC"   ) else None
+		meta_DEC = dat[0]["DEC"][0] if hasattr(dat[0], "DEC") else None
+		meta_R_A = dat[0]["RA" ][0] if hasattr(dat[0], "RA" ) else None
+		meta["DEC"     ].append(dat[0]["DECCAT"  ][0] if hasattr(dat[0], "DECCAT") else meta_DEC)
+		meta["RA"      ].append(dat[0]["RACAT"   ][0] if hasattr(dat[0], "RACAT" ) else meta_R_A)
+		meta["RCHI2"   ].append(dat[0]["RCHI2"   ][0])
+		meta["Z"       ].append(dat[0]["Z"       ][0])
+		meta["ZWARNING"].append(dat[0]["ZWARNING"][0])
 		mjd_final = str((dat[0]["MJD_FINAL"] if hasattr(dat[0], "MJD_FINAL") else dat[0]["MJD"])[0])
 		mjd_list = [mjd]
 		name.append(mjd_final)
@@ -216,18 +239,18 @@ def fetch_catID(field: int | str, catID: int | str, extra="") \
 		errs.append(dat[3])
 	else:
 		mjd_list = []
-		for x in data[1:]: # {13'FIELD,5'MJD}
-			x = int(x)
-			fid, mjd = divmod(abs(x), 10**5)
-			if field == "all" or int(field) == fid:
-				dat = SDSSV_fetch(username, password, fid, mjd, catID)
-				if not meta[0]: meta[0] = dat[0]["ZWARNING"][0]
-				if not meta[1]: meta[1] = dat[0]["Z"       ][0]
-				if not meta[2]: meta[2] = dat[0]["RCHI2"   ][0]
-				if not meta[3]: meta[3] = dat[0]["RACAT"   ][0] if hasattr(dat[0], "RACAT" ) else None
-				if not meta[3]: meta[3] = dat[0]["RA"      ][0] if hasattr(dat[0], "RA"    ) else None
-				if not meta[4]: meta[4] = dat[0]["DECCAT"  ][0] if hasattr(dat[0], "DECCAT") else None
-				if not meta[4]: meta[4] = dat[0]["DEC"     ][0] if hasattr(dat[0], "DEC"   ) else None
+		for cat in cats:
+			for fieldmjd in catalogs.get(f"{cat}", [0])[1:]: # {13'FIELD,5'MJD}
+				fid, mjd = divmod(abs(fieldmjd), 10**5)
+				if field != "all" and int(field) != fid: continue
+				dat = SDSSV_fetch(username, password, fid, mjd, cat)
+				meta_DEC = dat[0]["DEC"][0] if hasattr(dat[0], "DEC") else None
+				meta_R_A = dat[0]["RA" ][0] if hasattr(dat[0], "RA" ) else None
+				meta["DEC"     ].append(dat[0]["DECCAT"  ][0] if hasattr(dat[0], "DECCAT") else meta_DEC)
+				meta["RA"      ].append(dat[0]["RACAT"   ][0] if hasattr(dat[0], "RACAT" ) else meta_R_A)
+				meta["RCHI2"   ].append(dat[0]["RCHI2"   ][0])
+				meta["Z"       ].append(dat[0]["Z"       ][0])
+				meta["ZWARNING"].append(dat[0]["ZWARNING"][0])
 				mjd_final = str((dat[0]["MJD_FINAL"] if hasattr(dat[0], "MJD_FINAL") else dat[0]["MJD"])[0])
 				name.append(mjd_final)
 				wave.append(dat[1])
@@ -236,6 +259,12 @@ def fetch_catID(field: int | str, catID: int | str, extra="") \
 				if mjd not in mjd_list: mjd_list.append(mjd)
 		mjd_list.sort(reverse=True)
 	# print(mjd_list)
+
+	meta["DEC"     ] = meta["DEC"     ][-1]
+	meta["RA"      ] = meta["RA"      ][-1]
+	meta["RCHI2"   ] = meta["RCHI2"   ][-1]
+	meta["Z"       ] = meta["Z"       ][-1]
+	meta["ZWARNING"] = meta["ZWARNING"][-1]
 
 	# allplate
 	for mjd in mjd_list:
@@ -266,7 +295,7 @@ def fetch_catID(field: int | str, catID: int | str, extra="") \
 	if not (meta and name and wave and flux):
 		raise HTTPError(f"[fetch_catID] {(field, catID, extra)}")
 	r = meta, name, wave, flux, errs
-	cache[(field, catID, extra)] = r
+	cache[(field, catID, extra, match_sdss_id)] = r
 	return r
 
 ###
@@ -444,10 +473,11 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 			dcc.Checklist(id="extra_func_list", options={
 				"z": "pipeline redshift",
 				"p": "match program",
+				"s": "match sdss_id",
 				"e": "show error (σ)",
 				"u": "file uploader",
 			},
-				value=["z", "p"], inline=True, persistence=True, persistence_type="local",
+				value=["z", "p", "s"], inline=True, persistence=True, persistence_type="local",
 				style={"marginTop": "20px", "display": "flex", "flexFlow": "wrap"},
 				inputStyle={"marginRight": "5px"},
 				labelStyle={"width": "180px", "whiteSpace": "nowrap"},
@@ -948,11 +978,12 @@ def hide_pipeline_redshift(checklist: list[str]):
 	Input("fieldid_dropdown", "value"),
 	Input("catalogid_dropdown", "value"),
 	Input("fieldid_input", "value"),
-	Input("catalogid_input", "value"))
-def show_pipeline_redshift(field_d, cat_d, field_i, cat_i):
+	Input("catalogid_input", "value"),
+	Input("extra_func_list", "value"))
+def show_pipeline_redshift(field_d, cat_d, field_i, cat_i, checklist: list[str]):
 	try:
-		meta = fetch_catID(field_d or field_i, cat_d or cat_i)[0]
-		return meta[0], meta[1], meta[2], meta[3], meta[4]
+		meta = fetch_catID(field_d or field_i, cat_d or cat_i, match_sdss_id="s" in checklist)[0]
+		return meta["ZWARNING"], meta["Z"], meta["RCHI2"], meta["RA"], meta["DEC"]
 	except Exception as e:
 		if str(e): print(f"[show_pipeline_redshift]  fetch_catID{([field_d, field_i], [cat_d, cat_i])}")
 		if str(e): print(e) if isinstance(e, HTTPError) else print_exc()
@@ -1049,9 +1080,9 @@ def make_multiepoch_spectra(field_d, cat_d, field_i, cat_i, extra_obj, redshift,
 	noop_size = len(names)
 
 	try:
-		meta, name, wave, flux, errs = fetch_catID(fieldid, catalogid, extra_obj) # type: ignore
+		meta, name, wave, flux, errs = fetch_catID(fieldid, catalogid, extra_obj, match_sdss_id="s" in checklist) # type: ignore
 		names.extend(name), waves.extend(wave), fluxes.extend(flux), delta.extend(errs) # type: ignore
-		if meta[1] and not redshift and redshift_step == "any": redshift = meta[1]
+		if meta["Z"] and not redshift and redshift_step == "any": redshift = meta["Z"]
 	except Exception as e:
 		if str(e): print(f"[make_multiepoch_spectra] fetch_catID{([field_d, field_i], [cat_d, cat_i], extra_obj)}")
 		if str(e): print(e) if isinstance(e, HTTPError) else print_exc()
