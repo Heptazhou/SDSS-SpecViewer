@@ -27,17 +27,37 @@ let manifest = @something Base.project_file_manifest_path(Base.active_project())
 end
 
 using DataFramesMeta
+using Dates: DateTime, UTC, now
 using Exts
 using FITSIO: FITS
 using JSON5: json
 using Pkg: PlatformEngines
+using Serde
+using Serialization: deserialize, serialize
 
 const s_info(xs...) = (@inline; @info string(xs...))
 const u_sort! = unique! ∘ sort!
 
+@kwdef struct File
+	name::String
+	size::Int64
+	time::Int64
+end
+File(path) = File((basename, filesize, mtime)(path)...)
+
+@kwdef struct Header
+	date::DateTime       = now(UTC)
+	size::Vector{Int64}  = []
+	source::Vector{File} = []
+end
+Header(size, source) = Header(; size, source)
+
 Base.cat(x::Integer, y::Integer, ::Val{5}) = flipsign((10^5)abs(x) + mod(y, 10^5), x)
+Base.convert(::Type{<:Vector}, x::Tuple) = collect(x)
+Base.convert(::Type{File}, x::String) = File(x)
 Base.isless(::Any, ::Union{Number, VersionNumber}) = (@nospecialize; Bool(0))
 Base.isless(::Union{Number, VersionNumber}, ::Any) = (@nospecialize; Bool(1))
+Serde.deser(::Any, ::Type{T}, x) where T = T(x)
 
 @info "Looking for spAll files or archives"
 
@@ -52,6 +72,7 @@ const cols = LDict{Symbol, DataType}(
 	:OBJTYPE      => String,  # Why this object was targetted; see spZbest
 	:PROGRAMNAME  => String,  # Program name within a given survey
 	:RCHI2        => Float32, # Reduced χ² for best fit
+	:SDSS_ID      => Int64,   #
 	:SURVEY       => String,  # Survey that plate is part of
 	:Z            => Float32, # Redshift; assume incorrect if ZWARNING is nonzero
 	:ZWARNING     => Int64,   # A flag set for bad redshift fits; see bitmasks
@@ -81,7 +102,10 @@ catch
 end
 # FITS(fits[end])["SPALL"]
 
-const df = @time @sync let
+const header = @try deser_json(Header, readstr("dictionaries-txt.json")) Header()
+
+const df = !true ? deserialize("data/df.dat") :
+		   @time @sync let
 	_read(f::String) = begin
 		n = FITS(f -> get(f, "SPALL", 2).ext, f)
 		s_info("Reading ", length(cols), " column(s) from `$f[$n]` (t = $(nthreads()))")
@@ -89,7 +113,15 @@ const df = @time @sync let
 		FITS(f -> read(f[n], Vector, cols.keys), f)
 	end
 	df = DataFrame(mapreduce(_read, vcat, fits), cols.keys, copycols = false)
-	df = unique!(@rsubset df :FIELDQUALITY ≡ "good")
+	df = unique!(@chain df begin
+		@rsubset :FIELDQUALITY ≡ "good"
+		@select Not(:FIELDQUALITY)
+	end)
+	header = Header(size(df), fits)
+	serialize("data/df.dat", df)
+	serialize("data/hdr.dat", header)
+	# write("data/df.tsv", df)
+	df
 end
 # LDict(propertynames(df), eltype.(eachcol(df)))
 
@@ -169,12 +201,14 @@ const catalogIDs = @time @sync let
 end
 
 @info "Dumping dictionaries to file"
+write("dictionaries-txt.json", json(header, 4))
 write("dictionaries.txt",
 	"""
 	[
 		$(json(programs)),
 		$(json(fieldIDs)),
-		$(json(catalogIDs))
+		$(json(catalogIDs)),
+		$(json(header))
 	]
 	""")
 

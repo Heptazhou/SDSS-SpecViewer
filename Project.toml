@@ -5,11 +5,17 @@ version = "0.1.0"
 
 [deps]
 DataFramesMeta = "1313f7d8-7da2-5740-9ea0-a2ca25f37964"
+Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
 Exts = "0b12d779-4123-4875-9d6c-e33c2e29e2c9"
 FITSIO = "525bcba6-941b-5504-bd06-fd0dc1a4d2eb"
 JSON5 = "275fdaeb-5887-4102-8704-6b08b28f797b"
 Match = "7eb4fadd-790c-5f42-8a69-bfa0b872bfbf"
 Pkg = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
+Serde = "db9b398d-9517-45f8-9a95-92af99003e0e"
+Serialization = "9e88b42a-f829-5b0c-bbe9-9e923198166b"
+
+[sources]
+Serde = {rev = "master-v3.6", url = "https://github.com/Heptazhou/Serde.jl"}
 
 [compat]
 DataFramesMeta = "≥ 0.9"
