@@ -27,17 +27,43 @@ let manifest = @something Base.project_file_manifest_path(Base.active_project())
 end
 
 using DataFramesMeta
+using Dates: DateTime, Second, UTC, now, unix2datetime
 using Exts
-using FITSIO: FITS
-using JSON5: json
+using FITSIO: FITS, colnames, fits_read_table_header
+using JSON5: JSON5, json
 using Pkg: PlatformEngines
+using Serde: Serde, deser_json, deser_toml
+using Serialization: deserialize, serialize
+using TOML1: TOML1
 
+const fits_nrow(fn) = FITS(f -> fits_read_table_header(get(f, "SPALL", 2), 0)[1], fn)
 const s_info(xs...) = (@inline; @info string(xs...))
+const toml = TOML1.toml ∘ Serde.parse_toml ∘ Serde.to_toml
 const u_sort! = unique! ∘ sort!
 
+@kwdef struct File
+	name::String
+	rows::Int64
+	size::Int64
+	time::DateTime
+end
+File(path) = File((basename, fits_nrow, filesize, mtime)(path)...)
+
+@kwdef struct Header
+	date::DateTime       = trunc(now(UTC), Second)
+	dims::Vector{Int64}  = []
+	source::Vector{File} = []
+end
+Header(dims, source) = Header(; dims, source)
+
 Base.cat(x::Integer, y::Integer, ::Val{5}) = flipsign((10^5)abs(x) + mod(y, 10^5), x)
+Base.convert(::Type{DateTime}, time::Real) = unix2datetime(time)::DateTime
+Base.convert(::Type{T}, x) where T = T(x)::T
+Base.convert(::Type{Vector{T}}, x::Tuple) where T = collect(T, x)::Vector{<:T}
 Base.isless(::Any, ::Union{Number, VersionNumber}) = (@nospecialize; Bool(0))
 Base.isless(::Union{Number, VersionNumber}, ::Any) = (@nospecialize; Bool(1))
+Serde.deser(::Any, ::Type{T}, x) where T = convert(T, x)
+# (Serde.SerToml.ser_name(::Type{T}, ::Val{x})::Symbol) where {T, x} = Symbol(x)
 
 @info "Looking for spAll files or archives"
 
@@ -55,6 +81,10 @@ const cols = LDict{Symbol, DataType}(
 	:SURVEY       => String,  # Survey that plate is part of
 	:Z            => Float32, # Redshift; assume incorrect if ZWARNING is nonzero
 	:ZWARNING     => Int64,   # A flag set for bad redshift fits; see bitmasks
+	# :PRIMTARGET   => Int32,   # Primary target flags
+	# :SDSS_ID      => Int64,   #
+	# :SPECOBJID    => Int64,   # CAS-style SPECID based upon plate, mjd, fiber, rerun; since DR10/v5_5_12
+	# :SPECPRIMARY  => UInt8,   # Set to 1 for one observation; usually the "best"; see platemerge.pro
 )
 const fits = try
 	exe_7z = @try PlatformEngines.find7z() PlatformEngines.exe7z()
@@ -81,16 +111,38 @@ catch
 end
 # FITS(fits[end])["SPALL"]
 
-const df = @time @sync let
+const hdr, df = @time @try let
+	error("Ignoring any cache")
+	all(isdir, ("data", "temp")) && @info "Trying loading from cache"
+	hdr = @try deser_toml(Header, readstr("data/hdr.toml")) deserialize("temp/hdr.dat")
+	hdr, deserialize("temp/df.dat")
+end @sync let
 	_read(f::String) = begin
 		n = FITS(f -> get(f, "SPALL", 2).ext, f)
 		s_info("Reading ", length(cols), " column(s) from `$f[$n]` (t = $(nthreads()))")
 		# see https://0h7z.com/Exts.jl/stable/FITSIO/#Base.read
-		FITS(f -> read(f[n], Vector, cols.keys), f)
+		v = FITS(f -> let cols = copy(cols.keys)
+				all_cols = Symbol.(colnames(f[n]))
+				all_cols ∋ :FIELDQUALITY || replace!(cols, :FIELDQUALITY => :PLATEQUALITY)
+				@assert all_cols ⊇ cols "column(s) not exist: $(setdiff(cols, all_cols))"
+				read(f[n], Vector, cols)
+			end, f)
+		DataFrame(v, cols.keys, copycols = false)
 	end
-	df = DataFrame(mapreduce(_read, vcat, fits), cols.keys, copycols = false)
-	df = unique!(@rsubset df :FIELDQUALITY ≡ "good")
+	df = mapreduce(_read, vcat, fits)
+	df = unique!(@chain df begin
+		@rsubset :FIELDQUALITY ≡ "good"
+		@select Not(:FIELDQUALITY)
+	end)
+	hdr = Header(size(df), fits)
+	mkpath.(("data", "temp"))
+	serialize("temp/df.dat", df)
+	serialize("temp/hdr.dat", hdr)
+	write("data/hdr.toml", toml(hdr))
+	# write("temp/df.tsv", df)
+	hdr, df
 end
+@assert hdr.dims == collect(size(df))
 # LDict(propertynames(df), eltype.(eachcol(df)))
 
 @info "Setting up dictionary for fieldIDs with each RM_field"
@@ -127,6 +179,7 @@ const programs_cats = @time @sync let
 	for (p, x) ∈ f_programs_dict
 		programs[p] = @eval OSet(sort!(@rsubset(df, $x).FIELD))
 	end
+	programs |> sort!
 	all_cats |> fetch
 end
 
@@ -153,7 +206,7 @@ end
 
 @info "Building dictionary for catalogIDs"
 
-const catalogIDs = @time @sync let
+const catalogIDs = @time @sync let cat_t = cols[:CATALOGID]
 	dict_of(ids::OSet{cols[:CATALOGID]}) = @chain df begin
 		@rselect :CATALOGID :FIELD_MJD = cat(:FIELD, :MJD, Val(5)) :RCHI2 :Z :ZWARNING
 		@rsubset! :CATALOGID ∈ ids
@@ -165,16 +218,18 @@ const catalogIDs = @time @sync let
 		LDict(_.ks, _.vs)
 	end
 	s_info("Processing ", length(programs_cats), " entries")
-	dict_of(programs_cats)
+	d = @try dict_of(programs_cats) LDict() # `programs_cats` might be empty
+	sort!(d, by = s -> @something tryparse(cat_t, s) s)
 end
 
 @info "Dumping dictionaries to file"
-write("dictionaries.txt",
-	"""
-	[
-		$(json(programs)),
-		$(json(fieldIDs)),
-		$(json(catalogIDs))
-	]
-	""")
+write("data/hdr.toml", toml(hdr))
+write("data/hdr.json", json(hdr, 4))
+write("data/all.json", json(LDict(:HDR => hdr,
+		:PRG => programs,
+		:FLD => fieldIDs,
+		:CAT => catalogIDs,
+	), ~0))
+true ? nothing :
+write("dictionaries.txt", json([programs, fieldIDs, catalogIDs, hdr], ~0))
 

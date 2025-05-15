@@ -21,6 +21,9 @@ Please install the following Python packages to use this tool.
 - requests
 - numpy
 
+For Python v3.10, you also need:
+- tomli
+
 > [!NOTE]
 > Python v3.10 or higher is required ([versions](https://devguide.python.org/versions/)).
 

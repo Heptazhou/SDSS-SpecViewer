@@ -29,6 +29,11 @@ from requests.exceptions import HTTPError
 
 from util import SDSSV_buildURL, link_central
 
+# https://docs.python.org/3/library/tomllib.html
+# https://peps.python.org/pep-0680/
+if sys.version_info < (3, 11): import tomli as tomllib
+if sys.version_info > (3, 11): import tomllib
+
 ###
 ### input the data directory path
 ###
@@ -108,7 +113,8 @@ def SDSSV_fetch(username: str, password: str, field: int | str, mjd: int, obj: i
 		for v in ("26", "104", "103") if branch == "legacy" \
 			else ("master", "v6_2_0", "v6_1_3"):
 			try: return SDSSV_fetch(username, password, field, mjd, obj, v)
-			except: continue
+			except HTTPError: pass
+			except Exception: print_exc()
 		raise HTTPError(f"[SDSSV_fetch] {(field, mjd, obj)}")
 	if not (field and mjd and obj):
 		raise HTTPError(f"[SDSSV_fetch] {(field, mjd, obj, branch)}")
