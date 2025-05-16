@@ -14,7 +14,7 @@ This is a demo for a multi-epoch spectral viewer for SDSSV-BHM using [plotly/das
 You **must** have the proper SDSS-V Proprietary Data username and password in the `authentication.txt` (created upon first run) to use this tool, the program will prompt you to input required authentication if the file does not exist yet. The code will immediately check the authentication upon start up.
 
 ### Dependencies
-Please install the following Python packages to use this tool.
+Please install the following Python packages to use this tool.  See the end of this file for a list of package versions with which SpecViewer is confirmed to work.
 - dash
 - plotly
 - astropy
@@ -73,6 +73,26 @@ PS: The filename(s) shall match the pattern `/\bspall\b.*\.fits(\.tmp)?$/i` and 
 - You can also select the x-axis and/or y-axis range by clicking and dragging; HOWEVER, this method does not update the Y-axis range or X-axis range buttons and your selection will be reset if the smoothing or redshift is changed.
 - Rest-frame wavelengths appear along the top of the plot and observed-frame wavelengths along the bottom of the plot.
 - Emission-line labels appear above the top of the plot, and their wavelengths are shown with solid vertical lines. Absorption-line labels appear at the bottom of the plot, and their wavelengths are shown with dotted vertical lines. In both cases, the wavelength(s) of the line(s) associated with that label are shown when the cursor hovers over the label.
+
+
+## Dependency package versions with which SpecViewer is Confirmed to work
+SpecViewer is confirmed to run bug-free with the following package versions for its dependencies:
+astropy                       6.0.0
+astropy-healpix               1.0.2
+astropy-iers-data             0.2024.1.1.0.33.39
+dash                          2.14.2
+dash-core-components          2.0.0
+dash-html-components          2.0.0
+dash-table                    5.0.0
+numpy                         1.26.4
+numpydoc                      1.5.0
+plotly                        5.9.0
+requests                      2.31.0
+requests-file                 1.5.1
+requests-toolbelt             1.0.0
+
+To generate a list of the above package versions on your (Unix) system, run:
+pip list | grep -E 'astropy|dash|numpy|plotly|plotly-stubs|requests|types-requests'
 
 
 ## Features to be added
