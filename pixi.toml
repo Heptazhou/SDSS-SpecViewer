@@ -9,13 +9,13 @@ sync = "git pull -ptr && pixi update"
 test = "pytest --rootdir util -v"
 
 [dependencies]
-astropy = ">=7.0.1,<8"
-dash = ">=3.0.4,<4"
-numpy = ">=2.2.5,<3"
-plotly = ">=6.0.1,<7"
+astropy = "=6.0.0"
+dash = "=2.17.0"
+numpy = "=1.26.4"
+plotly = "=5.22.0"
 pytest = ">=8.3.5,<9"
 python = ">=3.12.10,<3.14"
-requests = ">=2.32.3,<3"
+requests = "=2.31.0"
 types-requests = ">=2.32.0.20250306,<3"
 
 [pypi-dependencies]
