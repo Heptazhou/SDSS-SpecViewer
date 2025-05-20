@@ -104,9 +104,9 @@ def SDSSV_fetch(username: str, password: str, field: int | str, mjd: int, obj: i
 				branch = branch or "v5_13_2"
 	field, obj = str(field), str(obj) # ensure type
 
+	# Program will try all the branches below in the order listed
 	if not branch or branch == "legacy":
 		for v in ("26", "104", "103") if branch == "legacy" \
-			# Program will try all these branches in this order
 			else ("master", "v6_2_0", "v6_1_3", "v6_1_0"):
 			try: return SDSSV_fetch(username, password, field, mjd, obj, v)
 			except: continue
