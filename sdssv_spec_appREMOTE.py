@@ -106,7 +106,8 @@ def SDSSV_fetch(username: str, password: str, field: int | str, mjd: int, obj: i
 
 	if not branch or branch == "legacy":
 		for v in ("26", "104", "103") if branch == "legacy" \
-			else ("master", "v6_2_0", "v6_1_3"):
+			# Program will try all these branches in this order
+			else ("master", "v6_2_0", "v6_1_3", "v6_1_0"):
 			try: return SDSSV_fetch(username, password, field, mjd, obj, v)
 			except: continue
 		raise HTTPError(f"[SDSSV_fetch] {(field, mjd, obj)}")
