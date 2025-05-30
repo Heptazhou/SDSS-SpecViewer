@@ -474,6 +474,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 				"z": "pipeline redshift",
 				"p": "match program",
 				"s": "match sdss_id",
+				"l": "log mode (experimental)",
 				"e": "show error (σ)",
 				"u": "file uploader",
 			},
@@ -1153,6 +1154,13 @@ def make_multiepoch_spectra(field_d, cat_d, field_i, cat_i, extra_obj, redshift,
 		fig.update_layout(xaxis2_range=[x_min, x_max]) # this line is necessary for some reason
 
 		fig.update_layout(uirevision=f"{fieldid};{catalogid};{extra_obj}")
+
+		# logarithmic scale
+		if "l" in checklist:
+			fig.update_layout(xaxis1_type="log", xaxis2_type="log")
+			# fig.layout.xaxis.range = [math.log10(rest_x_min), math.log10(rest_x_max)]
+			fig.update_layout(xaxis1_range=[math.log10(rest_x_min), math.log10(rest_x_max)])
+			fig.update_layout(xaxis2_range=[math.log10(x_min), math.log10(x_max)])
 
 	except: print_exc()
 
