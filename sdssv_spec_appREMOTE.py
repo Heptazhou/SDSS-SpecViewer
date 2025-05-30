@@ -1066,12 +1066,14 @@ def make_multiepoch_spectra(field_d, cat_d, field_i, cat_i, extra_obj, redshift,
 		if y_max < y_min: y_min, y_max = y_max, y_min
 		if x_max < x_min: x_min, x_max = x_max, x_min
 		# changed following to explicitly be in rest frame (bottom x axis)
-		rest_x_max = math.ceil(x_max / (1 + z))
-		rest_x_min = math.floor(x_min / (1 + z))
+		rest_x_max = math.log10(math.ceil(x_max / (1 + z)))
+		rest_x_min = math.log10(math.floor(x_min / (1 + z)))
 
 		fig = Figure(layout=layout)
 		fig.layout.yaxis.range = [y_min, y_max]
 		fig.layout.xaxis.range = [rest_x_min, rest_x_max]
+
+		fig.update_xaxes(type="log")
 
 		# For each spectrum in the list
 		for i in range(len(names)):
