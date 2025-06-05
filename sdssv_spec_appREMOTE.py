@@ -267,10 +267,10 @@ def fetch_catID(field: int | str, catID: int | str, extra="", match_sdss_id=True
 	meta["ZWARNING"] = meta["ZWARNING"][-1]
 
 	# allplate
-	for mjd in mjd_list:
-		if mjd <= 59392:
+	for cat in cats:
+		for mjd in (x for x in mjd_list if x <= 59392):
 			try:
-				dat = SDSSV_fetch_allepoch(username, password, mjd, catID)
+				dat = SDSSV_fetch_allepoch(username, password, mjd, cat)
 			except Exception as e:
 				# if str(e): print(e) if isinstance(e, HTTPError) else print_exc()
 				continue
@@ -280,10 +280,10 @@ def fetch_catID(field: int | str, catID: int | str, extra="", match_sdss_id=True
 			errs.append(dat[3])
 			break
 	# allFPS
-	for mjd in mjd_list:
-		if mjd >= 59393:
+	for cat in cats:
+		for mjd in (x for x in mjd_list if x >= 59393):
 			try:
-				dat = SDSSV_fetch_allepoch(username, password, mjd, catID)
+				dat = SDSSV_fetch_allepoch(username, password, mjd, cat)
 			except Exception as e:
 				# if str(e): print(e) if isinstance(e, HTTPError) else print_exc()
 				continue
@@ -1173,7 +1173,7 @@ def make_multiepoch_spectra(field_d, cat_d, field_i, cat_i, extra_obj, redshift,
 			if (rest_x_min <= x and x <= rest_x_max):
 				if "l" in checklist: # Label now if logarithmic option is used
 					fig.add_annotation(x=math.log10(x), y=y_max, text=j, hovertext=f" {j} ({x} Å)", textangle=70)
-		
+
 		for l in spec_line_abs: # absorption
 			j, xs = l[3], l[2].split() # j is the label, xs is the wavelength list
 			# j, xs, n, b = l[3], l[2].split(), l[1], bool(l[0]) # j = label, xs = wavelength list, n = multiplicity, b = 0/1
