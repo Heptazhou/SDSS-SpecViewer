@@ -70,6 +70,8 @@ jobs:
         with:
           persist-credentials: false
       - uses: prefix-dev/setup-pixi@v0
+        with:
+          cache: false
       - run: pixi ls -x --color always
       - run: pixi run test --color yes
       - run: pixi update -n --color always
