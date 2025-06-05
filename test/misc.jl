@@ -22,9 +22,9 @@
 		@test isa(@show(err), SystemError) && err.errnum ≡ Libc.ENOENT
 
 		hdr = @invokelatest Header()
-		@test length(hdr.frmt) === 3
-		@test length(hdr.proj) === 40
-		@test VersionNumber(hdr.frmt...) === v"1.0"
+		@test length(hdr.frmt) ≡ 3
+		@test length(hdr.proj) ≡ 40
+		@test VersionNumber(hdr.frmt...) ≡ v"1.0"
 	end
 end
 

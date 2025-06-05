@@ -8,6 +8,11 @@ on:
       - "*"
     tags:
       - "*"
+    paths:
+      - ".github/workflows/CI.yml"
+      - "src/**"
+      - "test/**"
+      - "util/**"
 defaults:
   run:
     shell: bash
@@ -17,7 +22,6 @@ jobs:
   test:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
-    continue-on-error: ${{ matrix.experimental }}
     strategy:
       fail-fast: false
       matrix:
@@ -31,10 +35,6 @@ jobs:
           - "1"
           - "pre"
           - "nightly"
-        include:
-          # https://github.com/JuliaLang/julia/issues/58227
-          - { experimental: false }
-          - { experimental: true, julia-version: "pre" }
     steps:
       - uses: actions/checkout@v4
         with:
@@ -48,13 +48,10 @@ jobs:
           ignore-no-cache: true
           localregistry: https://github.com/0h7z/0hjl.git
       - uses: julia-actions/julia-runtest@v1
-        with:
-          coverage: ${{ !matrix.experimental }}
       - uses: heptazhou/julia-codecov@v1
       - uses: codecov/codecov-action@v3.1.5
         with:
           file: lcov.info
-        if: ${{ !matrix.experimental }}
   pixi:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30

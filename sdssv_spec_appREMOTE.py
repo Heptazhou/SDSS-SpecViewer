@@ -27,7 +27,7 @@ from numpy.typing import NDArray
 from plotly.graph_objects import Figure, Scatter
 from requests.exceptions import HTTPError
 
-from util import SDSSV_buildURL, link_central
+from util import SDSSV_buildURL, identity, link_central
 
 # https://docs.python.org/3/library/tomllib.html
 # https://peps.python.org/pep-0680/
@@ -474,7 +474,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 				"z": "pipeline redshift",
 				"p": "match program",
 				"s": "match sdss_id",
-				"l": "log mode (experimental)",
+				"l": "log10 x-axis",
 				"e": "show error (σ)",
 				"u": "file uploader",
 			},
@@ -1057,6 +1057,8 @@ def make_multiepoch_spectra(field_d, cat_d, field_i, cat_i, extra_obj, redshift,
                             checklist: list[str], user_data: dict):
 	layout_axis = dict(fixedrange=True)
 	layout = dict(yaxis=layout_axis, xaxis=layout_axis, xaxis2=layout_axis)
+	xscale, xtype = identity, "linear"
+	if "l" in checklist: xscale, xtype = math.log10, "log" # type: ignore
 
 	fieldid, catalogid = str(field_d or field_i), str(cat_d or cat_i)
 	smooth, z = int(smooth or smooth_default), float(redshift or redshift_default)
@@ -1103,7 +1105,7 @@ def make_multiepoch_spectra(field_d, cat_d, field_i, cat_i, extra_obj, redshift,
 
 		fig = Figure(layout=layout)
 		fig.layout.yaxis.range = [y_min, y_max]
-		fig.layout.xaxis.range = [rest_x_min, rest_x_max]
+		fig.layout.xaxis.range = [xscale(rest_x_min), xscale(rest_x_max)]
 
 		# For each spectrum in the list
 		for i in range(len(names)):
@@ -1124,15 +1126,14 @@ def make_multiepoch_spectra(field_d, cat_d, field_i, cat_i, extra_obj, redshift,
 				x=[x_min, x_max], y=[numpy.nan, numpy.nan], showlegend=False))
 		fig.data[1].xaxis = "x2" # assign the "ghost trace" to a new axis object
 
-		# Line labels for linear x-axis
+		# Line labels for x-axis
 		for l in spec_line_emi: # emission
 			j, x = l[2], l[1] # j is the label, x is the wavelength
 			if x not in list_emi: continue # skip if the wavelength is not in the active plotting dictionary
 			x = float(x)
 			if (rest_x_min <= x and x <= rest_x_max):
 				fig.add_vline(x=x, line_dash="solid", opacity=1 / 4)
-				if "l" not in checklist: # Label now only if logarithmic option NOT used
-					fig.add_annotation(x=x, y=y_max, text=j, hovertext=f" {j} ({x} Å)", textangle=70)
+				fig.add_annotation(x=xscale(x), y=y_max, text=j, hovertext=f" {j} ({x} Å)", textangle=70)
 
 		for l in spec_line_abs: # absorption
 			j, xs = l[3], l[2].split() # j is the label, xs is the wavelength list
@@ -1142,49 +1143,20 @@ def make_multiepoch_spectra(field_d, cat_d, field_i, cat_i, extra_obj, redshift,
 			for x in (xs := list(map(float, xs))): # for each wavelength in the wavelength list
 				if (rest_x_min <= x and x <= rest_x_max):
 					fig.add_vline(x=x, line_dash="dot", opacity=1 / 2)
-					if "l" not in checklist: # Label now only if logarithmic option NOT used
-						# label the first entry in the list of wavelengths
-						labeled or fig.add_annotation(x=x, y=y_min, text=j, hovertext=f" {j} ({xs} Å)", textangle=70)
-						labeled = True
+					# label the first entry in the list of wavelengths
+					labeled or fig.add_annotation(x=xscale(x), y=y_min, text=j, hovertext=f" {j} ({xs} Å)", textangle=70)
+					labeled = True
 
 		fig.update_layout( # Rest wavelengths on top axis; observed wavelengths on bottom axis
 			# The xaxis1 command just displays the rest-frame axis numbers and title.
-			xaxis1=dict(side="top", title_text="Rest-Frame Wavelength (Å)"),
+			xaxis1=dict(type=xtype, side="top", title_text="Rest-Frame Wavelength (Å)"),
 			# The xaxis2 command displays the DATA and the observed-frame axis title, but the numbers are already there.
-			xaxis2=dict(anchor="y", overlaying="x", title_text="Observed Wavelength (Å)"),
+			xaxis2=dict(type=xtype, anchor="y", overlaying="x", title_text="Observed Wavelength (Å)"),
 		)
 
-		fig.update_layout(xaxis2_range=[x_min, x_max]) # this line is necessary for some reason
+		fig.update_layout(xaxis2_range=[xscale(x_min), xscale(x_max)]) # this line is necessary for some reason
 
 		fig.update_layout(uirevision=f"{fieldid};{catalogid};{extra_obj}")
-
-		# logarithmic x-axis option
-		if "l" in checklist:
-			fig.update_layout(xaxis1_type="log", xaxis2_type="log")
-			# fig.layout.xaxis.range = [math.log10(rest_x_min), math.log10(rest_x_max)]
-			fig.update_layout(xaxis1_range=[math.log10(rest_x_min), math.log10(rest_x_max)])
-			fig.update_layout(xaxis2_range=[math.log10(x_min), math.log10(x_max)])
-
-		# Line labels for logarithmic x-axis
-		for l in spec_line_emi: # emission
-			j, x = l[2], l[1] # j is the label, x is the wavelength
-			if x not in list_emi: continue # skip if the wavelength is not in the active plotting dictionary
-			x = float(x)
-			if (rest_x_min <= x and x <= rest_x_max):
-				if "l" in checklist: # Label now if logarithmic option is used
-					fig.add_annotation(x=math.log10(x), y=y_max, text=j, hovertext=f" {j} ({x} Å)", textangle=70)
-
-		for l in spec_line_abs: # absorption
-			j, xs = l[3], l[2].split() # j is the label, xs is the wavelength list
-			# j, xs, n, b = l[3], l[2].split(), l[1], bool(l[0]) # j = label, xs = wavelength list, n = multiplicity, b = 0/1
-			labeled = False # reset labeling flag
-			if xs[0] not in list_abs: continue # skip if the transition is not in the active plotting dictionary
-			for x in (xs := list(map(float, xs))): # for each wavelength in the wavelength list
-				if (rest_x_min <= x and x <= rest_x_max):
-					if "l" in checklist: # Label now if logarithmic option is used
-						# label the first entry in the list of wavelengths
-						labeled or fig.add_annotation(x=math.log10(x), y=y_min, text=j, hovertext=f" {j} ({xs} Å)", textangle=70)
-						labeled = True
 
 	except: print_exc()
 
