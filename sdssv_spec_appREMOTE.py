@@ -27,7 +27,7 @@ from numpy.typing import NDArray
 from plotly.graph_objects import Figure, Scatter
 from requests.exceptions import HTTPError
 
-from util import SDSSV_buildURL, identity, link_central
+from util import SDSSV_buildURL, identity, object_links
 
 # https://docs.python.org/3/library/tomllib.html
 # https://peps.python.org/pep-0680/
@@ -120,7 +120,7 @@ def SDSSV_fetch(username: str, password: str, field: int | str, mjd: int, obj: i
 	# Program will try all the branches below in the order listed
 	if not branch or branch == "legacy":
 		for v in ("26", "104", "103") if branch == "legacy" \
-			else ("master", "v6_2_0", "v6_1_3", "v6_1_0"):
+			else ("master", "v6_2_1", "v6_2_0", "v6_1_3", "v6_1_0"):
 			try: return SDSSV_fetch(username, password, field, mjd, obj, v)
 			except HTTPError: pass
 			except Exception: print_exc()
@@ -328,7 +328,7 @@ try:
 	print("Try loading http://127.0.0.1:8050/?<field>-<mjd>-<catid>")
 	print("         or http://127.0.0.1:8050/?<field>-<mjd>-<catid>&prev=<plate>-<mjd>-<fiber>@<branch>")
 	print("       e.g. http://127.0.0.1:8050/?101126-60477-63050394846126565")
-	print("         or http://127.0.0.1:8050/?104623-60251-63050395075696130&prev=7670-57328-0918#m=5&y=0,16&z=2.66")
+	print("         or http://127.0.0.1:8050/?104623-60251-63050395075696130&prev=7670-57328-0918#m=5&x=3565,10350&y=0,18&z=2.66")
 	print("Change any setting after loading to reset redshift from z=0.")
 except:
 	print("Verification failed.")
@@ -997,10 +997,10 @@ def show_pipeline_redshift(field_d, cat_d, field_i, cat_i, checklist: list[str])
 	Input("redshift_sdss_dec", "value"),
 )
 def display_generated_links(ra: float, dec: float):
-	links = link_central(ra, dec)
+	links = object_links(ra, dec)
 	return [
 		html.Li(html.A(id, href=url, target="_blank"))
-		for id, url in [s.split(": ", 1) for s in links]
+		for id, url in (s.split(": ", 1) for s in links)
 	], (not links)
 
 @app.callback(
