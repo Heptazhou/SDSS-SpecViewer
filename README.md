@@ -1,8 +1,11 @@
 # SDSS SpecViewer
+[![CI status](https://github.com/Heptazhou/SDSS-SpecViewer/actions/workflows/CI.yml/badge.svg)](https://github.com/Heptazhou/SDSS-SpecViewer/actions/workflows/CI.yml)
+[![codecov.io](https://codecov.io/gh/Heptazhou/SDSS-SpecViewer/branch/master/graph/badge.svg)](https://app.codecov.io/gh/Heptazhou/SDSS-SpecViewer)
+
 authors: Dr. Jennifer Li (UIUC) and Meg Davis (UConn, <megan.c.davis@uconn.edu>), 2021 <br />
 authors: Pat Hall, Zezhou Zhu, and Kevin Welch (YorkU, <phall@yorku.ca>, <zzz@my.yorku.ca>), 2023-2025
 
-This is a demo for a multi-epoch spectral viewer for SDSSV-BHM using [plotly/dash](https://dash.plotly.com/). The ultimate goal is to build a web application that allows quick spectral visualization for SDSSV BHM data. The current version will access the data via url and it takes 1-2 seconds to load each spectra.
+This is a multi-epoch spectral viewer for SDSSV-BHM using [plotly/dash](https://dash.plotly.com/). The goal is to build a web application that allows quick spectral visualization for SDSSV BHM data. The current version will access the data via url and it takes a few seconds to load the spectra.
 
 **Usage**: Please see the Getting Started section, below, before launching the tool. To launch the web app, you run the script `sdssv_spec_appREMOTE.py` as a regular python file. The web app will be at <http://127.0.0.1:8050/>, which you can open with any web browser.
 
@@ -14,18 +17,25 @@ This is a demo for a multi-epoch spectral viewer for SDSSV-BHM using [plotly/das
 You **must** have the proper SDSS-V Proprietary Data username and password in the `authentication.txt` (created upon first run) to use this tool, the program will prompt you to input required authentication if the file does not exist yet. The code will immediately check the authentication upon start up.
 
 ### Dependencies
-Please install the following Python packages to use this tool.  See the end of this file for a list of package versions with which SpecViewer is confirmed to work.
-- dash
-- plotly
-- astropy
-- requests
-- numpy
+Please install the following Python packages to use this tool, with the minimum required versions shown as such. See also the file [`pixi.toml`](pixi.toml) for a list of package versions with which SpecViewer is always guaranteed to work.
+- astropy  >= 4.3.1
+- dash     >= 2.9.1
+- numpy    >= 1.21.4
+- plotly   >= 5.0.0
+- requests >= 2.23.0
 
 > [!NOTE]
-> Python v3.10 or higher is required ([versions](https://devguide.python.org/versions/)).
+> Python v3.10 or higher is required ([status of Python versions](https://devguide.python.org/versions/)).
 
 *****
-If you are using [conda](https://docs.conda.io/)/[mamba](https://mamba.readthedocs.io/), you may run (preferably, within a separate [environment](https://docs.conda.io/projects/conda/en/latest/user-guide/getting-started.html#creating-environments)):
+If you have [pixi](https://pixi.sh/latest/), you may simply do
+```shell
+pixi run main
+```
+to run the tool. Otherwise, see the following.
+
+*****
+If you are using [conda](https://docs.conda.io/) or [mamba](https://mamba.readthedocs.io/), you may run (preferably, within a separate [environment](https://docs.conda.io/projects/conda/en/latest/user-guide/getting-started.html#creating-environments)):
 ```shell
 conda install astropy dash numpy plotly requests types-requests
 ```
@@ -53,9 +63,9 @@ python sdssv_spec_appREMOTE.py
 
 ### Keeping up-to-date
 
-The `dictionaries.txt` file is the backbone to this tool. By running the `update_dictionaries.jl` file, it will look for FITS file(s) (e.g., `spAll-lite-master.fits`; note: `v6_1_1` or higher required) on your machine and update said dictionary file. Runtime with 1 input file was ~50s on AMD Zen 1, or ~30s on AMD Zen 3, FWIW. The file provided here is up-to-date for BHM targets ***for GOOD fields ONLY*** ~~as of 2024-04-30~~.
+The ~~`dictionaries.txt`~~ file is the backbone to this tool. By running the `update_dictionaries.jl` file, it will look for FITS file(s) (e.g., `spAll-lite-master.fits`; note: `v6_1_1` or higher required) on your machine and update said dictionary file. Runtime with 1 input file was ~50s on AMD Zen 1, or ~30s on AMD Zen 3, FWIW. The file provided here is up-to-date for BHM targets ***for GOOD fields ONLY*** ~~as of 2024-04-30~~.
 
-To update `dictionaries.txt`, install the latest version of [Julia](https://julialang.org/), and set environment variable `JULIA_NUM_THREADS=auto,auto` so you can omit the `-t auto` argument ([read more](https://docs.julialang.org/en/v1/manual/multi-threading/)).
+To update ~~`dictionaries.txt`~~, install the latest version of [Julia](https://julialang.org/), and set environment variable `JULIA_NUM_THREADS=auto,auto` so you can omit the `-t auto` argument ([read more](https://docs.julialang.org/en/v1/manual/multi-threading/)).
 
 Then, having the FITS files or archive files (each archive should contain only one FITS file, and would be used only if the filename to be extracted does not exist) accessible in the same directory (either hard copies or via symbolic links), run:
 ```shell
@@ -73,26 +83,6 @@ PS: The filename(s) shall match the pattern `/\bspall\b.*\.fits(\.tmp)?$/i` and 
 - You can also select the x-axis and/or y-axis range by clicking and dragging; HOWEVER, this method does not update the Y-axis range or X-axis range buttons and your selection will be reset if the smoothing or redshift is changed.
 - Rest-frame wavelengths appear along the top of the plot and observed-frame wavelengths along the bottom of the plot.
 - Emission-line labels appear above the top of the plot, and their wavelengths are shown with solid vertical lines. Absorption-line labels appear at the bottom of the plot, and their wavelengths are shown with dotted vertical lines. In both cases, the wavelength(s) of the line(s) associated with that label are shown when the cursor hovers over the label.
-
-
-## Dependency package versions with which SpecViewer is Confirmed to work
-SpecViewer is confirmed to run bug-free with the following package versions for its dependencies:
-astropy                       6.0.0
-astropy-healpix               1.0.2
-astropy-iers-data             0.2024.1.1.0.33.39
-dash                          2.14.2
-dash-core-components          2.0.0
-dash-html-components          2.0.0
-dash-table                    5.0.0
-numpy                         1.26.4
-numpydoc                      1.5.0
-plotly                        5.9.0
-requests                      2.31.0
-requests-file                 1.5.1
-requests-toolbelt             1.0.0
-
-To generate a list of the above package versions on your (Unix) system, run:
-pip list | grep -E 'astropy|dash|numpy|plotly|plotly-stubs|requests|types-requests'
 
 
 ## Features to be added
