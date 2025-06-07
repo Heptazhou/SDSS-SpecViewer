@@ -20,18 +20,16 @@ python = "~=3.10.18"
 requests = "<=2.23.0"
 types-requests = "*"
 
-# [tool.pixi.pypi-dependencies]
-# plotly-stubs = "*"
+[tool.pixi.pypi-dependencies]
+plotly-stubs = "*"
 
 [project]
 dependencies = [
 	"astropy",
 	"dash",
 	"numpy",
-	"plotly-stubs", # pypi
 	"plotly",
 	"requests",
-	"types-requests",
 ]
 name = "SpecViewer"
 requires-python = ">=3.10"

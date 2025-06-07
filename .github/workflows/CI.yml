@@ -73,4 +73,14 @@ jobs:
           cache: false
       - run: pixi ls -x --color always
       - run: pixi run test --color yes
-      - run: pixi update -n --color always
+      - run: pixi run lcov
+      - uses: codecov/codecov-action@v4
+        with:
+          file: util/lcov.info
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+      - run: |
+          rm pixi.toml
+          pixi ls -x --color always
+          pixi run test --color yes
+        if: ${{ matrix.os == 'ubuntu-latest' }}
