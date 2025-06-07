@@ -177,9 +177,10 @@ def fetch_catID(field: int | str, catID: int | str, extra="", match_sdss_id=True
 		raise Exception()    # so abort quietly
 	if not (extra or catID and field):
 		raise Exception((field, catID, extra))
-	field = str(field).replace(" ", "") if not match_sdss_id else "all"
+	field = str(field).replace(" ", "")
 	catID = str(catID).replace(" ", "")
 	extra = str(extra).replace(" ", "")
+	if match_sdss_id and not fullmatch(r"\d+p?-\d+", field): field = "all"
 	if (field, catID, extra, match_sdss_id) in cache:
 		return cache[(field, catID, extra, match_sdss_id)]
 

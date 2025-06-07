@@ -17,9 +17,9 @@ This is a multi-epoch spectral viewer for SDSSV-BHM using [plotly/dash](https://
 You **must** have the proper SDSS-V Proprietary Data username and password in the `authentication.txt` (created upon first run) to use this tool, the program will prompt you to input required authentication if the file does not exist yet. The code will immediately check the authentication upon start up.
 
 ### Dependencies
-Please install the following Python packages to use this tool, with the minimum required versions shown as such. See also the file [`pixi.toml`](pixi.toml) for a list of package versions with which SpecViewer is always guaranteed to work.
+Please install the following Python packages to use this tool, with the minimum required versions shown as such. See also the file [`pixi.toml`](pixi.toml) for a list of recommended package versions with which SpecViewer is guaranteed to work.
 - astropy  >= 4.3.1
-- dash     >= 2.9.1
+- dash     >= 2.13.0
 - numpy    >= 1.21.4
 - plotly   >= 5.0.0
 - requests >= 2.23.0

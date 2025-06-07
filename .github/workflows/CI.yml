@@ -1,5 +1,6 @@
 name: CI
 on:
+  workflow_dispatch: ~
   pull_request:
     branches:
       - "master"
@@ -10,6 +11,8 @@ on:
       - "*"
     paths:
       - ".github/workflows/CI.yml"
+      - "pixi.lock"
+      - "pixi.toml"
       - "src/**"
       - "test/**"
       - "util/**"
@@ -57,20 +60,33 @@ jobs:
   pixi:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
+    continue-on-error: ${{ matrix.pixi-manifest != 'pixi.toml' }}
     strategy:
       fail-fast: false
       matrix:
+        pixi-manifest: [pixi.toml]
         os:
           - windows-latest
           - ubuntu-latest
           - macos-latest
+        include:
+          - { pixi-manifest: pyproject.toml, os: ubuntu-latest }
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - run: rm pixi.{toml,lock}
+        if: ${{ matrix.pixi-manifest != 'pixi.toml' }}
       - uses: prefix-dev/setup-pixi@v0
         with:
           cache: false
       - run: pixi ls -x --color always
       - run: pixi run test --color yes
+      - run: pixi run lcov
+      - uses: codecov/codecov-action@v4
+        with:
+          file: util/lcov.info
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        if: ${{ matrix.pixi-manifest == 'pixi.toml' }}
       - run: pixi update -n --color always
