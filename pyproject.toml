@@ -8,6 +8,7 @@ lcov = "coverage run -m pytest -q && coverage lcov && coverage report"
 main = "python sdssv_spec_appREMOTE.py"
 sync = "git pull -ptr && pixi install"
 test = "pytest -v"
+updt = "julia --project update_pixi.jl"
 
 [tool.pixi.dependencies]
 astropy = "<=4.3.1"
@@ -23,6 +24,9 @@ types-requests = "*"
 [tool.pixi.pypi-dependencies]
 plotly-stubs = "*"
 
+[tool.pixi.pypi-options]
+no-build = true
+
 [project]
 dependencies = [
 	"astropy",
@@ -30,6 +34,7 @@ dependencies = [
 	"numpy",
 	"plotly",
 	"requests",
+	"setuptools<81",
 ]
 name = "SpecViewer"
 requires-python = ">=3.10"

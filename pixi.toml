@@ -8,6 +8,7 @@ lcov = "coverage run -m pytest -q && coverage lcov && coverage report"
 main = "python sdssv_spec_appREMOTE.py"
 sync = "git pull -ptr && pixi install"
 test = "pytest -v"
+updt = "julia --project update_pixi.jl"
 
 [dependencies]
 astropy = ">=7.1.0,<8"
@@ -22,3 +23,6 @@ types-requests = ">=2.32.0.20250602,<3"
 
 [pypi-dependencies]
 plotly-stubs = ">=0.0.5, <0.0.6"
+
+[pypi-options]
+no-build = true
