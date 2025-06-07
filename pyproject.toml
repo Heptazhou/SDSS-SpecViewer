@@ -1,3 +1,28 @@
+[tool.pixi.workspace]
+channels = ["conda-forge"]
+name = "SpecViewer"
+platforms = ["linux-64", "osx-64", "osx-arm64", "win-64"]
+
+[tool.pixi.tasks]
+lcov = "coverage run -m pytest -q && coverage lcov && coverage report"
+main = "python sdssv_spec_appREMOTE.py"
+sync = "git pull -ptr && pixi install"
+test = "pytest -v"
+
+[tool.pixi.dependencies]
+astropy = "<=4.3.1"
+coverage = "*"
+dash = "<=2.9.1"
+numpy = "<=1.21.4"
+plotly = "<=5.0.0"
+pytest = "*"
+python = "~=3.10.18"
+requests = "<=2.23.0"
+types-requests = "*"
+
+# [tool.pixi.pypi-dependencies]
+# plotly-stubs = "*"
+
 [project]
 dependencies = [
 	"astropy",
@@ -11,24 +36,13 @@ dependencies = [
 name = "SpecViewer"
 requires-python = ">=3.10"
 
-[tool.pixi.workspace]
-channels = ["conda-forge"]
-platforms = ["linux-64", "osx-64", "osx-arm64", "win-64"]
+[tool.coverage]
+# https://coverage.readthedocs.io/en/latest/
+lcov.output = "util/lcov.info"
+run.data_file = "util/__pycache__/.coverage"
+run.source = ["util"]
 
-[tool.pixi.tasks]
-main = "python sdssv_spec_appREMOTE.py"
-sync = "git pull -ptr && pixi install"
-test = "pytest --rootdir util -v"
-
-[tool.pixi.dependencies]
-astropy = "<=4.3.1"
-dash = "<=2.9.1"
-numpy = "<=1.21.4"
-plotly = "<=5.0.0"
-pytest = "*"
-python = "~=3.10.18"
-requests = "<=2.23.0"
-types-requests = "*"
-
-# [tool.pixi.pypi-dependencies]
-# plotly-stubs = "*"
+[tool.pytest.ini_options]
+# https://docs.pytest.org/en/stable/
+cache_dir = "util/__pycache__"
+testpaths = "util"
