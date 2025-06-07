@@ -43,6 +43,7 @@ requires-python = ">=3.10"
 [tool.coverage]
 # https://coverage.readthedocs.io/en/latest/
 lcov.output = "util/lcov.info"
+run.branch = true
 run.data_file = "util/__pycache__/.coverage"
 run.source = ["util"]
 

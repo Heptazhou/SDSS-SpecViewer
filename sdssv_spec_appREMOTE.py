@@ -120,7 +120,8 @@ def SDSSV_fetch(username: str, password: str, field: int | str, mjd: int, obj: i
 	# Program will try all the branches below in the order listed
 	if not branch or branch == "legacy":
 		for v in ("26", "104", "103") if branch == "legacy" \
-			else ("master", "v6_2_1", "v6_2_0", "v6_1_3", "v6_1_0"):
+			else ("master", "v6_2_1", "v6_2_0", "v6_1_3", "v6_0_9", "v6_1_0"):
+			# some objects seem to only exist in v6.1.0 so we have to keep it here :(
 			try: return SDSSV_fetch(username, password, field, mjd, obj, v)
 			except HTTPError: pass
 			except Exception: print_exc()
@@ -159,6 +160,8 @@ def SDSSV_fetch_allepoch(username: str, password: str, mjd: int, obj: int | str)
 	"""
 	if mjd >= 59187:
 		for x in ["allepoch_apo"] if mjd < 60000 else ["allepoch_apo", "allepoch_lco"]:
+			try: return SDSSV_fetch(username, password, x, mjd, obj, branch="v6_2_1")
+			except: pass
 			try: return SDSSV_fetch(username, password, x, mjd, obj, branch="v6_2_0")
 			except: pass
 		for x in ["allepoch"    ] if mjd < 60000 else ["allepoch", "allepoch_lco"    ]:
@@ -186,7 +189,7 @@ def fetch_catID(field: int | str, catID: int | str, extra="", match_sdss_id=True
 
 	name, wave, flux, errs = list[str](), list[NDArray](), list[NDArray](), list[NDArray]()
 
-	cats: list[int] = [int(catID)]
+	cats: list[int] = [int(catID)] if catID else []
 	meta: dict[str, list] = {
 		"DEC": [],
 		"RA": [],
@@ -261,11 +264,11 @@ def fetch_catID(field: int | str, catID: int | str, extra="", match_sdss_id=True
 		mjd_list.sort(reverse=True)
 	# print(mjd_list)
 
-	meta["DEC"     ] = meta["DEC"     ][-1]
-	meta["RA"      ] = meta["RA"      ][-1]
-	meta["RCHI2"   ] = meta["RCHI2"   ][-1]
-	meta["Z"       ] = meta["Z"       ][-1]
-	meta["ZWARNING"] = meta["ZWARNING"][-1]
+	meta["DEC"     ] = meta["DEC"     ][-1] if meta["DEC"     ] else None # type: ignore
+	meta["RA"      ] = meta["RA"      ][-1] if meta["RA"      ] else None # type: ignore
+	meta["RCHI2"   ] = meta["RCHI2"   ][-1] if meta["RCHI2"   ] else None # type: ignore
+	meta["Z"       ] = meta["Z"       ][-1] if meta["Z"       ] else None # type: ignore
+	meta["ZWARNING"] = meta["ZWARNING"][-1] if meta["ZWARNING"] else None # type: ignore
 
 	# allplate
 	for cat in cats:
@@ -297,7 +300,7 @@ def fetch_catID(field: int | str, catID: int | str, extra="", match_sdss_id=True
 		raise HTTPError(f"[fetch_catID] {(field, catID, extra)}")
 	r = meta, name, wave, flux, errs
 	cache[(field, catID, extra, match_sdss_id)] = r
-	return r
+	return r # type: ignore
 
 ###
 ### Authentication
@@ -319,6 +322,7 @@ finally:
 		io.write(f"{username}\n{password}\n")
 
 try:
+	# raise Exception()
 	print("Verifying authentication...")
 	# fetch_test = SDSSV_fetch(username, password, 15173, 59281, 4350951054)
 	# fetch_test = SDSSV_fetch(username, password, 112359, 60086, 27021600949438682)
@@ -332,11 +336,12 @@ try:
 	print("         or http://127.0.0.1:8050/?104623-60251-63050395075696130&prev=7670-57328-0918#m=5&x=3565,10350&y=0,18&z=2.66")
 	print("Change any setting after loading to reset redshift from z=0.")
 except:
+	username, password = "", ""
 	print("Verification failed.")
 	print("Please make sure you have internet access and/or fix authentication.txt.")
-	print("You may either edit the file to fix it, or simply delete it and rerun this program.")
+	print("You may either edit the file to fix it or simply delete it, and then rerun this program.")
 	# print("Contact Meg (megan.c.davis@uconn.edu) if the issue persists.")
-	exit(1)
+	# exit(1)
 
 
 
