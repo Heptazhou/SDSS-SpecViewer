@@ -99,4 +99,5 @@ def testset_work_master() -> None:
 	b = "master"
 	field, mjd, catid, fits = 15000, 59146, 4375786564, "spec-015000-59146-4375786564.fits"
 	assert func(field, mjd, catid, b) == "https://data.sdss5.org/sas/sdsswork/bhm/boss/spectro/redux/master/spectra/daily/lite/015XXX/015000/59146/" + fits
+	assert func(field, mjd, catid, b) == func(f"{field}p", mjd, catid, b)
 

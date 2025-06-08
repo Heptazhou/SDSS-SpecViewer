@@ -45,6 +45,7 @@ requires-python = ">=3.10"
 lcov.output = "util/lcov.info"
 run.branch = true
 run.data_file = "util/__pycache__/.coverage"
+run.omit = ["*_test.py"]
 run.source = ["util"]
 
 [tool.pytest.ini_options]
