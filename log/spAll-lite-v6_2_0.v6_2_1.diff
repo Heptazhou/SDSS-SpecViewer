@@ -1,0 +1,34 @@
+ spAll-lite-v6_2_0.txt => spAll-lite-v6_2_1.txt | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/spAll-lite-v6_2_0.txt b/spAll-lite-v6_2_1.txt
+index 5317561..4418c90 100644
+--- a/spAll-lite-v6_2_0.txt
++++ b/spAll-lite-v6_2_1.txt
+@@ -1,7 +1,7 @@
+-File: spAll-lite-v6_2_0.fits
++File: spAll-lite-v6_2_1.fits
+ HDU: 2 (name=SPALL)
+ Type: Table
+-Rows: 11403300
++Rows: 8017142
+ Columns: Name                 Size   Type     TFORM
+          AIRMASS                     Float32  E
+          ANYANDMASK                  Int64    K
+@@ -71,7 +71,7 @@ Columns: Name                 Size   Type     TFORM
+          RUN1D                       String   6A
+          RUN2D                       String   6A
+          SDSS_ID                     Int64    K
+-         SDSS5_TARGET_FLAGS   (71,)  UInt8    71B
++         SDSS5_TARGET_FLAGS   (69,)  UInt8    69B
+          SEEING20                    Float32  E
+          SEEING50                    Float32  E
+          SEEING80                    Float32  E
+@@ -98,6 +98,7 @@ Columns: Name                 Size   Type     TFORM
+          TARGET_INDEX                Int64    K
+          TFILE                       String   24A
+          TOO                         Int64    K
++         TOO_ID                      Int64    K
+          TWOMASS_MAG          (3,)   Float32  3E
+          VALID                       Int64    K
+          VDISP                       Float32  E

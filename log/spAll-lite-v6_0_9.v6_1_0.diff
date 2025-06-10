@@ -1,0 +1,87 @@
+ spAll-lite-v6_0_9.txt => spAll-lite-v6_1_0.txt | 29 ++++++++++----------------
+ 1 file changed, 11 insertions(+), 18 deletions(-)
+
+diff --git a/spAll-lite-v6_0_9.txt b/spAll-lite-v6_1_0.txt
+index f5c9e24..2aaf658 100644
+--- a/spAll-lite-v6_0_9.txt
++++ b/spAll-lite-v6_1_0.txt
+@@ -1,20 +1,20 @@
+-File: spAll-lite-v6_0_9.fits
++File: spAll-lite-v6_1_0.fits
+ HDU: 2
+ Type: Table
+-Rows: 1571090
++Rows: 3200646
+ Columns: Name                 Size  Type     TFORM
+          AIRMASS                    Float32  E
+          ANYANDMASK                 Int32    J
+          ANYORMASK                  Int32    J
+          ASSIGNED                   Int16    I
+-         CADENCE                    String   13A
++         CADENCE                    String   19A
+          CALIBFLUX            (5,)  Float32  5E
+          CALIBFLUX_IVAR       (5,)  Float32  5E
+          CARTON_TO_TARGET_PK        Int64    K
+          CATALOGID                  Int64    K
+          CATALOGID_V0               Int64    K
+          CATALOGID_V0P5             Int64    K
+-         CATALOGID_V1               Int64    K
++         CATDB_MAG            (5,)  Float32  5E
+          CHI68P                     Float32  E
+          CLASS                      String   6A
+          CLASS_NOQSO                String   6A
+@@ -23,18 +23,6 @@ Columns: Name                 Size  Type     TFORM
+          DOF                        Int32    J
+          EBV                        Float32  E
+          EBV_TYPE                   String   11A
+-         ELODIE_BV                  Float32  E
+-         ELODIE_DOF                 Int32    J
+-         ELODIE_FEH                 Float32  E
+-         ELODIE_FILENAME            String   16A
+-         ELODIE_LOGG                Float32  E
+-         ELODIE_OBJECT              String   9A
+-         ELODIE_RCHI2               Float32  E
+-         ELODIE_SPTYPE              String   12A
+-         ELODIE_TEFF                Float32  E
+-         ELODIE_Z                   Float32  E
+-         ELODIE_Z_ERR               Float32  E
+-         ELODIE_Z_MODELERR          Float32  E
+          EXP_DISP_MED               Float64  D
+          EXPTIME                    Int16    I
+          FIBER_DEC                  Float64  D
+@@ -47,6 +35,7 @@ Columns: Name                 Size  Type     TFORM
+          FIRSTCARTON                String   48A
+          GAIA_BP                    Float32  E
+          GAIA_G                     Float32  E
++         GAIA_ID_DR2                Int64    K
+          GAIA_RP                    Float32  E
+          GUVCAT_MAG           (2,)  Float32  2E
+          HEALPIX                    Int32    J
+@@ -58,14 +47,15 @@ Columns: Name                 Size  Type     TFORM
+          MOON_PHASE                 Float32  E
+          NEXP                       Int16    I
+          OBJTYPE                    String   16A
++         OBS                        String   3A
+          ON_TARGET                  Int16    I
++         OPTICAL_PROV               String   26A
+          PARALLAX                   Float32  E
+-         PLATE                      Int32    J
+          PLUG_DEC                   Float64  D
+          PLUG_RA                    Float64  D
+          PMDEC                      Float32  E
+          PMRA                       Float32  E
+-         PROGRAMNAME                String   13A
++         PROGRAMNAME                String   14A
+          PSFMAG               (5,)  Float32  5E
+          RACAT                      Float64  D
+          RCHI2                      Float32  E
+@@ -82,6 +72,9 @@ Columns: Name                 Size  Type     TFORM
+          SPEC1_G                    Float32  E
+          SPEC1_I                    Float32  E
+          SPEC1_R                    Float32  E
++         SPEC2_G                    Float32  E
++         SPEC2_I                    Float32  E
++         SPEC2_R                    Float32  E
+          SPECOBJID                  Int64    K
+          SPECTROFLUX          (5,)  Float32  5E
+          SPECTROFLUX_IVAR     (5,)  Float32  5E

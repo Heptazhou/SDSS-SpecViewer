@@ -3,11 +3,11 @@
 astropy = ">=7.1.0,<8"
 coverage = ">=7.8.2,<8"
 dash = ">=3.0.4,<4"
-numpy = ">=2.2.6,<3"
+numpy = ">=2.3.0,<3"
 plotly = ">=6.1.2,<7"
 pytest = ">=8.4.0,<9"
 python = ">=3.12.11,<3.14"
-requests = ">=2.32.3,<3"
+requests = ">=2.32.4,<3"
 types-requests = ">=2.32.0.20250602,<3"
 
 [pypi-dependencies]
@@ -19,7 +19,7 @@ no-build = true
 [tasks]
 lcov = "coverage run -m pytest -q && coverage lcov && coverage report"
 main = "python sdssv_spec_appREMOTE.py"
-sync = "git pull -ptr && pixi install"
+sync = "git pull -ptr && pixi install --frozen"
 test = "pytest -v"
 updt = "julia --startup-file=no --project update_pixi.jl"
 

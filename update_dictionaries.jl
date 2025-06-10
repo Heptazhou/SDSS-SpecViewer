@@ -31,6 +31,7 @@ using Dates: DateTime, Second, UTC, now, unix2datetime
 using Exts
 using FITSIO: FITS, colnames, fits_read_table_header
 using JSON5: JSON5, json
+using Mmap: mmap
 using Pkg: PlatformEngines
 using Serialization: deserialize, serialize
 using Zstd_jll: Zstd_jll
@@ -42,7 +43,9 @@ const projecthash() = @try Context().env.manifest.other["project_hash"] ""
 const s_info(xs...) = @info string(xs...)
 const u_sort! = unique! ∘ sort!
 const u_sorted(x) = issorted(x) & allunique(x)
-const zstdmt = `$(Zstd_jll.zstdmt().exec[1]) -1 --long --zstd=strat=7,tlen=4096`
+const zstdcat = `$(Zstd_jll.zstdmt().exec[1]) -dcf`;
+const zstdin = `$(Zstd_jll.zstdmt().exec[1]) -q -`;
+const zstdmt = `$(Zstd_jll.zstdmt().exec[1]) -1 --long --zstd=strat=7,tlen=4096`;
 
 @kwdef struct File
 	name::String
@@ -83,10 +86,20 @@ function deser_json(::Type{Header}, d::ODict)
 	Header(; d...)
 end
 
-@info "Looking for spAll files or archives (t = $(nthreads()))"
+function zstd_des(f::String)
+	deserialize(IOBuffer(read(`$zstdcat $f`)))
+end
+function zstd_ser(f::String, x)
+	io = IOBuffer()
+	serialize(io, x)
+	seekstart(io)
+	run(`$zstdin -o $f -f`, io)
+	close(io)
+end
+
+@info "Looking for spAll files or archives (t = $(nthreads()), v$VERSION)"
 
 # https://data.sdss.org/datamodel/files/BOSS_SPECTRO_REDUX/RUN2D/spAll.html
-# https://github.com/sciserver/sqlloader/blob/master/schema/sql/SpectroTables.sql
 # https://github.com/sdss/idlspec2d/blob/master/datamodel/spall_dm.par
 # https://www.sdss.org/dr18/data_access/bitmasks/
 const cols = ODict{Symbol, DataType}(
@@ -97,13 +110,10 @@ const cols = ODict{Symbol, DataType}(
 	:OBJTYPE      => String,  # Why this object was targetted; QSO=SCIENCE; see spZbest
 	:PROGRAMNAME  => String,  # Program name within a given survey
 	:SDSS_ID      => Int64,   # Unified SDSS-V Target Identifier; UInt32 / -999
-	:SPECPRIMARY  => Int64,   # Best version of spectrum at this location; Bool / -999; see platemerge.pro
 	:SURVEY       => String,  # Survey that field is part of
-	# :DECCAT       => Float64, # Catalog DEC in ICRS coordinates at coord_epoch
-	# :PRIMTARGET   => Int64,   # Primary target flags
-	# :RACAT        => Float64, # Catalog RA in ICRS coordinates at coord_epoch
 	# :RCHI2        => Float32, # Reduced χ² for best fit
 	# :SPECOBJID    => Int128,  # Unique ID from SDSSID, Field, MJD, Coadd, RUN2D; Int64 / String since v6.2
+	# :SPECPRIMARY  => Int64,   # Best version of spectrum at this location; Bool / -999; see platemerge.pro
 	# :Z            => Float32, # Redshift; assume incorrect if ZWARNING is nonzero
 	# :ZWARNING     => Int64,   # A flag for bad z fits in place of CLASS=UNKNOWN; see bitmasks
 )
@@ -129,44 +139,43 @@ const fits = let
 end
 # FITS(fits[end])["SPALL"]
 
-const df = @time let
+const df = @time let dir = rstrip(stdpath(@__DIR__, "temp"), '/')
 	function _read(fn::String)
-		r, f = nothing, File(fn)
-		if f == @try deser_json(File, "temp/$(f.name).json")
+		f = File(fn)
+		r = @try if f == deser_json(File, "$dir/$(f.name).json")
 			c = setdiff(cols.keys, [:FIELDQUALITY])
 			@info "Loading `$fn` from cache (try)"
-			r = deserialize("temp/$(f.name).dat")
-			r = c ⊈ propertynames(r) ? nothing : @select! r $c
+			r = zstd_des("$dir/$(f.name).dat.zst")
+			@select! r $c
 		end
 		if isnothing(r)
 			n = FITS(f -> get(f, "SPALL", 2).ext, fn)
 			s_info("Reading `$fn[$n]` for ", length(cols), " columns")
-			# see https://0h7z.com/Exts.jl/stable/FITSIO/#Base.read
-			v = FITS(f -> let all_cols = Symbol.(colnames(f[n]))
-					@assert all_cols ⊇ cols.keys "column(s) not exist: $(setdiff(cols.keys, all_cols))"
-					@time read(f[n], Vector, cols.keys)
-				end, fn)
-			r = @chain DataFrame(v, cols.keys, copycols = false) begin
-				@subset! :FIELDQUALITY .≡ "good" :CATALOGID .> 0
-				@rselect! Not(:FIELDQUALITY)
+			v = @time open(fn) do io
+				FITS(mmap(io)) do f
+					nx_cols = setdiff(cols.keys, Symbol.(colnames(f[n])))
+					@assert isempty(nx_cols) "column(s) not exist: $nx_cols"
+					map(col -> ensure_vector(read(f[n], String(col))), cols.keys)
+				end
 			end
-			serialize("temp/$(f.name).dat", r)
-			write("temp/$(f.name).json", json(f, 4))
+			r = @chain DataFrame(v, cols.keys, copycols = false) begin
+				@rsubset! :FIELDQUALITY ≡ "good" :CATALOGID > 0
+				@select! Not(:FIELDQUALITY)
+			end
+			zstd_ser("$dir/$(f.name).dat.zst", r)
+			write("$dir/$(f.name).json", json(f, 4))
 		end
-		# write("temp/$(f.name).tsv", r)
+		# write("$dir/$(f.name).tsv", r)
 		r
 	end
 	df = mapreduce(_read, vcat, fits)
-	df.SPECPRIMARY = Int16[df.SPECPRIMARY;]
 	replace!(df.SDSS_ID, -999 => 0)
-	replace!(df.SPECPRIMARY, -999 => 0)
-	@assert all(!signbit, df.SDSS_ID) &
-			all(!signbit, df.SPECPRIMARY)
+	@assert all(!signbit, df.SDSS_ID)
 	unique!(df)
-	# write("temp/df.tsv", df)
+	# write("$dir/df.tsv", df)
 	df
 end
-# ODict(propertynames(df), eltype.(eachcol(df)))
+# LDict(propertynames(df), eltype.(eachcol(df))) |> ODict
 
 @info "Setting up dictionary for fieldIDs with each RM_field"
 
@@ -272,22 +281,22 @@ end
 
 @info "Dumping dictionaries to file"
 
-@time let
+@time let dir = rstrip(stdpath(@__DIR__, "data"), '/')
 	data = [
 		:prg => dict_prg,
 		:fld => dict_fld,
 		:sid => dict_sid,
 		:cat => dict_cat,
 	]
-	meta = let old = deser_json(Header, "data/bhm.meta.json")
+	meta = let old = deser_json(Header, "$dir/bhm.meta.json")
 		row = ODict(k => length(v) for (k, v) ∈ data)
 		len = length(json(ODict(data), ~0))
 		new = Header(size(df), row, len, File.(fits))
 		new == old ? old : new
 	end
-	# foreach((k, v)::Pair -> write("temp/bhm-$k.json", json(v, ~0)), data)
-	write("data/bhm.meta.json", json(meta, 4))
-	write("data/bhm.json", json(ODict([:hdr => meta; data]), ~0))
-	run(`$zstdmt data/bhm.json -o data/bhm.json.zst -f`, devnull)
+	# foreach((k, v)::Pair -> write("$dir/bhm-$k.json", json(v, ~0)), data)
+	write("$dir/bhm.meta.json", json(meta, 4))
+	write("$dir/bhm.json", json(ODict([:hdr => meta; data]), ~0))
+	run(`$zstdmt $dir/bhm.json -o $dir/bhm.json.zst -f`, devnull)
 end
 

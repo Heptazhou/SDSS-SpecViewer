@@ -1,0 +1,140 @@
+ spAll-lite-v6_1_0.txt => spAll-lite-v6_1_1.txt | 65 ++++++++++++++------------
+ 1 file changed, 36 insertions(+), 29 deletions(-)
+
+diff --git a/spAll-lite-v6_1_0.txt b/spAll-lite-v6_1_1.txt
+index 2aaf658..82b12ee 100644
+--- a/spAll-lite-v6_1_0.txt
++++ b/spAll-lite-v6_1_1.txt
+@@ -1,16 +1,17 @@
+-File: spAll-lite-v6_1_0.fits
+-HDU: 2
++File: spAll-lite-v6_1_1.fits
++HDU: 2 (name=SPALL)
+ Type: Table
+-Rows: 3200646
++Rows: 2182889
+ Columns: Name                 Size   Type     TFORM
+          AIRMASS                     Float32  E
+-         ANYANDMASK                 Int32    J
+-         ANYORMASK                  Int32    J
+-         ASSIGNED                   Int16    I
+-         CADENCE                    String   19A
++         ANYANDMASK                  Int64    K
++         ANYORMASK                   Int64    K
++         ASSIGNED                    Int64    K
++         BOSS_SPECOBJ_ID             Int64    K
++         BP_MAG                      Float32  E
++         CADENCE                     String   13A
+          CALIBFLUX            (5,)   Float32  5E
+          CALIBFLUX_IVAR       (5,)   Float32  5E
+-         CARTON_TO_TARGET_PK        Int64    K
+          CATALOGID                   Int64    K
+          CATALOGID_V0                Int64    K
+          CATALOGID_V0P5              Int64    K
+@@ -20,49 +21,53 @@ Columns: Name                 Size  Type     TFORM
+          CLASS_NOQSO                 String   6A
+          COORD_EPOCH                 Float32  E
+          DECCAT                      Float64  D
+-         DOF                        Int32    J
++         DECOLLIDED                  Int64    K
++         DOF                         Int64    K
+          EBV                         Float32  E
+-         EBV_TYPE                   String   11A
++         EBV_TYPE                    String   14A
+          EXP_DISP_MED                Float64  D
+-         EXPTIME                    Int16    I
++         EXPTIME                     Float32  E
+          FIBER_DEC                   Float64  D
+-         FIBER_OFFSET               Float32  E
++         FIBER_OFFSET                Int64    K
+          FIBER_RA                    Float64  D
+          FIBER2MAG            (5,)   Float32  5E
+-         FIELD                      Int32    J
++         FIELD                       Int64    K
+          FIELDQUALITY                String   4A
+          FIELDSN2                    Float32  E
+          FIRSTCARTON                 String   48A
+-         GAIA_BP                    Float32  E
+-         GAIA_G                     Float32  E
+-         GAIA_ID_DR2                Int64    K
+-         GAIA_RP                    Float32  E
++         GAIA_G_MAG                  Float32  E
++         GAIA_ID                     Int64    K
+          GUVCAT_MAG           (2,)   Float32  2E
+-         HEALPIX                    Int32    J
+-         HEALPIXGRP                 Int16    I
++         HEALPIX                     Int64    K
++         HEALPIXGRP                  Int64    K
+          LAMBDA_EFF                  Float32  E
+-         MJD                        Int32    J
++         MAG                  (5,)   Float32  5E
++         MJD                         Int64    K
+          MJD_FINAL                   Float64  D
+          MOON_DIST                   Float32  E
+          MOON_PHASE                  Float32  E
+-         NEXP                       Int16    I
++         NEXP                        Int64    K
++         NSPECOBS                    Int64    K
+          OBJTYPE                     String   16A
+          OBS                         String   3A
+-         ON_TARGET                  Int16    I
++         ON_TARGET                   Int64    K
+          OPTICAL_PROV                String   26A
+          PARALLAX                    Float32  E
+          PLUG_DEC                    Float64  D
+          PLUG_RA                     Float64  D
+          PMDEC                       Float32  E
+          PMRA                        Float32  E
+-         PROGRAMNAME                String   14A
++         PROGRAMNAME                 String   13A
+          PSFMAG               (5,)   Float32  5E
+          RACAT                       Float64  D
+          RCHI2                       Float32  E
+          RCHI2DIFF                   Float32  E
+          RCHI2DIFF_NOQSO             Float32  E
++         RP_MAG                      Float32  E
+          RUN1D                       String   6A
+          RUN2D                       String   6A
++         SDSS_ID                     Int64    K
++         SDSS5_TARGET_FLAGS   (57,)  UInt8    57B
+          SEEING20                    Float32  E
+          SEEING50                    Float32  E
+          SEEING80                    Float32  E
+@@ -75,7 +80,9 @@ Columns: Name                 Size  Type     TFORM
+          SPEC2_G                     Float32  E
+          SPEC2_I                     Float32  E
+          SPEC2_R                     Float32  E
++         SPECBOSS                    Int64    K
+          SPECOBJID                   Int64    K
++         SPECPRIMARY                 Int64    K
+          SPECTROFLUX          (5,)   Float32  5E
+          SPECTROFLUX_IVAR     (5,)   Float32  5E
+          SPECTROSKYFLUX       (5,)   Float32  5E
+@@ -84,14 +91,14 @@ Columns: Name                 Size  Type     TFORM
+          SUBCLASS                    String   21A
+          SUBCLASS_NOQSO              String   21A
+          SURVEY                      String   13A
+-         TARGET_INDEX               Int32    J
++         TARGET_INDEX                Int64    K
+          TFILE                       String   24A
+          TWOMASS_MAG          (3,)   Float32  3E
+-         VALID                      Int16    I
++         VALID                       Int64    K
+          VDISP                       Float32  E
+          VDISP_ERR                   Float32  E
+          VDISPCHI2                   Float32  E
+-         VDISPDOF                   Int32    J
++         VDISPDOF                    Int64    K
+          VDISPNPIX                   Float32  E
+          VDISPZ                      Float32  E
+          VDISPZ_ERR                  Float32  E
+@@ -112,6 +119,6 @@ Columns: Name                 Size  Type     TFORM
+          Z_ERR                       Float32  E
+          Z_ERR_NOQSO                 Float32  E
+          Z_NOQSO                     Float32  E
+-         ZNUM_NOQSO                 Int32    J
+-         ZWARNING                   Int32    J
+-         ZWARNING_NOQSO             Int32    J
++         ZNUM_NOQSO                  Int64    K
++         ZWARNING                    Int64    K
++         ZWARNING_NOQSO              Int64    K

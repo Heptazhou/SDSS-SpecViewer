@@ -1,0 +1,60 @@
+ spAll-lite-v6_1_3.txt => spAll-lite-v6_2_0.txt | 12 +++++++-----
+ 1 file changed, 7 insertions(+), 5 deletions(-)
+
+diff --git a/spAll-lite-v6_1_3.txt b/spAll-lite-v6_2_0.txt
+index 158c6d6..5317561 100644
+--- a/spAll-lite-v6_1_3.txt
++++ b/spAll-lite-v6_2_0.txt
+@@ -1,7 +1,7 @@
+-File: spAll-lite-v6_1_3.fits
++File: spAll-lite-v6_2_0.fits
+ HDU: 2 (name=SPALL)
+ Type: Table
+-Rows: 5816242
++Rows: 11403300
+ Columns: Name                 Size   Type     TFORM
+          AIRMASS                     Float32  E
+          ANYANDMASK                  Int64    K
+@@ -15,6 +15,7 @@ Columns: Name                 Size   Type     TFORM
+          CATALOGID                   Int64    K
+          CATALOGID_V0                Int64    K
+          CATALOGID_V0P5              Int64    K
++         CATALOGID_V1                Int64    K
+          CATDB_MAG            (5,)   Float32  5E
+          CHI68P                      Float32  E
+          CLASS                       String   6A
+@@ -36,7 +37,7 @@ Columns: Name                 Size   Type     TFORM
+          FIELD                       Int64    K
+          FIELDQUALITY                String   4A
+          FIELDSN2                    Float32  E
+-         FIRSTCARTON                 String   48A
++         FIRSTCARTON                 String   54A
+          GAIA_G_MAG                  Float32  E
+          GAIA_ID                     Int64    K
+          GRI_GAIA_TRANSFORM          Int64    K
+@@ -70,7 +71,7 @@ Columns: Name                 Size   Type     TFORM
+          RUN1D                       String   6A
+          RUN2D                       String   6A
+          SDSS_ID                     Int64    K
+-         SDSS5_TARGET_FLAGS   (57,)  UInt8    57B
++         SDSS5_TARGET_FLAGS   (71,)  UInt8    71B
+          SEEING20                    Float32  E
+          SEEING50                    Float32  E
+          SEEING80                    Float32  E
+@@ -84,7 +85,7 @@ Columns: Name                 Size   Type     TFORM
+          SPEC2_I                     Float32  E
+          SPEC2_R                     Float32  E
+          SPECBOSS                    Int64    K
+-         SPECOBJID                   Int64    K
++         SPECOBJID                   String   29A
+          SPECPRIMARY                 Int64    K
+          SPECTROFLUX          (5,)   Float32  5E
+          SPECTROFLUX_IVAR     (5,)   Float32  5E
+@@ -96,6 +97,7 @@ Columns: Name                 Size   Type     TFORM
+          SURVEY                      String   13A
+          TARGET_INDEX                Int64    K
+          TFILE                       String   24A
++         TOO                         Int64    K
+          TWOMASS_MAG          (3,)   Float32  3E
+          VALID                       Int64    K
+          VDISP                       Float32  E

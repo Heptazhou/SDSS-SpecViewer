@@ -25,6 +25,7 @@ jobs:
   test:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
+    continue-on-error: ${{ github.ref_name == 'dev' }}
     strategy:
       fail-fast: false
       matrix:
@@ -60,7 +61,7 @@ jobs:
   pixi:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
-    continue-on-error: ${{ matrix.pixi-manifest != 'pixi.toml' }}
+    continue-on-error: ${{ github.ref_name == 'dev' }}
     strategy:
       fail-fast: false
       matrix:

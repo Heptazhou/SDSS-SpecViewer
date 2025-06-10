@@ -1,0 +1,52 @@
+ spAll-lite-v6_1_1.txt => spAll-lite-v6_1_2.txt | 11 +++++++----
+ 1 file changed, 7 insertions(+), 4 deletions(-)
+
+diff --git a/spAll-lite-v6_1_1.txt b/spAll-lite-v6_1_2.txt
+index 82b12ee..6085bf5 100644
+--- a/spAll-lite-v6_1_1.txt
++++ b/spAll-lite-v6_1_2.txt
+@@ -1,7 +1,7 @@
+-File: spAll-lite-v6_1_1.fits
++File: spAll-lite-v6_1_2.fits
+ HDU: 2 (name=SPALL)
+ Type: Table
+-Rows: 2182889
++Rows: 4757284
+ Columns: Name                 Size   Type     TFORM
+          AIRMASS                     Float32  E
+          ANYANDMASK                  Int64    K
+@@ -9,7 +9,7 @@ Columns: Name                 Size   Type     TFORM
+          ASSIGNED                    Int64    K
+          BOSS_SPECOBJ_ID             Int64    K
+          BP_MAG                      Float32  E
+-         CADENCE                     String   13A
++         CADENCE                     String   19A
+          CALIBFLUX            (5,)   Float32  5E
+          CALIBFLUX_IVAR       (5,)   Float32  5E
+          CATALOGID                   Int64    K
+@@ -22,6 +22,8 @@ Columns: Name                 Size   Type     TFORM
+          COORD_EPOCH                 Float32  E
+          DECCAT                      Float64  D
+          DECOLLIDED                  Int64    K
++         DELTA_DEC                   Float32  E
++         DELTA_RA                    Float32  E
+          DOF                         Int64    K
+          EBV                         Float32  E
+          EBV_TYPE                    String   14A
+@@ -37,6 +39,7 @@ Columns: Name                 Size   Type     TFORM
+          FIRSTCARTON                 String   48A
+          GAIA_G_MAG                  Float32  E
+          GAIA_ID                     Int64    K
++         GRI_GAIA_TRANSFORM          Int64    K
+          GUVCAT_MAG           (2,)   Float32  2E
+          HEALPIX                     Int64    K
+          HEALPIXGRP                  Int64    K
+@@ -57,7 +60,7 @@ Columns: Name                 Size   Type     TFORM
+          PLUG_RA                     Float64  D
+          PMDEC                       Float32  E
+          PMRA                        Float32  E
+-         PROGRAMNAME                 String   13A
++         PROGRAMNAME                 String   14A
+          PSFMAG               (5,)   Float32  5E
+          RACAT                       Float64  D
+          RCHI2                       Float32  E

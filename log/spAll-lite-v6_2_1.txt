@@ -1,0 +1,130 @@
+File: spAll-lite-v6_2_1.fits
+HDU: 2 (name=SPALL)
+Type: Table
+Rows: 8017142
+Columns: Name                 Size   Type     TFORM
+         AIRMASS                     Float32  E
+         ANYANDMASK                  Int64    K
+         ANYORMASK                   Int64    K
+         ASSIGNED                    Int64    K
+         BOSS_SPECOBJ_ID             Int64    K
+         BP_MAG                      Float32  E
+         CADENCE                     String   19A
+         CALIBFLUX            (5,)   Float32  5E
+         CALIBFLUX_IVAR       (5,)   Float32  5E
+         CATALOGID                   Int64    K
+         CATALOGID_V0                Int64    K
+         CATALOGID_V0P5              Int64    K
+         CATALOGID_V1                Int64    K
+         CATDB_MAG            (5,)   Float32  5E
+         CHI68P                      Float32  E
+         CLASS                       String   6A
+         CLASS_NOQSO                 String   6A
+         COORD_EPOCH                 Float32  E
+         DECCAT                      Float64  D
+         DECOLLIDED                  Int64    K
+         DELTA_DEC                   Float32  E
+         DELTA_RA                    Float32  E
+         DOF                         Int64    K
+         EBV                         Float32  E
+         EBV_TYPE                    String   14A
+         EXP_DISP_MED                Float64  D
+         EXPTIME                     Float32  E
+         FIBER_DEC                   Float64  D
+         FIBER_OFFSET                Int64    K
+         FIBER_RA                    Float64  D
+         FIBER2MAG            (5,)   Float32  5E
+         FIELD                       Int64    K
+         FIELDQUALITY                String   4A
+         FIELDSN2                    Float32  E
+         FIRSTCARTON                 String   54A
+         GAIA_G_MAG                  Float32  E
+         GAIA_ID                     Int64    K
+         GRI_GAIA_TRANSFORM          Int64    K
+         GUVCAT_MAG           (2,)   Float32  2E
+         HEALPIX                     Int64    K
+         HEALPIXGRP                  Int64    K
+         LAMBDA_EFF                  Float32  E
+         MAG                  (5,)   Float32  5E
+         MJD                         Int64    K
+         MJD_FINAL                   Float64  D
+         MOON_DIST                   Float32  E
+         MOON_PHASE                  Float32  E
+         NEXP                        Int64    K
+         NSPECOBS                    Int64    K
+         OBJTYPE                     String   16A
+         OBS                         String   3A
+         ON_TARGET                   Int64    K
+         OPTICAL_PROV                String   26A
+         PARALLAX                    Float32  E
+         PLUG_DEC                    Float64  D
+         PLUG_RA                     Float64  D
+         PMDEC                       Float32  E
+         PMRA                        Float32  E
+         PROGRAMNAME                 String   14A
+         PSFMAG               (5,)   Float32  5E
+         RACAT                       Float64  D
+         RCHI2                       Float32  E
+         RCHI2DIFF                   Float32  E
+         RCHI2DIFF_NOQSO             Float32  E
+         RP_MAG                      Float32  E
+         RUN1D                       String   6A
+         RUN2D                       String   6A
+         SDSS_ID                     Int64    K
+         SDSS5_TARGET_FLAGS   (69,)  UInt8    69B
+         SEEING20                    Float32  E
+         SEEING50                    Float32  E
+         SEEING80                    Float32  E
+         SN_MEDIAN            (5,)   Float32  5E
+         SN_MEDIAN_ALL               Float32  E
+         SPEC_FILE                   String   42A
+         SPEC1_G                     Float32  E
+         SPEC1_I                     Float32  E
+         SPEC1_R                     Float32  E
+         SPEC2_G                     Float32  E
+         SPEC2_I                     Float32  E
+         SPEC2_R                     Float32  E
+         SPECBOSS                    Int64    K
+         SPECOBJID                   String   29A
+         SPECPRIMARY                 Int64    K
+         SPECTROFLUX          (5,)   Float32  5E
+         SPECTROFLUX_IVAR     (5,)   Float32  5E
+         SPECTROSKYFLUX       (5,)   Float32  5E
+         SPECTROSYNFLUX       (5,)   Float32  5E
+         SPECTROSYNFLUX_IVAR  (5,)   Float32  5E
+         SUBCLASS                    String   21A
+         SUBCLASS_NOQSO              String   21A
+         SURVEY                      String   13A
+         TARGET_INDEX                Int64    K
+         TFILE                       String   24A
+         TOO                         Int64    K
+         TOO_ID                      Int64    K
+         TWOMASS_MAG          (3,)   Float32  3E
+         VALID                       Int64    K
+         VDISP                       Float32  E
+         VDISP_ERR                   Float32  E
+         VDISPCHI2                   Float32  E
+         VDISPDOF                    Int64    K
+         VDISPNPIX                   Float32  E
+         VDISPZ                      Float32  E
+         VDISPZ_ERR                  Float32  E
+         WAVEMAX                     Float32  E
+         WAVEMIN                     Float32  E
+         WCOVERAGE                   Float32  E
+         WISE_MAG             (4,)   Float32  4E
+         XCSAO_EFEH                  Float32  E
+         XCSAO_ELOGG                 Float32  E
+         XCSAO_ERV                   Float32  E
+         XCSAO_ETEFF                 Float32  E
+         XCSAO_FEH                   Float32  E
+         XCSAO_LOGG                  Float32  E
+         XCSAO_RV                    Float32  E
+         XCSAO_RXC                   Float32  E
+         XCSAO_TEFF                  Float32  E
+         Z                           Float32  E
+         Z_ERR                       Float32  E
+         Z_ERR_NOQSO                 Float32  E
+         Z_NOQSO                     Float32  E
+         ZNUM_NOQSO                  Int64    K
+         ZWARNING                    Int64    K
+         ZWARNING_NOQSO              Int64    K

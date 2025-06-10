@@ -18,19 +18,10 @@
 end
 
 using Exts
-using Exts: Jl, with_temp_env
+using Exts: with_temp_env
 using Pkg: Pkg
-using PythonCall: pyimport
 using Test
 
 include("misc.jl")
 include("sdss.jl")
-
-foreach(_ -> GC.gc(), 1:5)
-const py_sys = let sys = pyimport("sys")
-	sys.path.append(stdpath(@__DIR__, ".."))
-	sys
-end
-const py_util = pyimport("util")
-include("util.jl")
 

@@ -1,0 +1,17 @@
+ spAll-lite-v6_1_2.txt => spAll-lite-v6_1_3.txt | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/spAll-lite-v6_1_2.txt b/spAll-lite-v6_1_3.txt
+index 6085bf5..158c6d6 100644
+--- a/spAll-lite-v6_1_2.txt
++++ b/spAll-lite-v6_1_3.txt
+@@ -1,7 +1,7 @@
+-File: spAll-lite-v6_1_2.fits
++File: spAll-lite-v6_1_3.fits
+ HDU: 2 (name=SPALL)
+ Type: Table
+-Rows: 4757284
++Rows: 5816242
+ Columns: Name                 Size   Type     TFORM
+          AIRMASS                     Float32  E
+          ANYANDMASK                  Int64    K
