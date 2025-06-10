@@ -29,7 +29,7 @@ end
 using DataFramesMeta
 using Dates: DateTime, Second, UTC, now, unix2datetime
 using Exts
-using FITSIO: FITS, colnames, fits_read_table_header
+using FITSIO: FITS, colnames, read_header
 using JSON5: JSON5, json
 using Mmap: mmap
 using Pkg: PlatformEngines
@@ -38,7 +38,7 @@ using Zstd_jll: Zstd_jll
 
 const dropfirst(v) = @view v[2:end]
 const exe_7z = @try PlatformEngines.find7z() PlatformEngines.exe7z().exec[1]
-const hdu2_nrow(fn) = FITS(f -> fits_read_table_header(get(f, "SPALL", 2), 0)[1], fn)
+const hdu2_nrow(fn) = FITS(f -> read_header(get(f, "SPALL", 2))["NAXIS2"], fn)
 const projecthash() = @try Context().env.manifest.other["project_hash"] ""
 const s_info(xs...) = @info string(xs...)
 const u_sort! = unique! ∘ sort!
@@ -66,7 +66,7 @@ File(path) = File((basename, hdu2_nrow, filesize, unix2datetime ∘ mtime)(path)
 end
 Header(dims, nrow, size, source) = Header(; dims, nrow, size, source)
 
-Base.:(==)(a::Header, b::Header) = all((i -> @eval $a.$i==$b.$i), setdiff(fieldnames(Header), [:date]))
+Base.:(==)(a::Header, b::Header) = all((i -> @eval $a.$i == $b.$i), setdiff(fieldnames(Header), [:date]))
 Base.cat(x::Integer, y::Integer, ::Val{5}) = flipsign((10^5)abs(x) + mod(y, 10^5), x)
 Base.isless(::Any, ::Union{Number, VersionNumber}) = (@nospecialize; Bool(0))
 Base.isless(::Union{Number, VersionNumber}, ::Any) = (@nospecialize; Bool(1))
@@ -105,7 +105,7 @@ end
 const cols = ODict{Symbol, DataType}(
 	:CATALOGID    => Int64,   # SDSS-V CatalogID
 	:FIELD        => Int64,   # Field number
-	:FIELDQUALITY => String,  # Characterization of field quality ("good" | "bad")
+	:FIELDQUALITY => String,  # Characterization of field quality ("good" | "bad"); was :PLATEQUALITY
 	:MJD          => Int64,   # Modified Julian date of combined Spectra
 	:OBJTYPE      => String,  # Why this object was targetted; QSO=SCIENCE; see spZbest
 	:PROGRAMNAME  => String,  # Program name within a given survey
@@ -113,8 +113,8 @@ const cols = ODict{Symbol, DataType}(
 	:SURVEY       => String,  # Survey that field is part of
 	# :RCHI2        => Float32, # Reduced χ² for best fit
 	# :SPECOBJID    => Int128,  # Unique ID from SDSSID, Field, MJD, Coadd, RUN2D; Int64 / String since v6.2
-	# :SPECPRIMARY  => Int64,   # Best version of spectrum at this location; Bool / -999; see platemerge.pro
-	# :Z            => Float32, # Redshift; assume incorrect if ZWARNING is nonzero
+	# :SPECPRIMARY  => UInt8,   # Best version of spectrum at this location; Bool / -999; see platemerge.pro
+	# :Z            => Float32, # Redshift; assume incorrect if :ZWARNING is nonzero
 	# :ZWARNING     => Int64,   # A flag for bad z fits in place of CLASS=UNKNOWN; see bitmasks
 )
 const fits = let
@@ -189,21 +189,21 @@ const dict_prg = ODict{String, OSet{cols[:FIELD]}}(
 
 const programs_cats = @time let
 	f_programs_dict = ODict{String, Expr}(
-		"eFEDS1"       => :(:SURVEY≡"BHM"&&:OBJTYPE≡"QSO"&&:PROGRAMNAME≡"eFEDS1"),
-		"eFEDS2"       => :(:SURVEY≡"BHM"&&:OBJTYPE≡"QSO"&&:PROGRAMNAME≡"eFEDS2"),
-		"eFEDS3"       => :(:SURVEY≡"BHM"&&:OBJTYPE≡"QSO"&&:PROGRAMNAME≡"eFEDS3"),
-		"MWM3"         => :(:SURVEY≡"BHM"&&:OBJTYPE≡"QSO"&&:PROGRAMNAME≡"MWM3"),
-		"MWM4"         => :(:SURVEY≡"BHM"&&:OBJTYPE≡"QSO"&&:PROGRAMNAME≡"MWM4"),
-		"AQMES-Bonus"  => :(:SURVEY≡"BHM"&&:OBJTYPE≡"QSO"&&:PROGRAMNAME≡"AQMES-Bonus"),
-		"AQMES-Wide"   => :(:SURVEY≡"BHM"&&:OBJTYPE≡"QSO"&&:PROGRAMNAME≡"AQMES-Wide"),
-		"AQMES-Medium" => :(:SURVEY≡"BHM"&&:OBJTYPE≡"QSO"&&:PROGRAMNAME≡"AQMES-Medium"),
-		"RM-Plates"    => :(:SURVEY≡"BHM"&&:OBJTYPE≡"QSO"&&:PROGRAMNAME∈("RM", "RMv2", "RMv2-fewMWM")),
-		"RM-Fibers"    => :(:SURVEY≡"BHM"&&:OBJTYPE≡"science"&&:PROGRAMNAME≡"bhm_rm"),
-		"bhm_aqmes"    => :(:SURVEY≡"BHM"&&:OBJTYPE≡"science"&&:PROGRAMNAME≡"bhm_aqmes"),
-		"bhm_csc"      => :(:SURVEY≡"BHM"&&:OBJTYPE≡"science"&&:PROGRAMNAME≡"bhm_csc"),
-		"bhm_filler"   => :(:SURVEY≡"BHM"&&:OBJTYPE≡"science"&&:PROGRAMNAME≡"bhm_filler"),
-		"bhm_spiders"  => :(:SURVEY≡"BHM"&&:OBJTYPE≡"science"&&:PROGRAMNAME≡"bhm_spiders"),
-		"open_fiber"   => :(:SURVEY≡"open_fiber"&&:OBJTYPE≡"science"&&:PROGRAMNAME≡"open_fiber"),
+		"eFEDS1"       => :(:SURVEY ≡ "BHM" && :OBJTYPE ≡ "QSO" && :PROGRAMNAME ≡ "eFEDS1"),
+		"eFEDS2"       => :(:SURVEY ≡ "BHM" && :OBJTYPE ≡ "QSO" && :PROGRAMNAME ≡ "eFEDS2"),
+		"eFEDS3"       => :(:SURVEY ≡ "BHM" && :OBJTYPE ≡ "QSO" && :PROGRAMNAME ≡ "eFEDS3"),
+		"MWM3"         => :(:SURVEY ≡ "BHM" && :OBJTYPE ≡ "QSO" && :PROGRAMNAME ≡ "MWM3"),
+		"MWM4"         => :(:SURVEY ≡ "BHM" && :OBJTYPE ≡ "QSO" && :PROGRAMNAME ≡ "MWM4"),
+		"AQMES-Bonus"  => :(:SURVEY ≡ "BHM" && :OBJTYPE ≡ "QSO" && :PROGRAMNAME ≡ "AQMES-Bonus"),
+		"AQMES-Wide"   => :(:SURVEY ≡ "BHM" && :OBJTYPE ≡ "QSO" && :PROGRAMNAME ≡ "AQMES-Wide"),
+		"AQMES-Medium" => :(:SURVEY ≡ "BHM" && :OBJTYPE ≡ "QSO" && :PROGRAMNAME ≡ "AQMES-Medium"),
+		"RM-Plates"    => :(:SURVEY ≡ "BHM" && :OBJTYPE ≡ "QSO" && :PROGRAMNAME ∈ ("RM", "RMv2", "RMv2-fewMWM")),
+		"RM-Fibers"    => :(:SURVEY ≡ "BHM" && :OBJTYPE ≡ "science" && :PROGRAMNAME ≡ "bhm_rm"),
+		"bhm_aqmes"    => :(:SURVEY ≡ "BHM" && :OBJTYPE ≡ "science" && :PROGRAMNAME ≡ "bhm_aqmes"),
+		"bhm_csc"      => :(:SURVEY ≡ "BHM" && :OBJTYPE ≡ "science" && :PROGRAMNAME ≡ "bhm_csc"),
+		"bhm_filler"   => :(:SURVEY ≡ "BHM" && :OBJTYPE ≡ "science" && :PROGRAMNAME ≡ "bhm_filler"),
+		"bhm_spiders"  => :(:SURVEY ≡ "BHM" && :OBJTYPE ≡ "science" && :PROGRAMNAME ≡ "bhm_spiders"),
+		"open_fiber"   => :(:SURVEY ≡ "open_fiber" && :OBJTYPE ≡ "science" && :PROGRAMNAME ≡ "open_fiber"),
 	)
 	foreach(sort!, dict_prg.vals)
 	x = :(any([$(f_programs_dict.vals...)]))
@@ -260,7 +260,7 @@ const dict_cat = @time let
 	dict_of(programs_cats)
 end
 # @assert u_sorted(dict_cat.keys) & all(u_sorted ∘ dropfirst, dict_cat.vals)
-# @show extrema(length, dict_cat.vals) # (2, 49)
+# @show extrema(length, dict_cat.vals) # (2, 94)
 
 @info "Building dictionary for SDSS_ID"
 
@@ -294,9 +294,11 @@ end
 		new = Header(size(df), row, len, File.(fits))
 		new == old ? old : new
 	end
-	# foreach((k, v)::Pair -> write("$dir/bhm-$k.json", json(v, ~0)), data)
-	write("$dir/bhm.meta.json", json(meta, 4))
-	write("$dir/bhm.json", json(ODict([:hdr => meta; data]), ~0))
-	run(`$zstdmt $dir/bhm.json -o $dir/bhm.json.zst -f`, devnull)
+	cd(dir) do
+		# foreach((k, v)::Pair -> write("bhm-$k.json", json(v, ~0)), data)
+		write("bhm.meta.json", json(meta, 4))
+		write("bhm.json", json(ODict([:hdr => meta; data]), ~0))
+		run(`$zstdmt bhm.json -o bhm.json.zst -f`, devnull)
+	end
 end
 

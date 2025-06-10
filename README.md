@@ -67,13 +67,13 @@ The ~~`dictionaries.txt`~~ file is the backbone to this tool. By running the `up
 
 To update ~~`dictionaries.txt`~~, install the latest version of [Julia](https://julialang.org/), and set environment variable `JULIA_NUM_THREADS=auto,auto` so you can omit the `-t auto` argument ([read more](https://docs.julialang.org/en/v1/manual/multi-threading/)).
 
-Then, having the FITS files or archive files (each archive should contain only one FITS file, and would be used only if the filename to be extracted does not exist) accessible in the same directory (either hard copies or via symbolic links), run:
+Then, having the FITS files or archive files (each archive should contain only one FITS file, and would be used only if the filename to be extracted does not exist) accessible in the current directory (either hard copies or via symbolic links), run:
 ```shell
-julia --project -t auto update_dictionaries.jl
+julia -t auto update_dictionaries.jl
 ```
 Alternatively, provide paths as arguments:
 ```shell
-julia --project -t auto update_dictionaries.jl <path/to/file>...
+julia -t auto update_dictionaries.jl <path/to/file>...
 ```
 PS: The filename(s) shall match the pattern `/\bspall\b.*\.fits(\.tmp)?$/i` and not match `/\ballepoch\b/i`.
 

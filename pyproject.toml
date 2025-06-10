@@ -19,7 +19,7 @@ no-build = true
 [tool.pixi.tasks]
 lcov = "coverage run -m pytest -q && coverage lcov && coverage report"
 main = "python sdssv_spec_appREMOTE.py"
-sync = "git pull -ptr && pixi install"
+sync = "git pull -ptr && pixi install --frozen"
 test = "pytest -v"
 updt = "julia --startup-file=no --project update_pixi.jl"
 
