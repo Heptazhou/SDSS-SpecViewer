@@ -22,6 +22,7 @@ Please install the following Python packages to use this tool, with the minimum 
 - dash     >= 2.13.0
 - numpy    >= 1.21.4
 - plotly   >= 5.0.0
+- pyzstd   >= 0.15.9
 - requests >= 2.23.0
 
 > [!NOTE]
@@ -37,21 +38,21 @@ to run the tool. Otherwise, see the following.
 *****
 If you are using [conda](https://docs.conda.io/) or [mamba](https://mamba.readthedocs.io/), you may run (preferably, within a separate [environment](https://docs.conda.io/projects/conda/en/latest/user-guide/getting-started.html#creating-environments)):
 ```shell
-conda install astropy dash numpy plotly requests types-requests
+conda install astropy dash numpy plotly pyzstd requests types-requests
 ```
 Also, to update:
 ```shell
-conda update astropy dash numpy plotly requests types-requests
+conda update astropy dash numpy plotly pyzstd requests types-requests
 ```
 
 *****
 If you are using [pip](https://pip.pypa.io/), you may run (preferably, within a separate [environment](https://packaging.python.org/en/latest/tutorials/installing-packages/#creating-virtual-environments)):
 ```shell
-pip install astropy dash numpy plotly plotly-stubs requests types-requests
+pip install astropy dash numpy plotly plotly-stubs pyzstd requests types-requests
 ```
 Also, to update:
 ```shell
-pip install -U astropy dash numpy plotly plotly-stubs requests types-requests
+pip install -U astropy dash numpy plotly plotly-stubs pyzstd requests types-requests
 ```
 
 *****

@@ -13,6 +13,7 @@ from pathlib import Path
 from re import IGNORECASE, fullmatch
 from tempfile import TemporaryDirectory
 from traceback import print_exc
+from typing import Any
 
 import dash
 import numpy
@@ -25,42 +26,29 @@ from dash.dependencies import Input, Output, State
 from numpy import mean, median, sqrt, std
 from numpy.typing import NDArray
 from plotly.graph_objects import Figure, Scatter
+from pyzstd import open as zstd
 from requests.exceptions import HTTPError
 
-from util import SDSSV_buildURL, identity, object_links
-
-# https://docs.python.org/3/library/tomllib.html
-# https://peps.python.org/pep-0680/
-# if sys.version_info < (3, 11): import tomli as tomllib
-# if sys.version_info > (3, 11): import tomllib
+import util
+from util import identity, sdss_iau, sdss_sas_fits
 
 ###
-### input the data directory path
-###
 
-# dictionaries = json.load(open("dictionaries.txt"))
 authentication = "authentication.txt"
-# programs: dict[str, list[int]] = dictionaries[0]
-# fieldIDs: dict[str, list[int]] = dictionaries[1]
-# catalogs: dict[str, list[list | int]] = dictionaries[2]
 
+# todo
 bhm_meta = json.load(open("data/bhm.meta.json"))
-bhm_data = json.load(open("data/bhm.json"))
+bhm_data = json.load(zstd("data/bhm.json.zst") if
+                     Path("data/bhm.json.zst").is_file() else
+                     open("data/bhm.json"))
 
+metadata: dict[str, Any      ] = bhm_data["hdr"]
 programs: dict[str, list[int]] = bhm_data["prg"]
 fieldIDs: dict[str, list[int]] = bhm_data["fld"]
 sdss_IDs: dict[str, list[int]] = bhm_data["sid"]
 catalogs: dict[str, list[int]] = bhm_data["cat"]
 
-# for testing
-# print(programs)
-# print("those were programs")
-# print(fieldIDs)
-# print("those were fieldIDs")
-# print(catalogs)
-# print("those were catalogs")
-# print("catalog*5", catalogs["27021598109009995"])
-# print("field17049", fieldIDs["17049"])
+print({k: v for k, v in metadata.items() if k in ["date", "dims", "nrow", "size"]})
 
 # the redshift and stepping to easily adjust redshift using arrow keys or mouse wheel, disabled by default
 # because unfortunately, setting a numeric `step` attribute for an `input` element also means the value of
@@ -131,7 +119,7 @@ def SDSSV_fetch(username: str, password: str, field: int | str, mjd: int, obj: i
 	if (field, mjd, obj, branch) in cache:
 		return cache[(field, mjd, obj, branch)]
 
-	url = SDSSV_buildURL(field, mjd, obj, branch)
+	url = sdss_sas_fits(field, mjd, obj, branch)
 	# print(url)
 
 	rv = requests.get(url, auth=(username, password) if "/sdsswork/" in url else None)
@@ -264,11 +252,19 @@ def fetch_catID(field: int | str, catID: int | str, extra="", match_sdss_id=True
 		mjd_list.sort(reverse=True)
 	# print(mjd_list)
 
+	# todo
 	meta["DEC"     ] = meta["DEC"     ][-1] if meta["DEC"     ] else None # type: ignore
 	meta["RA"      ] = meta["RA"      ][-1] if meta["RA"      ] else None # type: ignore
 	meta["RCHI2"   ] = meta["RCHI2"   ][-1] if meta["RCHI2"   ] else None # type: ignore
 	meta["Z"       ] = meta["Z"       ][-1] if meta["Z"       ] else None # type: ignore
 	meta["ZWARNING"] = meta["ZWARNING"][-1] if meta["ZWARNING"] else None # type: ignore
+
+	meta["IAU_NAME"] = None # type: ignore
+	meta["SDSS_ID" ] = None # type: ignore
+	if None not in (a := meta["RA"], d := meta["DEC"]):
+		meta["IAU_NAME"] = sdss_iau(a, d) # type: ignore
+	if sdss_id > 0:
+		meta["SDSS_ID" ] = sdss_id # type: ignore
 
 	# allplate
 	for cat in cats:
@@ -557,13 +553,13 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 					placeholder="CatalogID", value="",
 				)], id="catalogid_dropdown_div", hidden=False),
 
-			## SDSS_ID
+			## SDSS ID
 			html.Div(className="col-lg-3 col-md-3 col-sm-4 col-xs-6", children=[
 				html.Label(
-					html.H4("SDSS_ID"),
+					html.H4("SDSS ID", style={"color": "grey"}),
 				),
 				dcc.Input(
-					id="", placeholder="N/A", value="", readOnly=True,
+					id="spec_info_sdss_id", placeholder="N/A", value="", readOnly=True,
 					style={"height": "36px", "width": "100%"}, inputMode="numeric",
 				)], title="Read only"),
 
@@ -611,7 +607,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 				html.H4("Z", style={"color": "grey"}),
 			),
 			dcc.Input(
-				id="redshift_sdss_z", placeholder="N/A", value="", readOnly=True,
+				id="spec_info_z", placeholder="N/A", value="", readOnly=True,
 				style={"height": "36px", "width": "100%"}, inputMode="numeric",
 			)], title="Read only"),
 
@@ -621,7 +617,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 				html.H4("RCHI2", style={"color": "grey"}),
 			),
 			dcc.Input(
-				id="redshift_sdss_rchi2", placeholder="N/A", value="", readOnly=True,
+				id="spec_info_rchi2", placeholder="N/A", value="", readOnly=True,
 				style={"height": "36px", "width": "100%"}, inputMode="numeric",
 			)], title="Read only"),
 
@@ -631,7 +627,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 				html.H4("ZWARNING", style={"color": "grey"}),
 			),
 			dcc.Input(
-				id="redshift_sdss_zwarning", placeholder="N/A", value="", readOnly=True,
+				id="spec_info_zwarning", placeholder="N/A", value="", readOnly=True,
 				style={"height": "36px", "width": "100%"}, inputMode="numeric",
 			)], title="Read only"),
 
@@ -641,7 +637,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 				html.H4("RA (°)", style={"color": "grey"}),
 			),
 			dcc.Input(
-				id="redshift_sdss_ra", placeholder="N/A", value="", readOnly=True,
+				id="spec_info_ra", placeholder="N/A", value="", readOnly=True,
 				style={"height": "36px", "width": "100%"}, inputMode="numeric",
 			)], title="Read only"),
 
@@ -651,7 +647,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 				html.H4("DEC (°)", style={"color": "grey"}),
 			),
 			dcc.Input(
-				id="redshift_sdss_dec", placeholder="N/A", value="", readOnly=True,
+				id="spec_info_dec", placeholder="N/A", value="", readOnly=True,
 				style={"height": "36px", "width": "100%"}, inputMode="numeric",
 			)], title="Read only"),
 
@@ -661,8 +657,8 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 				html.H4("IAU Designation", style={"color": "grey"}),
 			),
 			dcc.Input(
-				id="", placeholder="N/A", value="", readOnly=True,
-				style={"height": "36px", "width": "100%"}, inputMode="numeric",
+				id="spec_info_iau_name", placeholder="N/A", value="", readOnly=True,
+				style={"height": "36px", "width": "100%"},
 			)], title="Read only"),
 
 	]),
@@ -997,11 +993,13 @@ def process_upload(sto: dict, contents: list[str], filename: list[str], timestam
 def hide_pipeline_redshift(checklist: list[str]):
 	return "z" not in checklist
 @app.callback(
-	Output("redshift_sdss_zwarning", "value"),
-	Output("redshift_sdss_z", "value"),
-	Output("redshift_sdss_rchi2", "value"),
-	Output("redshift_sdss_ra", "value"),
-	Output("redshift_sdss_dec", "value"),
+	Output("spec_info_zwarning", "value"),
+	Output("spec_info_z", "value"),
+	Output("spec_info_rchi2", "value"),
+	Output("spec_info_sdss_id", "value"),
+	Output("spec_info_iau_name", "value"),
+	Output("spec_info_ra", "value"),
+	Output("spec_info_dec", "value"),
 	Input("fieldid_dropdown", "value"),
 	Input("catalogid_dropdown", "value"),
 	Input("fieldid_input", "value"),
@@ -1010,20 +1008,20 @@ def hide_pipeline_redshift(checklist: list[str]):
 def show_pipeline_redshift(field_d, cat_d, field_i, cat_i, checklist: list[str]):
 	try:
 		meta = fetch_catID(field_d or field_i, cat_d or cat_i, match_sdss_id="s" in checklist)[0]
-		return meta["ZWARNING"], meta["Z"], meta["RCHI2"], meta["RA"], meta["DEC"]
+		return meta["ZWARNING"], meta["Z"], meta["RCHI2"], meta["SDSS_ID"], meta["IAU_NAME"], meta["RA"], meta["DEC"]
 	except Exception as e:
 		if str(e): print(f"[show_pipeline_redshift]  fetch_catID{([field_d, field_i], [cat_d, cat_i])}")
 		if str(e): print(e) if isinstance(e, HTTPError) else print_exc()
-		return None, None, None, None, None
+		return None, None, None, None, None, None, None
 
 @app.callback(
 	Output("generated_links_list", "children"),
 	Output("generated_links", "hidden"),
-	Input("redshift_sdss_ra", "value"),
-	Input("redshift_sdss_dec", "value"),
+	Input("spec_info_ra", "value"),
+	Input("spec_info_dec", "value"),
 )
 def display_generated_links(ra: float, dec: float):
-	links = object_links(ra, dec)
+	links = util.object_links(ra, dec)
 	return [
 		html.Li(html.A(id, href=url, target="_blank"))
 		for id, url in (s.split(": ", 1) for s in links)
@@ -1126,8 +1124,8 @@ def make_multiepoch_spectra(field_d, cat_d, field_i, cat_i, extra_obj, redshift,
 		if y_max < y_min: y_min, y_max = y_max, y_min
 		if x_max < x_min: x_min, x_max = x_max, x_min
 		# changed following to explicitly be in rest frame (bottom x axis)
-		rest_x_max = math.ceil(x_max / (1 + z))
-		rest_x_min = math.floor(x_min / (1 + z))
+		rest_x_max = util.cld(x_max, 1 + z)
+		rest_x_min = util.fld(x_min, 1 + z)
 
 		fig = Figure(layout=layout)
 		fig.layout.yaxis.range = [y_min, y_max]

@@ -1,4 +1,5 @@
-from .sdss import SDSSV_buildURL as func
+from .sdss import sdss_iau
+from .sdss import sdss_sas_fits as func
 
 
 def testset_dr09() -> None:
@@ -100,4 +101,16 @@ def testset_work_master() -> None:
 	field, mjd, catid, fits = 15000, 59146, 4375786564, "spec-015000-59146-4375786564.fits"
 	assert func(field, mjd, catid, b) == "https://data.sdss5.org/sas/sdsswork/bhm/boss/spectro/redux/master/spectra/daily/lite/015XXX/015000/59146/" + fits
 	assert func(field, mjd, catid, b) == func(f"{field}p", mjd, catid, b)
+
+def testset_iau_name_00() -> None:
+	assert sdss_iau(000.000_000, -0.000) == "SDSS J000000.00-000000.0"
+	assert sdss_iau(000.000_000, +0.000) == "SDSS J000000.00+000000.0"
+
+def testset_iau_name_01() -> None:
+	assert sdss_iau(001.999_999, -0.100) == "SDSS J000759.99-000600.0"
+	assert sdss_iau(001.999_999, +0.100) == "SDSS J000759.99+000600.0"
+
+def testset_iau_name_02() -> None:
+	assert sdss_iau(188.737_042, -1.396) == "SDSS J123456.89-012345.6"
+	assert sdss_iau(188.737_042, +1.396) == "SDSS J123456.89+012345.6"
 

@@ -103,14 +103,14 @@ end
 # https://github.com/sdss/idlspec2d/blob/master/datamodel/spall_dm.par
 # https://www.sdss.org/dr18/data_access/bitmasks/
 const cols = ODict{Symbol, DataType}(
-	:CATALOGID    => Int64,   # SDSS-V CatalogID
-	:FIELD        => Int64,   # Field number
-	:FIELDQUALITY => String,  # Characterization of field quality ("good" | "bad"); was :PLATEQUALITY
-	:MJD          => Int64,   # Modified Julian date of combined Spectra
-	:OBJTYPE      => String,  # Why this object was targetted; QSO=SCIENCE; see spZbest
-	:PROGRAMNAME  => String,  # Program name within a given survey
-	:SDSS_ID      => Int64,   # Unified SDSS-V Target Identifier; UInt32 / -999
-	:SURVEY       => String,  # Survey that field is part of
+	:CATALOGID   => Int64,   # SDSS-V CatalogID
+	:FIELD       => Int64,   # Field number
+	:MJD         => Int64,   # Modified Julian date of combined Spectra
+	:OBJTYPE     => String,  # Why this object was targetted; QSO=SCIENCE; see spZbest
+	:PROGRAMNAME => String,  # Program name within a given survey
+	:SDSS_ID     => Int64,   # Unified SDSS-V Target Identifier; UInt32 / -999
+	:SURVEY      => String,  # Survey that field is part of
+	# :FIELDQUALITY => String,  # Characterization of field quality ("good" | "bad"); was :PLATEQUALITY
 	# :RCHI2        => Float32, # Reduced χ² for best fit
 	# :SPECOBJID    => Int128,  # Unique ID from SDSSID, Field, MJD, Coadd, RUN2D; Int64 / String since v6.2
 	# :SPECPRIMARY  => UInt8,   # Best version of spectrum at this location; Bool / -999; see platemerge.pro
@@ -143,10 +143,9 @@ const df = @time let dir = rstrip(stdpath(@__DIR__, "temp"), '/')
 	function _read(fn::String)
 		f = File(fn)
 		r = @try if f == deser_json(File, "$dir/$(f.name).json")
-			c = setdiff(cols.keys, [:FIELDQUALITY])
 			@info "Loading `$fn` from cache (try)"
 			r = zstd_des("$dir/$(f.name).dat.zst")
-			@select! r $c
+			@select! r $(cols.keys)
 		end
 		if isnothing(r)
 			n = FITS(f -> get(f, "SPALL", 2).ext, fn)
@@ -158,10 +157,8 @@ const df = @time let dir = rstrip(stdpath(@__DIR__, "temp"), '/')
 					map(col -> ensure_vector(read(f[n], String(col))), cols.keys)
 				end
 			end
-			r = @chain DataFrame(v, cols.keys, copycols = false) begin
-				@rsubset! :FIELDQUALITY ≡ "good" :CATALOGID > 0
-				@select! Not(:FIELDQUALITY)
-			end
+			r = DataFrame(v, cols.keys, copycols = false)
+			unique!(@subset! r :CATALOGID .> 0)
 			zstd_ser("$dir/$(f.name).dat.zst", r)
 			write("$dir/$(f.name).json", json(f, 4))
 		end

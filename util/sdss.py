@@ -1,7 +1,10 @@
 from re import fullmatch
 
+from .math import signbit
+from .unit import deg2dms, deg2hms
 
-def SDSSV_buildURL(field: int | str, mjd: int, obj: int | str, branch: str) -> str:
+
+def sdss_sas_fits(field: int | str, mjd: int, obj: int | str, branch: str) -> str:
 	"""
 	A function to build the url that will be used to fetch the data.
 	"""
@@ -59,4 +62,17 @@ def SDSSV_buildURL(field: int | str, mjd: int, obj: int | str, branch: str) -> s
 			url = f"{path}/{branch}/spectra/{daily}/lite/{group}/{field6}/{mjd}/{file(field6, obj)}"
 
 	return url
+
+def sdss_iau(α: float, δ: float) -> str:
+	def _str(x: float, tpl="00") -> str:
+		return f"{x:+010.6f}"[1:len(tpl) + 1]
+
+	h, m, s = deg2hms(α)
+	lon = _str(h) + _str(m) + _str(s, "00.00")
+
+	d, m, s = deg2dms(δ)
+	lat = _str(d) + _str(m) + _str(s, "00.0" )
+
+	pm = "-" if signbit(d) else "+"
+	return f"SDSS J{lon}{pm}{lat}"
 
