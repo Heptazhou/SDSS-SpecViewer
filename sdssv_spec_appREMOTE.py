@@ -25,6 +25,7 @@ from dash.dependencies import Input, Output, State
 from numpy import mean, median, sqrt, std
 from numpy.typing import NDArray
 from plotly.graph_objects import Figure, Scatter
+from pyzstd import decompress
 from requests.exceptions import HTTPError
 
 from util import SDSSV_buildURL, identity, object_links
@@ -45,7 +46,7 @@ authentication = "authentication.txt"
 # catalogs: dict[str, list[list | int]] = dictionaries[2]
 
 bhm_meta = json.load(open("data/bhm.meta.json"))
-bhm_data = json.load(open("data/bhm.json"))
+bhm_data = json.loads(decompress(open("data/bhm.json.zst", "rb").read()))
 
 programs: dict[str, list[int]] = bhm_data["prg"]
 fieldIDs: dict[str, list[int]] = bhm_data["fld"]
