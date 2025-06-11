@@ -537,8 +537,8 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 					placeholder="FieldID", value="",
 				)], id="fieldid_dropdown_div", hidden=False),
 
-			## catalog ID input
-			html.Div(className="col-lg-6 col-md-6 col-sm-8 col-xs-12", children=[
+			## Catalog ID input
+			html.Div(className="col-lg-3 col-md-3 col-sm-4 col-xs-6", children=[
 				html.Label(
 					html.H4("Catalog ID"),
 				),
@@ -547,8 +547,8 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 					placeholder="CatalogID", value="", style={"height": "36px", "width": "100%"},
 				)], id="catalogid_input_div", hidden=True),
 
-			## catalog ID dropdown
-			html.Div(className="col-lg-6 col-md-6 col-sm-8 col-xs-12", children=[
+			## Catalog ID dropdown
+			html.Div(className="col-lg-3 col-md-3 col-sm-4 col-xs-6", children=[
 				html.Label(
 					html.H4("Catalog ID"),
 				),
@@ -557,8 +557,18 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 					placeholder="CatalogID", value="",
 				)], id="catalogid_dropdown_div", hidden=False),
 
+			## SDSS_ID
+			html.Div(className="col-lg-3 col-md-3 col-sm-4 col-xs-6", children=[
+				html.Label(
+					html.H4("SDSS_ID"),
+				),
+				dcc.Input(
+					id="", placeholder="N/A", value="", readOnly=True,
+					style={"height": "36px", "width": "100%"}, inputMode="numeric",
+				)], title="Read only"),
+
 			## extra object(s) list input (hidden, but can be used directly otherwise)
-			html.Div(className="col-xs-12", title="comma-seperated list", children=[
+			html.Div(className="col-xs-6", title="comma-seperated list", children=[
 				html.Label(
 					html.H4("Extra Object(s)"),
 				),
@@ -642,6 +652,16 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 			),
 			dcc.Input(
 				id="redshift_sdss_dec", placeholder="N/A", value="", readOnly=True,
+				style={"height": "36px", "width": "100%"}, inputMode="numeric",
+			)], title="Read only"),
+
+		## IAU designation
+		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
+			html.Label(
+				html.H4("IAU Designation", style={"color": "grey"}),
+			),
+			dcc.Input(
+				id="", placeholder="N/A", value="", readOnly=True,
 				style={"height": "36px", "width": "100%"}, inputMode="numeric",
 			)], title="Read only"),
 
