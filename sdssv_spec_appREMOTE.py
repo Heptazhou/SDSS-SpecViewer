@@ -472,7 +472,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 	html.Div(className="row", children=[
 
 		html.Div(className="col-lg-6 col-sm-8 col-xs-12", children=[
-			html.H2("SDSSV-BHM Spectra Viewer (remote version)"),
+			html.H2("SDSS-V SpecViewer"),
 		]),
 
 		html.Div(className="col-lg-6 col-sm-4 col-xs-12", children=[

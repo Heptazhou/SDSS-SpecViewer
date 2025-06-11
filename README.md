@@ -85,19 +85,7 @@ PS: The filename(s) shall match the pattern `/\bspall\b.*\.fits(\.tmp)?$/i` and 
 - Emission-line labels appear above the top of the plot, and their wavelengths are shown with solid vertical lines. Absorption-line labels appear at the bottom of the plot, and their wavelengths are shown with dotted vertical lines. In both cases, the wavelength(s) of the line(s) associated with that label are shown when the cursor hovers over the label.
 
 
-## Features to be added
-- DONE: optimize the loading speed
-- DONE: smoothing of spectra
-- DONE: include previous spectra from SDSS I-IV
-- DONE-ISH (in text output if run from command line, but not on webpage yet): provide downloadable links to all data
-- include source information summary (RA, Dec, z, source types...)
-- include at least option for log x axis
+## Wish list of features to be added
 - renormalization of spectra/spectrum (based on specific wavelength or line, or input value)
 - add APO/LCO to MJDs for display? Or elsewhere in display for SDSS-V spectra only?
-- include quick links to other databases (Simbad, Ned, etc...)
-- search with RA/Dec for objects
-- show the residual spectra in greyscale (could add as a second figure)
-- add session history
-- S/N selection slider bar
-- Fix colors
 - Convert TAIHMS to fractional MJD and add to MJD to get MJD_FINAL for SDSS-I/IV for display
