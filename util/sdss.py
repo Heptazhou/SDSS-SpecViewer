@@ -74,5 +74,5 @@ def sdss_iau(α: float, δ: float) -> str:
 	lat = _str(d) + _str(m) + _str(s, "00.0" )
 
 	pm = "-" if signbit(d) else "+"
-	return f"SDSS J{lon}{pm}{lat}"
+	return f"J{lon}{pm}{lat}"
 

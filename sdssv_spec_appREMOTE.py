@@ -179,16 +179,19 @@ def fetch_catID(field: int | str, catID: int | str, extra="", match_sdss_id=True
 
 	cats: list[int] = [int(catID)] if catID else []
 	meta: dict[str, list] = {
+		"CATALOGID": cats,
 		"DEC": [],
 		"RA": [],
 		"RCHI2": [],
 		"Z": [],
 		"ZWARNING": [],
 	}
-	if (sdss_id := catalogs.get(catID, [0])[0]) > 0 and match_sdss_id:
+	if (sdss_id := catalogs.get(catID, [0])[0]) > 0:
 		for cat in sdss_IDs.get(f"{sdss_id}", []):
-			if not cat in cats: cats.append(cat)
-		cats = sorted(cats)
+			if not cat in meta["CATALOGID"]: meta["CATALOGID"].append(cat)
+		meta["CATALOGID"] = sorted(meta["CATALOGID"])
+	if match_sdss_id:
+		cats = meta["CATALOGID"]
 	# print(f"[sdss_id] {catID} => {sdss_id} => {cats} # {match_sdss_id}")
 
 	for x in extra.split(","):
@@ -467,16 +470,17 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 
 	html.Div(className="row", children=[
 
-		html.Div(className="col-lg-6 col-sm-8 col-xs-12", children=[
+		html.Div(className="col-sm-4 col-xs-12", children=[
 			html.H2("SDSS-V SpecViewer"),
 		]),
 
-		html.Div(className="col-lg-6 col-sm-4 col-xs-12", children=[
+		html.Div(className="col-sm-8 col-xs-12", children=[
 			dcc.Checklist(id="extra_func_list", options={
-				"z": "pipeline redshift",
+				"z": "pipeline info",
 				"p": "match program",
 				"s": "match sdss_id",
 				"l": "log10 x-axis",
+				"i": "more info",
 				"e": "show error (σ)",
 				"u": "file uploader",
 			},
@@ -599,7 +603,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 		]),
 	]),
 
-	html.Div(className="row", id="pipeline_redshift", children=[
+	html.Div(className="row", id="spec_info", children=[
 
 		## pipeline info - redshift
 		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
@@ -654,14 +658,25 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 		## IAU designation
 		html.Div(className="col-lg-2 col-md-3 col-sm-4 col-xs-6", children=[
 			html.Label(
-				html.H4("IAU Designation", style={"color": "grey"}),
+				html.H4("IAU designation", style={"color": "grey"}),
 			),
 			dcc.Input(
 				id="spec_info_iau_name", placeholder="N/A", value="", readOnly=True,
 				style={"height": "36px", "width": "100%"},
-			)], title="Read only"),
+			)], title="Read only (derived value; SDSS prefix omitted)"),
 
 	]),
+
+	html.Div(className="row", id="spec_info2", children=[
+
+		html.Div(className="col-xs-12", children=[
+			html.H4("CATALOGID_LIST", style={"color": "grey"}),
+			dcc.Input(
+				id="spec_info_other", placeholder="N/A", value="", readOnly=True,
+				style={"height": "36px", "width": "100%"},
+			)], title="Read only"),
+
+	], hidden=True),
 
 	## multiepoch spectra plot
 	# dcc.Checklist(
@@ -988,10 +1003,15 @@ def process_upload(sto: dict, contents: list[str], filename: list[str], timestam
 
 ## hide/show pipeline redshift info
 @app.callback(
-	Output("pipeline_redshift", "hidden"),
+	Output("spec_info", "hidden"),
 	Input("extra_func_list", "value"))
-def hide_pipeline_redshift(checklist: list[str]):
+def hide_spec_info(checklist: list[str]):
 	return "z" not in checklist
+@app.callback(
+	Output("spec_info2", "hidden"),
+	Input("extra_func_list", "value"))
+def hide_spec_info2(checklist: list[str]):
+	return "z" not in checklist or "i" not in checklist
 @app.callback(
 	Output("spec_info_zwarning", "value"),
 	Output("spec_info_z", "value"),
@@ -1005,14 +1025,29 @@ def hide_pipeline_redshift(checklist: list[str]):
 	Input("fieldid_input", "value"),
 	Input("catalogid_input", "value"),
 	Input("extra_func_list", "value"))
-def show_pipeline_redshift(field_d, cat_d, field_i, cat_i, checklist: list[str]):
+def show_spec_info(field_d, cat_d, field_i, cat_i, checklist: list[str]):
 	try:
 		meta = fetch_catID(field_d or field_i, cat_d or cat_i, match_sdss_id="s" in checklist)[0]
 		return meta["ZWARNING"], meta["Z"], meta["RCHI2"], meta["SDSS_ID"], meta["IAU_NAME"], meta["RA"], meta["DEC"]
 	except Exception as e:
-		if str(e): print(f"[show_pipeline_redshift]  fetch_catID{([field_d, field_i], [cat_d, cat_i])}")
+		if str(e): print(f"[show_spec_info]  fetch_catID{([field_d, field_i], [cat_d, cat_i])}")
 		if str(e): print(e) if isinstance(e, HTTPError) else print_exc()
 		return None, None, None, None, None, None, None
+@app.callback(
+	Output("spec_info_other", "value"),
+	Input("fieldid_dropdown", "value"),
+	Input("catalogid_dropdown", "value"),
+	Input("fieldid_input", "value"),
+	Input("catalogid_input", "value"),
+	Input("extra_func_list", "value"))
+def show_spec_info2(field_d, cat_d, field_i, cat_i, checklist: list[str]):
+	try:
+		meta = fetch_catID(field_d or field_i, cat_d or cat_i, match_sdss_id="s" in checklist)[0]
+		return f"{meta["CATALOGID"]}"
+	except Exception as e:
+		if str(e): print(f"[show_spec_info2] fetch_catID{([field_d, field_i], [cat_d, cat_i])}")
+		if str(e): print(e) if isinstance(e, HTTPError) else print_exc()
+		return None
 
 @app.callback(
 	Output("generated_links_list", "children"),
@@ -1021,7 +1056,7 @@ def show_pipeline_redshift(field_d, cat_d, field_i, cat_i, checklist: list[str])
 	Input("spec_info_dec", "value"),
 )
 def display_generated_links(ra: float, dec: float):
-	links = util.object_links(ra, dec)
+	links = util.object_links(ra, dec) if type(ra) == type(dec) == float else []
 	return [
 		html.Li(html.A(id, href=url, target="_blank"))
 		for id, url in (s.split(": ", 1) for s in links)

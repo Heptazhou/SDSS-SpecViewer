@@ -6,7 +6,7 @@ def object_links(ra: float, dec: float) -> Iterable[str]:
 	Generate useful object links given RA and DEC.
 	"""
 	def f(x: dict) -> str:
-		return "?" + "&".join(f"{k}={v}" for (k, v) in x.items())
+		return "?" + "&".join(f"{k}={v}" for (k, v) in x.items()) if x else ""
 
 	if None in (ra, dec):
 		return # pragma: no cover

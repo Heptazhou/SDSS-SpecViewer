@@ -103,14 +103,14 @@ def testset_work_master() -> None:
 	assert func(field, mjd, catid, b) == func(f"{field}p", mjd, catid, b)
 
 def testset_iau_name_00() -> None:
-	assert sdss_iau(000.000_000, -0.000) == "SDSS J000000.00-000000.0"
-	assert sdss_iau(000.000_000, +0.000) == "SDSS J000000.00+000000.0"
+	assert sdss_iau(000.000_000, -0.000) == "J000000.00-000000.0"
+	assert sdss_iau(000.000_000, +0.000) == "J000000.00+000000.0"
 
 def testset_iau_name_01() -> None:
-	assert sdss_iau(001.999_999, -0.100) == "SDSS J000759.99-000600.0"
-	assert sdss_iau(001.999_999, +0.100) == "SDSS J000759.99+000600.0"
+	assert sdss_iau(001.999_999, -0.100) == "J000759.99-000600.0"
+	assert sdss_iau(001.999_999, +0.100) == "J000759.99+000600.0"
 
 def testset_iau_name_02() -> None:
-	assert sdss_iau(188.737_042, -1.396) == "SDSS J123456.89-012345.6"
-	assert sdss_iau(188.737_042, +1.396) == "SDSS J123456.89+012345.6"
+	assert sdss_iau(188.737_042, -1.396) == "J123456.89-012345.6"
+	assert sdss_iau(188.737_042, +1.396) == "J123456.89+012345.6"
 
