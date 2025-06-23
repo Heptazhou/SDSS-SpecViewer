@@ -128,7 +128,7 @@ def SDSSV_fetch(username: str, password: str, field: int | str, mjd: int, obj: i
 	numpy.seterr(divide="ignore") # Python does not comply with IEEE 754 :(
 	fits: HDUList = FITS.open(BytesIO(rv.content))
 	hdu2: BinTableHDU = fits["COADD"] if "COADD" in fits else fits[1]
-	hdu3: BinTableHDU = fits["SPALL"] if "SPALL" in fits else fits[2]
+	hdu3: BinTableHDU = fits["SPALL"] if "SPALL" in fits else fits[2] # SPECOBJ
 	meta: FITS_rec = hdu3.data
 	wave: NDArray = hdu2.data["LOGLAM"] # lg(λ)
 	flux: NDArray = hdu2.data["FLUX"]   # f_λ
@@ -205,7 +205,7 @@ def fetch_catID(field: int | str, catID: int | str, extra="", match_sdss_id=True
 			if str(e): print(e) if isinstance(e, HTTPError) else print_exc()
 			continue
 		mjd_final = str((dat[0]["MJD_FINAL"] if hasattr(dat[0], "MJD_FINAL") else dat[0]["MJD"])[0])
-		name.append(mjd_final)
+		name.append(mjd_final + "*")
 		wave.append(dat[1])
 		flux.append(dat[2])
 		errs.append(dat[3])
@@ -219,8 +219,8 @@ def fetch_catID(field: int | str, catID: int | str, extra="", match_sdss_id=True
 			if str(e): print(e) if isinstance(e, HTTPError) else print_exc()
 			raise # re-raise
 		# print(f"{dat[0].columns=}")
-		meta_DEC = dat[0]["DEC"][0] if hasattr(dat[0], "DEC") else None
-		meta_R_A = dat[0]["RA" ][0] if hasattr(dat[0], "RA" ) else None
+		meta_DEC = dat[0]["PLUG_DEC"][0] if hasattr(dat[0], "PLUG_DEC") else dat[0]["DEC"][0] if hasattr(dat[0], "DEC") else None
+		meta_R_A = dat[0]["PLUG_RA" ][0] if hasattr(dat[0], "PLUG_RA" ) else dat[0]["RA" ][0] if hasattr(dat[0], "RA" ) else None
 		meta["DEC"     ].append(dat[0]["DECCAT"  ][0] if hasattr(dat[0], "DECCAT") else meta_DEC)
 		meta["RA"      ].append(dat[0]["RACAT"   ][0] if hasattr(dat[0], "RACAT" ) else meta_R_A)
 		meta["RCHI2"   ].append(dat[0]["RCHI2"   ][0])
@@ -1043,7 +1043,7 @@ def show_spec_info(field_d, cat_d, field_i, cat_i, checklist: list[str]):
 def show_spec_info2(field_d, cat_d, field_i, cat_i, checklist: list[str]):
 	try:
 		meta = fetch_catID(field_d or field_i, cat_d or cat_i, match_sdss_id="s" in checklist)[0]
-		return f"{meta["CATALOGID"]}"
+		return str(meta["CATALOGID"])
 	except Exception as e:
 		if str(e): print(f"[show_spec_info2] fetch_catID{([field_d, field_i], [cat_d, cat_i])}")
 		if str(e): print(e) if isinstance(e, HTTPError) else print_exc()
