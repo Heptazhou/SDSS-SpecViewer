@@ -1,6 +1,6 @@
-authors = ["Heptazhou <zhou@0h7z.com>"]
 name = "SpecViewer"
 uuid = "13aed2ff-49da-4c20-8fef-027111bdd295"
+authors = ["Heptazhou <zhou@0h7z.com>"]
 version = "0.1.0"
 
 [deps]
@@ -19,7 +19,7 @@ Zstd_jll = "3161d3a3-bdf6-5164-811a-617609db77b4"
 [compat]
 CFITSIO_jll = "< 4.6"
 DataFramesMeta = "≥ 0.9"
-Exts = "≥ 0.2.15"
+Exts = "≥ 0.2.19"
 JSON5 = "≥ 0.22"
 Match = "≥ 2"
 Zstd_jll = "≥ 1.5"

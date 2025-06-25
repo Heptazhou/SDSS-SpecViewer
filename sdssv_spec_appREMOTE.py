@@ -6,70 +6,77 @@ Excelsior!
 
 import json
 import math
-import os
 import sys
 from base64 import b64decode
+from builtins import isinstance as isa
+from collections import defaultdict
+from functools import lru_cache
 from io import BytesIO
+from math import nan as NaN
 from pathlib import Path
 from re import IGNORECASE, fullmatch
-from tempfile import TemporaryDirectory
+from tempfile import TemporaryDirectory as mktempdir
+from threading import RLock as ReentrantLock
 from traceback import print_exc
-from typing import Any
 
 import dash
 import numpy
 import requests
-from astropy.convolution import Box1DKernel, convolve  # type: ignore
-from astropy.io import fits as FITS  # type: ignore
-from astropy.io.fits import BinTableHDU, FITS_rec, HDUList  # type: ignore
+from astropy.convolution import Box1DKernel, convolve  # type: ignore[import-untyped]
+from astropy.io import fits as FITS  # type: ignore[import-untyped]
+from astropy.io.fits import BinTableHDU, FITS_rec, HDUList  # type: ignore[import-untyped]
 from dash import dcc, html
 from dash.dependencies import Input, Output, State
 from numpy import mean, median, sqrt, std
 from numpy.typing import NDArray
-from plotly.graph_objects import Figure, Scatter
+from plotly.graph_objects import Figure, Scatter  # type: ignore[import-untyped]
 from pyzstd import open as zstd
-from requests.exceptions import HTTPError
+from requests.exceptions import ChunkedEncodingError, HTTPError
 
 import util
 from util import identity, sdss_iau, sdss_sas_fits
 
 
-def fetch(url: str) -> bytes:
-	rv = requests.get(url)
-	rv.raise_for_status()
-	print(rv.status_code, url)
+def fetch(url: str, auth: None | tuple[str, str] = None) -> bytes:
+	try:
+		rv = requests.get(url, auth=auth)
+	except ChunkedEncodingError: # Connection broken: IncompleteRead
+		rv = requests.get(url, auth=auth)
+	if (rv.status_code != 404): print(rv.status_code, url)
+	rv.raise_for_status() # HTTPError
 	return rv.content
+def isfile(f: str) -> bool:
+	return Path(f).is_file()
+def write(f: str, x: bytes):
+	with open(f, "wb") as io: io.write(x)
+def json_zstd(f: str):
+	if f.endswith(e := ".zst") and isfile(g := f[:-len(e)]):
+		with zstd(f) as io:     # only if a decompressed file already exists
+			write(g, io.read()) # replace it with latest data (compressed)
+		return json.load(open(g))
+	with zstd(f) as io: return json.load(io)
 
-###
+# mypy: disable-error-code="assignment, func-returns-value"
 
 authentication = "authentication.txt"
 bhm_data_local = "data/bhm.json.zst"
 bhm_meta_local = "data/bhm.meta.json"
 
-if Path(bhm_data_local).is_file():
-	url = "https://github.com/Heptazhou/SDSS-SpecViewer/releases/download/v1.0.0/bhm.meta.json"
-	try:
-		with zstd(bhm_data_local) as io: bhm_data = json.load(io)
-		if json.load(BytesIO(fetch(url)))["date"] > bhm_data["hdr"]["date"]:
-			os.remove(bhm_data_local)
-	except:
-		print_exc()
-		os.remove(bhm_data_local)
+while True:
+	remote = "https://github.com/Heptazhou/SDSS-SpecViewer/releases/download/v1.0.0/"
+	if isfile(bhm_data_local):
+		try:
+			lcl_data = json_zstd(bhm_data_local)
+			rmt_meta = json.load(BytesIO(fetch(remote + "bhm.meta.json")))
+			if lcl_data["hdr"]["date"] >= rmt_meta["date"]: break
+		except: print_exc()
+	write(bhm_data_local, fetch(remote + "bhm.json.zst"))
 
-while not Path(bhm_data_local).is_file():
-	url = "https://github.com/Heptazhou/SDSS-SpecViewer/releases/download/v1.0.0/bhm.json.zst"
-	with open(bhm_data_local, "wb") as io: io.write(fetch(url))
-	try:
-		with zstd(bhm_data_local) as io: bhm_data = json.load(io)
-	except:
-		print_exc()
-		os.remove(bhm_data_local)
-
-metadata: dict[str, Any      ] = bhm_data["hdr"]
-programs: dict[str, list[int]] = bhm_data["prg"]
-fieldIDs: dict[str, list[int]] = bhm_data["fld"]
-sdss_IDs: dict[str, list[int]] = bhm_data["sid"]
-catalogs: dict[str, list[int]] = bhm_data["cat"]
+metadata: dict[str, list | dict | str | int] = lcl_data["hdr"]
+programs: dict[str, list[int]] = lcl_data["prg"]
+fieldIDs: dict[str, list[int]] = lcl_data["fld"]
+sdss_IDs: dict[str, list[int]] = lcl_data["sid"]
+catalogs: dict[str, list[int]] = lcl_data["cat"]
 
 print({k: v for k, v in metadata.items() if k in ["date", "dims", "nrow", "size"]})
 
@@ -78,11 +85,10 @@ print({k: v for k, v in metadata.items() if k in ["date", "dims", "nrow", "size"
 # it must adhere such granularity (specified by the HTML specification, no way to bypass this behavior),
 # making an arbitrary input to be invalid, but we always want to accept redshift of any precision
 redshift_default = 0
-redshift = None
-stepping = None
 
 # global dict to save results of `SDSSV_fetch` and `fetch_catID`
 cache: dict[tuple, tuple] = {}
+queue: dict[str, ReentrantLock] = defaultdict(ReentrantLock)
 
 # default y-axis range of spectrum plots
 y_max_default = 20
@@ -103,6 +109,13 @@ external_stylesheets = [ "https://codepen.io/chriddyp/pen/bWLwgP.css",
 ###
 ### Any necessary functions
 ###
+
+@lru_cache(64)
+def cached_fetch(url: str) -> bytes:
+	return fetch(url, (username, password) if url.startswith("https://data.sdss5.org/sas/sdsswork/") else None)
+def locked_fetch(url: str) -> bytes:
+	with queue[url]: r = cached_fetch(url)
+	return r
 
 def SDSSV_fetch(username: str, password: str, field: int | str, mjd: int, obj: int | str, branch="") \
 	-> tuple[FITS_rec, NDArray, NDArray, NDArray]:
@@ -132,7 +145,7 @@ def SDSSV_fetch(username: str, password: str, field: int | str, mjd: int, obj: i
 	if not branch or branch == "legacy":
 		for v in ("26", "104", "103") if branch == "legacy" \
 			else ("master", "v6_2_1", "v6_2_0", "v6_1_3", "v6_0_9", "v6_1_0"):
-			# some objects seem to only exist in v6.1.0 so we have to keep it here :(
+			# some object seems to only exist in v6.1.0 so we have to keep it here :(
 			try: return SDSSV_fetch(username, password, field, mjd, obj, v)
 			except HTTPError: pass
 			except Exception: print_exc()
@@ -145,11 +158,8 @@ def SDSSV_fetch(username: str, password: str, field: int | str, mjd: int, obj: i
 	url = sdss_sas_fits(field, mjd, obj, branch)
 	# print(url)
 
-	rv = requests.get(url, auth=(username, password) if "/sdsswork/" in url else None)
-	rv.raise_for_status()
-	print(rv.status_code, url)
 	numpy.seterr(divide="ignore") # Python does not comply with IEEE 754 :(
-	fits: HDUList = FITS.open(BytesIO(rv.content))
+	fits: HDUList = FITS.open(BytesIO(locked_fetch(url))) # prevent duplicated requests
 	hdu2: BinTableHDU = fits["COADD"] if "COADD" in fits else fits[1]
 	hdu3: BinTableHDU = fits["SPALL"] if "SPALL" in fits else fits[2] # SPECOBJ
 	meta: FITS_rec = hdu3.data
@@ -225,7 +235,7 @@ def fetch_catID(field: int | str, catID: int | str, extra="", match_sdss_id=True
 		try:
 			dat = SDSSV_fetch(username, password, fid, mjd, obj, ver)
 		except Exception as e:
-			if str(e): print(e) if isinstance(e, HTTPError) else print_exc()
+			if str(e): print(e) if isa(e, HTTPError) else print_exc()
 			continue
 		mjd_final = str((dat[0]["MJD_FINAL"] if hasattr(dat[0], "MJD_FINAL") else dat[0]["MJD"])[0])
 		name.append(mjd_final + "*")
@@ -239,7 +249,7 @@ def fetch_catID(field: int | str, catID: int | str, extra="", match_sdss_id=True
 		try:
 			dat = SDSSV_fetch(username, password, fid, mjd, obj, ver)
 		except Exception as e:
-			if str(e): print(e) if isinstance(e, HTTPError) else print_exc()
+			if str(e): print(e) if isa(e, HTTPError) else print_exc()
 			raise # re-raise
 		# print(f"{dat[0].columns=}")
 		meta_DEC = dat[0]["PLUG_DEC"][0] if hasattr(dat[0], "PLUG_DEC") else dat[0]["DEC"][0] if hasattr(dat[0], "DEC") else None
@@ -279,18 +289,18 @@ def fetch_catID(field: int | str, catID: int | str, extra="", match_sdss_id=True
 	# print(mjd_list)
 
 	# todo
-	meta["DEC"     ] = meta["DEC"     ][-1] if meta["DEC"     ] else None # type: ignore
-	meta["RA"      ] = meta["RA"      ][-1] if meta["RA"      ] else None # type: ignore
-	meta["RCHI2"   ] = meta["RCHI2"   ][-1] if meta["RCHI2"   ] else None # type: ignore
-	meta["Z"       ] = meta["Z"       ][-1] if meta["Z"       ] else None # type: ignore
-	meta["ZWARNING"] = meta["ZWARNING"][-1] if meta["ZWARNING"] else None # type: ignore
+	meta["DEC"     ] = meta["DEC"     ][-1] if meta["DEC"     ] else None
+	meta["RA"      ] = meta["RA"      ][-1] if meta["RA"      ] else None
+	meta["RCHI2"   ] = meta["RCHI2"   ][-1] if meta["RCHI2"   ] else None
+	meta["Z"       ] = meta["Z"       ][-1] if meta["Z"       ] else None
+	meta["ZWARNING"] = meta["ZWARNING"][-1] if meta["ZWARNING"] else None
 
-	meta["IAU_NAME"] = None # type: ignore
-	meta["SDSS_ID" ] = None # type: ignore
+	meta["IAU_NAME"] = None
+	meta["SDSS_ID" ] = None
 	if None not in (a := meta["RA"], d := meta["DEC"]):
-		meta["IAU_NAME"] = sdss_iau(a, d) # type: ignore
+		meta["IAU_NAME"] = sdss_iau(a, d) # type: ignore[arg-type]
 	if sdss_id > 0:
-		meta["SDSS_ID" ] = sdss_id # type: ignore
+		meta["SDSS_ID" ] = sdss_id
 
 	# allplate
 	for cat in cats:
@@ -298,7 +308,7 @@ def fetch_catID(field: int | str, catID: int | str, extra="", match_sdss_id=True
 			try:
 				dat = SDSSV_fetch_allepoch(username, password, mjd, cat)
 			except Exception as e:
-				# if str(e): print(e) if isinstance(e, HTTPError) else print_exc()
+				# if str(e): print(e) if isa(e, HTTPError) else print_exc()
 				continue
 			name.append(f"allplate-{mjd}")
 			wave.append(dat[1])
@@ -311,7 +321,7 @@ def fetch_catID(field: int | str, catID: int | str, extra="", match_sdss_id=True
 			try:
 				dat = SDSSV_fetch_allepoch(username, password, mjd, cat)
 			except Exception as e:
-				# if str(e): print(e) if isinstance(e, HTTPError) else print_exc()
+				# if str(e): print(e) if isa(e, HTTPError) else print_exc()
 				continue
 			name.append(f"allFPS-{mjd}")
 			wave.append(dat[1])
@@ -322,7 +332,7 @@ def fetch_catID(field: int | str, catID: int | str, extra="", match_sdss_id=True
 		raise HTTPError(f"[fetch_catID] {(field, catID, extra)}")
 	r = meta, name, wave, flux, errs
 	cache[(field, catID, extra, match_sdss_id)] = r
-	return r # type: ignore
+	return r # type: ignore[return-value]
 
 ###
 ### Authentication
@@ -356,7 +366,6 @@ try:
 	print("         or http://127.0.0.1:8050/?<field>-<mjd>-<catid>&prev=<plate>-<mjd>-<fiber>@<branch>")
 	print("       e.g. http://127.0.0.1:8050/?101126-60477-63050394846126565")
 	print("         or http://127.0.0.1:8050/?104623-60251-63050395075696130&prev=7670-57328-0918#m=5&x=3565,10350&y=0,18&z=2.66")
-	print("Change any setting after loading to reset redshift from z=0.")
 except:
 	username, password = "", ""
 	print("Verification failed.")
@@ -534,7 +543,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 				dcc.Dropdown(
 					id="program_dropdown",
 					options=[
-						{"label": i, "value": i} for i in [*programs.keys(), "(other)"]],
+						{"label": i, "value": i} for i in [*programs.keys(), "(other)"]], # type: ignore[arg-type]
 					placeholder="Program",
 				)]),
 
@@ -609,7 +618,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 				dcc.Input( # do not use type="number"! it is automatically updated when the next field changes
 					id="redshift_input", # redshift_dropdown
 					type="text", step="any", pattern=r"-?\d+(\.\d*)?|-?\.\d+",
-					value=redshift or "", placeholder=redshift_default, min=-1,
+					value=None, placeholder=redshift_default, min=-1,
 					style={"height": "36px", "width": "100%"}, inputMode="numeric",
 				)]),
 
@@ -619,8 +628,8 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 					html.H4("z stepping"),
 				),
 				dcc.Dropdown(
-					id="redshift_step", options=["any", 0.1, 0.01, 0.001, 0.0001],
-					value=stepping, placeholder="Any",
+					id="redshift_step", options=["any", 0.1, 0.01, 0.001, 0.0001], # type: ignore[arg-type]
+					value=None, placeholder="Any",
 				)]),
 
 		]),
@@ -788,7 +797,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 				dcc.Checklist(id="line_list_emi", options=[
 					# Set up emission-line active plotting dictionary with values set to the transition wavelengths
 					{"label": f"{i[2]: <10}\t(%sÅ)" % round(float(i[1])),
-					 "value": f"{i[1]}"} for i in spec_line_emi],
+					 "value": f"{i[1]}"} for i in spec_line_emi], # type: ignore[arg-type]
 					value=spec_line_emi[numpy.bool_(numpy.int_(spec_line_emi[:, 0])), 1].tolist(), # values are wavelengths
 					style={"columnCount": "2"},
 					inputStyle={"marginRight": "5px"},
@@ -804,7 +813,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 				dcc.Checklist(id="line_list_abs", options=[
 					# Set up absorption-line active plotting dictionary with values set to the transition names
 					{"label": f"{i[3]: <10}\t(%sÅ)" % round(float(i[2].split()[0])),
-					 "value": f"{i[2].split()[0]}"} for i in spec_line_abs],
+					 "value": f"{i[2].split()[0]}"} for i in spec_line_abs], # type: ignore[arg-type]
 					value=[s.split()[0] for s in spec_line_abs[numpy.bool_(numpy.int_(spec_line_abs[:, 0])), 2]], # wavelengths
 					style={"columnCount": "2"},
 					inputStyle={"marginRight": "5px"},
@@ -855,7 +864,7 @@ def set_input_or_dropdown(search: str, program: str, checklist: list[str]):
 	if program == "(other)" and "p" in checklist and fullmatch(r"\d+(-.*)?", fid_mjd):
 		field = int(fid_mjd.split("-", 1)[0])
 		catid = int(catalog)
-		for prog in programs.keys():
+		for prog in programs:
 			if field not in programs.get(f"{prog    }", []): continue
 			if catid not in fieldIDs.get(f"{field   }", []): continue
 			if catid not in fieldIDs.get(f"{prog}-all", []): continue
@@ -1004,7 +1013,7 @@ def hide_file_upload(checklist: list[str]):
 def process_upload(sto: dict, contents: list[str], filename: list[str], timestamp: list[float]):
 	if not contents: return sto
 	if not sto: sto = dict()
-	with TemporaryDirectory(prefix="py_", ignore_cleanup_errors=True) as _tmpdir:
+	with mktempdir(prefix="py_", ignore_cleanup_errors=True) as _tmpdir:
 		tmpdir = Path(_tmpdir)
 		# print(tmpdir)
 		for s, _f, t in zip(contents, filename, timestamp):
@@ -1054,7 +1063,7 @@ def show_spec_info(field_d, cat_d, field_i, cat_i, checklist: list[str]):
 		return meta["ZWARNING"], meta["Z"], meta["RCHI2"], meta["SDSS_ID"], meta["IAU_NAME"], meta["RA"], meta["DEC"]
 	except Exception as e:
 		if str(e): print(f"[show_spec_info]  fetch_catID{([field_d, field_i], [cat_d, cat_i])}")
-		if str(e): print(e) if isinstance(e, HTTPError) else print_exc()
+		if str(e): print(e) if isa(e, HTTPError) else print_exc()
 		return None, None, None, None, None, None, None
 @app.callback(
 	Output("spec_info_other", "value"),
@@ -1069,7 +1078,7 @@ def show_spec_info2(field_d, cat_d, field_i, cat_i, checklist: list[str]):
 		return str(meta["CATALOGID"])
 	except Exception as e:
 		if str(e): print(f"[show_spec_info2] fetch_catID{([field_d, field_i], [cat_d, cat_i])}")
-		if str(e): print(e) if isinstance(e, HTTPError) else print_exc()
+		if str(e): print(e) if isa(e, HTTPError) else print_exc()
 		return None
 
 @app.callback(
@@ -1140,7 +1149,7 @@ def make_multiepoch_spectra(field_d, cat_d, field_i, cat_i, extra_obj, redshift,
 	layout_axis = dict(fixedrange=True)
 	layout = dict(yaxis=layout_axis, xaxis=layout_axis, xaxis2=layout_axis)
 	xscale, xtype = identity, "linear"
-	if "l" in checklist: xscale, xtype = math.log10, "log" # type: ignore
+	if "l" in checklist: xscale, xtype = math.log10, "log"
 
 	fieldid, catalogid = str(field_d or field_i), str(cat_d or cat_i)
 	smooth, z = int(smooth or smooth_default), float(redshift or redshift_default)
@@ -1160,17 +1169,17 @@ def make_multiepoch_spectra(field_d, cat_d, field_i, cat_i, extra_obj, redshift,
 						numpy.seterr(divide="ignore") # :(
 						errs = 1 / sqrt(errs) # σ
 				# print((name, wave, flux, errs))
-				names.append(name), waves.append(wave), fluxes.append(flux), delta.append(errs) # type: ignore
+				names.append(name), waves.append(wave), fluxes.append(flux), delta.append(errs)
 			except: print_exc()
 	noop_size = len(names)
 
 	try:
-		meta, name, wave, flux, errs = fetch_catID(fieldid, catalogid, extra_obj, match_sdss_id="s" in checklist) # type: ignore
-		names.extend(name), waves.extend(wave), fluxes.extend(flux), delta.extend(errs) # type: ignore
+		meta, name, wave, flux, errs = fetch_catID(fieldid, catalogid, extra_obj, match_sdss_id="s" in checklist)
+		names.extend(name), waves.extend(wave), fluxes.extend(flux), delta.extend(errs)
 		if meta["Z"] and not redshift and redshift_step == "any": redshift = meta["Z"]
 	except Exception as e:
 		if str(e): print(f"[make_multiepoch_spectra] fetch_catID{([field_d, field_i], [cat_d, cat_i], extra_obj)}")
-		if str(e): print(e) if isinstance(e, HTTPError) else print_exc()
+		if str(e): print(e) if isa(e, HTTPError) else print_exc()
 		return Figure(layout=layout), redshift
 
 	try:
@@ -1202,10 +1211,10 @@ def make_multiepoch_spectra(field_d, cat_d, field_i, cat_i, extra_obj, redshift,
 				y=convolve(fluxes[i], Box1DKernel(smooth)),
 				error_y_width=0, error_y_thickness=1, error_y_type="data", # σ
 				error_y_array=delta[i] if delta[i].size and "e" in checklist else None,
-				name=names[i], opacity=1 / 2, mode="lines", **kws)) # type: ignore
+				name=names[i], opacity=1 / 2, mode="lines", **kws))
 			# create "ghost trace" spanning the displayed observed wavelength range:
 			fig.add_trace(Scatter(
-				x=[x_min, x_max], y=[numpy.nan, numpy.nan], showlegend=False))
+				x=[x_min, x_max], y=[NaN, NaN], showlegend=False))
 		fig.data[1].xaxis = "x2" # assign the "ghost trace" to a new axis object
 
 		# Line labels for x-axis

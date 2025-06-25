@@ -63,13 +63,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        pixi-manifest: [pixi.toml]
+        pixi-manifest:
+          - pixi.toml
+          - pyproject.toml
         os:
           - windows-latest
           - ubuntu-latest
           - macos-latest
-        include:
-          - { pixi-manifest: pyproject.toml, os: ubuntu-latest }
     steps:
       - uses: actions/checkout@v4
         with:

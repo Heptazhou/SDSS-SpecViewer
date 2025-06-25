@@ -24,6 +24,7 @@ Please install the following Python packages to use this tool, with the minimum 
 +	plotly   >= 5.0.0
 +	pyzstd   >= 0.15.9
 +	requests >= 2.23.0
+<!-- ^ keep consistent with pyproject.toml -->
 
 > [!NOTE]
 > Python v3.10 or higher is required ([status of Python versions](https://devguide.python.org/versions/)).
@@ -48,11 +49,11 @@ conda update astropy dash numpy plotly pyzstd requests types-requests
 *****
 If you are using [pip](https://pip.pypa.io/), you may run (preferably, within a separate [environment](https://packaging.python.org/en/latest/tutorials/installing-packages/#creating-virtual-environments)):
 ```shell
-pip install astropy dash numpy plotly plotly-stubs pyzstd requests types-requests
+pip install astropy dash numpy plotly pyzstd requests types-requests
 ```
 Also, to update:
 ```shell
-pip install -U astropy dash numpy plotly plotly-stubs pyzstd requests types-requests
+pip install -U astropy dash numpy plotly pyzstd requests types-requests
 ```
 
 *****

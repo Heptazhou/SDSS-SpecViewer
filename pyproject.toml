@@ -6,16 +6,11 @@ dash = "<=2.13.0"
 numpy = "<=1.21.4"
 plotly = "<=5.0.0"
 pytest = "*"
-python = "~=3.10.18"
+python = "~=3.10.0"
 pyzstd = "<=0.15.9"
 requests = "<=2.23.0"
+setuptools = "<=80.8.0"
 types-requests = "*"
-
-[tool.pixi.pypi-dependencies]
-plotly-stubs = "*"
-
-[tool.pixi.pypi-options]
-no-build = true
 
 [tool.pixi.tasks]
 lcov = "coverage run -m pytest -q && coverage lcov && coverage report"
@@ -23,6 +18,7 @@ main = "python sdssv_spec_appREMOTE.py"
 sync = "git pull -ptr && pixi install --frozen"
 test = "pytest -v"
 updt = "julia --startup-file=no --project update_pixi.jl"
+upgd = "pixi upgrade --exclude python && pixi run updt"
 
 [tool.pixi.workspace]
 channels = ["conda-forge"]
@@ -35,8 +31,8 @@ dependencies = [
 	"dash",
 	"numpy",
 	"plotly",
+	"pyzstd",
 	"requests",
-	"setuptools<81",
 ]
 name = "SpecViewer"
 requires-python = ">=3.10"
@@ -49,7 +45,13 @@ run.data_file = "util/__pycache__/.coverage"
 run.omit = ["*_test.py"]
 run.source = ["util"]
 
+[tool.mypy]
+# https://mypy.readthedocs.io/en/stable/
+cache_dir = "util/__pycache__/mypy"
+sqlite_cache = true
+warn_unused_ignores = true
+
 [tool.pytest.ini_options]
 # https://docs.pytest.org/en/stable/
-cache_dir = "util/__pycache__"
+cache_dir = "util/__pycache__/pytest"
 testpaths = "util"
