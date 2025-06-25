@@ -2,5 +2,5 @@
 	"[json]": { "editor.wordWrap": "off" },
 	"code-runner.executorMapByGlob": { "sdssv_spec_appREMOTE.py": "pixi run main # $fileName" },
 	"copyrightInserter.useLineComment": true,
-	"mypy-type-checker.args": ["--implicit-reexport"]
+	"mypy-type-checker.args": ["--allow-redefinition-new", "--implicit-reexport"]
 }

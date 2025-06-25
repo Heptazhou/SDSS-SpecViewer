@@ -6,6 +6,7 @@ Excelsior!
 
 import json
 import math
+import os
 import sys
 from base64 import b64decode
 from io import BytesIO
@@ -32,15 +33,37 @@ from requests.exceptions import HTTPError
 import util
 from util import identity, sdss_iau, sdss_sas_fits
 
+
+def fetch(url: str) -> bytes:
+	rv = requests.get(url)
+	rv.raise_for_status()
+	print(rv.status_code, url)
+	return rv.content
+
 ###
 
 authentication = "authentication.txt"
+bhm_data_local = "data/bhm.json.zst"
+bhm_meta_local = "data/bhm.meta.json"
 
-# todo
-bhm_meta = json.load(open("data/bhm.meta.json"))
-bhm_data = json.load(zstd("data/bhm.json.zst") if
-                     Path("data/bhm.json.zst").is_file() else
-                     open("data/bhm.json"))
+if Path(bhm_data_local).is_file():
+	url = "https://github.com/Heptazhou/SDSS-SpecViewer/releases/download/v1.0.0/bhm.meta.json"
+	try:
+		with zstd(bhm_data_local) as io: bhm_data = json.load(io)
+		if json.load(BytesIO(fetch(url)))["date"] > bhm_data["hdr"]["date"]:
+			os.remove(bhm_data_local)
+	except:
+		print_exc()
+		os.remove(bhm_data_local)
+
+while not Path(bhm_data_local).is_file():
+	url = "https://github.com/Heptazhou/SDSS-SpecViewer/releases/download/v1.0.0/bhm.json.zst"
+	with open(bhm_data_local, "wb") as io: io.write(fetch(url))
+	try:
+		with zstd(bhm_data_local) as io: bhm_data = json.load(io)
+	except:
+		print_exc()
+		os.remove(bhm_data_local)
 
 metadata: dict[str, Any      ] = bhm_data["hdr"]
 programs: dict[str, list[int]] = bhm_data["prg"]
