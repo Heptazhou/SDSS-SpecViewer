@@ -10,6 +10,7 @@ import os
 import sys
 from base64 import b64decode
 from io import BytesIO
+from math import nan as NaN
 from pathlib import Path
 from re import IGNORECASE, fullmatch
 from tempfile import TemporaryDirectory
@@ -39,6 +40,8 @@ def fetch(url: str) -> bytes:
 	rv.raise_for_status()
 	print(rv.status_code, url)
 	return rv.content
+def write(f: str, x: bytes) -> None:
+	with open(f, "wb") as io: io.write(x)
 def json_zstd(f: str) -> dict:
 	with zstd(f) as io: return json.load(io)
 
@@ -60,7 +63,7 @@ if Path(bhm_data_local).is_file():
 
 while not Path(bhm_data_local).is_file():
 	url = "https://github.com/Heptazhou/SDSS-SpecViewer/releases/download/v1.0.0/bhm.json.zst"
-	with open(bhm_data_local, "wb") as _io: _io.write(fetch(url))
+	write(bhm_data_local, fetch(url))
 	try:
 		bhm_data = json_zstd(bhm_data_local)
 	except:
@@ -356,7 +359,6 @@ try:
 	print("         or http://127.0.0.1:8050/?<field>-<mjd>-<catid>&prev=<plate>-<mjd>-<fiber>@<branch>")
 	print("       e.g. http://127.0.0.1:8050/?101126-60477-63050394846126565")
 	print("         or http://127.0.0.1:8050/?104623-60251-63050395075696130&prev=7670-57328-0918#m=5&x=3565,10350&y=0,18&z=2.66")
-	print("Change any setting after loading to reset redshift from z=0.")
 except:
 	username, password = "", ""
 	print("Verification failed.")
@@ -1205,7 +1207,7 @@ def make_multiepoch_spectra(field_d, cat_d, field_i, cat_i, extra_obj, redshift,
 				name=names[i], opacity=1 / 2, mode="lines", **kws)) # type: ignore[arg-type]
 			# create "ghost trace" spanning the displayed observed wavelength range:
 			fig.add_trace(Scatter(
-				x=[x_min, x_max], y=[numpy.nan, numpy.nan], showlegend=False))
+				x=[x_min, x_max], y=[NaN, NaN], showlegend=False))
 		fig.data[1].xaxis = "x2" # assign the "ghost trace" to a new axis object
 
 		# Line labels for x-axis

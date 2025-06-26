@@ -296,6 +296,7 @@ end
 		write("bhm.meta.json", json(meta, 4))
 		write("bhm.json", json(ODict([:hdr => meta; data]), ~0))
 		run(`$zstdmt bhm.json -o bhm.json.zst -f`, devnull)
+		rm("bhm.json")
 	end
 end
 
