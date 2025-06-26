@@ -9,13 +9,17 @@ import math
 import os
 import sys
 from base64 import b64decode
+from builtins import isinstance as isa
+from collections import defaultdict
+from functools import lru_cache
 from io import BytesIO
 from math import nan as NaN
 from pathlib import Path
 from re import IGNORECASE, fullmatch
-from tempfile import TemporaryDirectory
+from tempfile import TemporaryDirectory as mktempdir
+from threading import RLock as ReentrantLock
 from traceback import print_exc
-from typing import Any
+from typing import Any, Optional
 
 import dash
 import numpy
@@ -29,15 +33,18 @@ from numpy import mean, median, sqrt, std
 from numpy.typing import NDArray
 from plotly.graph_objects import Figure, Scatter  # type: ignore[import-untyped]
 from pyzstd import open as zstd
-from requests.exceptions import HTTPError
+from requests.exceptions import ChunkedEncodingError, HTTPError
 
 import util
 from util import identity, sdss_iau, sdss_sas_fits
 
 
-def fetch(url: str) -> bytes:
-	rv = requests.get(url)
-	rv.raise_for_status()
+def fetch(url: str, auth: Optional[tuple[str, str]] = None) -> bytes:
+	try:
+		rv = requests.get(url, auth=auth)
+	except ChunkedEncodingError: # Connection broken: IncompleteRead
+		rv = requests.get(url, auth=auth)
+	rv.raise_for_status() # HTTPError
 	print(rv.status_code, url)
 	return rv.content
 def write(f: str, x: bytes) -> None:
@@ -86,6 +93,7 @@ redshift_default = 0
 
 # global dict to save results of `SDSSV_fetch` and `fetch_catID`
 cache: dict[tuple, tuple] = {}
+queue: dict[str, ReentrantLock] = defaultdict(ReentrantLock)
 
 # default y-axis range of spectrum plots
 y_max_default = 20
@@ -106,6 +114,13 @@ external_stylesheets = [ "https://codepen.io/chriddyp/pen/bWLwgP.css",
 ###
 ### Any necessary functions
 ###
+
+@lru_cache(64)
+def cached_fetch(url: str) -> bytes:
+	return fetch(url, (username, password) if url.startswith("https://data.sdss5.org/sas/sdsswork/") else None)
+def locked_fetch(url: str) -> bytes:
+	with queue[url]: r = cached_fetch(url)
+	return r
 
 def SDSSV_fetch(username: str, password: str, field: int | str, mjd: int, obj: int | str, branch="") \
 	-> tuple[FITS_rec, NDArray, NDArray, NDArray]:
@@ -148,11 +163,8 @@ def SDSSV_fetch(username: str, password: str, field: int | str, mjd: int, obj: i
 	url = sdss_sas_fits(field, mjd, obj, branch)
 	# print(url)
 
-	rv = requests.get(url, auth=(username, password) if "/sdsswork/" in url else None)
-	rv.raise_for_status()
-	print(rv.status_code, url)
 	numpy.seterr(divide="ignore") # Python does not comply with IEEE 754 :(
-	fits: HDUList = FITS.open(BytesIO(rv.content))
+	fits: HDUList = FITS.open(BytesIO(locked_fetch(url)))
 	hdu2: BinTableHDU = fits["COADD"] if "COADD" in fits else fits[1]
 	hdu3: BinTableHDU = fits["SPALL"] if "SPALL" in fits else fits[2] # SPECOBJ
 	meta: FITS_rec = hdu3.data
@@ -228,7 +240,7 @@ def fetch_catID(field: int | str, catID: int | str, extra="", match_sdss_id=True
 		try:
 			dat = SDSSV_fetch(username, password, fid, mjd, obj, ver)
 		except Exception as e:
-			if str(e): print(e) if isinstance(e, HTTPError) else print_exc()
+			if str(e): print(e) if isa(e, HTTPError) else print_exc()
 			continue
 		mjd_final = str((dat[0]["MJD_FINAL"] if hasattr(dat[0], "MJD_FINAL") else dat[0]["MJD"])[0])
 		name.append(mjd_final + "*")
@@ -242,7 +254,7 @@ def fetch_catID(field: int | str, catID: int | str, extra="", match_sdss_id=True
 		try:
 			dat = SDSSV_fetch(username, password, fid, mjd, obj, ver)
 		except Exception as e:
-			if str(e): print(e) if isinstance(e, HTTPError) else print_exc()
+			if str(e): print(e) if isa(e, HTTPError) else print_exc()
 			raise # re-raise
 		# print(f"{dat[0].columns=}")
 		meta_DEC = dat[0]["PLUG_DEC"][0] if hasattr(dat[0], "PLUG_DEC") else dat[0]["DEC"][0] if hasattr(dat[0], "DEC") else None
@@ -301,7 +313,7 @@ def fetch_catID(field: int | str, catID: int | str, extra="", match_sdss_id=True
 			try:
 				dat = SDSSV_fetch_allepoch(username, password, mjd, cat)
 			except Exception as e:
-				# if str(e): print(e) if isinstance(e, HTTPError) else print_exc()
+				# if str(e): print(e) if isa(e, HTTPError) else print_exc()
 				continue
 			name.append(f"allplate-{mjd}")
 			wave.append(dat[1])
@@ -314,7 +326,7 @@ def fetch_catID(field: int | str, catID: int | str, extra="", match_sdss_id=True
 			try:
 				dat = SDSSV_fetch_allepoch(username, password, mjd, cat)
 			except Exception as e:
-				# if str(e): print(e) if isinstance(e, HTTPError) else print_exc()
+				# if str(e): print(e) if isa(e, HTTPError) else print_exc()
 				continue
 			name.append(f"allFPS-{mjd}")
 			wave.append(dat[1])
@@ -857,7 +869,7 @@ def set_input_or_dropdown(search: str, program: str, checklist: list[str]):
 	if program == "(other)" and "p" in checklist and fullmatch(r"\d+(-.*)?", fid_mjd):
 		field = int(fid_mjd.split("-", 1)[0])
 		catid = int(catalog)
-		for prog in programs.keys():
+		for prog in programs:
 			if field not in programs.get(f"{prog    }", []): continue
 			if catid not in fieldIDs.get(f"{field   }", []): continue
 			if catid not in fieldIDs.get(f"{prog}-all", []): continue
@@ -1006,7 +1018,7 @@ def hide_file_upload(checklist: list[str]):
 def process_upload(sto: dict, contents: list[str], filename: list[str], timestamp: list[float]):
 	if not contents: return sto
 	if not sto: sto = dict()
-	with TemporaryDirectory(prefix="py_", ignore_cleanup_errors=True) as _tmpdir:
+	with mktempdir(prefix="py_", ignore_cleanup_errors=True) as _tmpdir:
 		tmpdir = Path(_tmpdir)
 		# print(tmpdir)
 		for s, _f, t in zip(contents, filename, timestamp):
@@ -1056,7 +1068,7 @@ def show_spec_info(field_d, cat_d, field_i, cat_i, checklist: list[str]):
 		return meta["ZWARNING"], meta["Z"], meta["RCHI2"], meta["SDSS_ID"], meta["IAU_NAME"], meta["RA"], meta["DEC"]
 	except Exception as e:
 		if str(e): print(f"[show_spec_info]  fetch_catID{([field_d, field_i], [cat_d, cat_i])}")
-		if str(e): print(e) if isinstance(e, HTTPError) else print_exc()
+		if str(e): print(e) if isa(e, HTTPError) else print_exc()
 		return None, None, None, None, None, None, None
 @app.callback(
 	Output("spec_info_other", "value"),
@@ -1071,7 +1083,7 @@ def show_spec_info2(field_d, cat_d, field_i, cat_i, checklist: list[str]):
 		return str(meta["CATALOGID"])
 	except Exception as e:
 		if str(e): print(f"[show_spec_info2] fetch_catID{([field_d, field_i], [cat_d, cat_i])}")
-		if str(e): print(e) if isinstance(e, HTTPError) else print_exc()
+		if str(e): print(e) if isa(e, HTTPError) else print_exc()
 		return None
 
 @app.callback(
@@ -1172,7 +1184,7 @@ def make_multiepoch_spectra(field_d, cat_d, field_i, cat_i, extra_obj, redshift,
 		if meta["Z"] and not redshift and redshift_step == "any": redshift = meta["Z"]
 	except Exception as e:
 		if str(e): print(f"[make_multiepoch_spectra] fetch_catID{([field_d, field_i], [cat_d, cat_i], extra_obj)}")
-		if str(e): print(e) if isinstance(e, HTTPError) else print_exc()
+		if str(e): print(e) if isa(e, HTTPError) else print_exc()
 		return Figure(layout=layout), redshift
 
 	try:
