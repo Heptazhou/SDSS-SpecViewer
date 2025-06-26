@@ -48,11 +48,11 @@ conda update astropy dash numpy plotly pyzstd requests types-requests
 *****
 If you are using [pip](https://pip.pypa.io/), you may run (preferably, within a separate [environment](https://packaging.python.org/en/latest/tutorials/installing-packages/#creating-virtual-environments)):
 ```shell
-pip install astropy dash numpy plotly plotly-stubs pyzstd requests types-requests
+pip install astropy dash numpy plotly pyzstd requests types-requests
 ```
 Also, to update:
 ```shell
-pip install -U astropy dash numpy plotly plotly-stubs pyzstd requests types-requests
+pip install -U astropy dash numpy plotly pyzstd requests types-requests
 ```
 
 *****

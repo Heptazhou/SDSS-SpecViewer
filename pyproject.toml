@@ -11,12 +11,6 @@ pyzstd = "<=0.15.9"
 requests = "<=2.23.0"
 types-requests = "*"
 
-[tool.pixi.pypi-dependencies]
-plotly-stubs = "*"
-
-[tool.pixi.pypi-options]
-no-build = true
-
 [tool.pixi.tasks]
 lcov = "coverage run -m pytest -q && coverage lcov && coverage report"
 main = "python sdssv_spec_appREMOTE.py"
@@ -49,7 +43,13 @@ run.data_file = "util/__pycache__/.coverage"
 run.omit = ["*_test.py"]
 run.source = ["util"]
 
+[tool.mypy]
+# https://mypy.readthedocs.io/en/stable/
+cache_dir = "util/__pycache__/mypy"
+sqlite_cache = true
+warn_unused_ignores = true
+
 [tool.pytest.ini_options]
 # https://docs.pytest.org/en/stable/
-cache_dir = "util/__pycache__"
+cache_dir = "util/__pycache__/pytest"
 testpaths = "util"

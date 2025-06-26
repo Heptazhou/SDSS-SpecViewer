@@ -11,12 +11,6 @@ pyzstd = ">=0.17.0,<0.18"
 requests = ">=2.32.4,<3"
 types-requests = ">=2.32.4.20250611,<3"
 
-[pypi-dependencies]
-plotly-stubs = ">=0.0.5, <0.0.6"
-
-[pypi-options]
-no-build = true
-
 [tasks]
 lcov = "coverage run -m pytest -q && coverage lcov && coverage report"
 main = "python sdssv_spec_appREMOTE.py"

@@ -20,14 +20,14 @@ from typing import Any
 import dash
 import numpy
 import requests
-from astropy.convolution import Box1DKernel, convolve
-from astropy.io import fits as FITS
-from astropy.io.fits import BinTableHDU, FITS_rec, HDUList
+from astropy.convolution import Box1DKernel, convolve  # type: ignore[import-untyped]
+from astropy.io import fits as FITS  # type: ignore[import-untyped]
+from astropy.io.fits import BinTableHDU, FITS_rec, HDUList  # type: ignore[import-untyped]
 from dash import dcc, html
 from dash.dependencies import Input, Output, State
 from numpy import mean, median, sqrt, std
 from numpy.typing import NDArray
-from plotly.graph_objects import Figure, Scatter
+from plotly.graph_objects import Figure, Scatter  # type: ignore[import-untyped]
 from pyzstd import open as zstd
 from requests.exceptions import HTTPError
 
@@ -45,7 +45,7 @@ def write(f: str, x: bytes) -> None:
 def json_zstd(f: str) -> dict:
 	with zstd(f) as io: return json.load(io)
 
-# mypy: disable-error-code="assignment, func-returns-value, import-untyped"
+# mypy: disable-error-code="assignment, func-returns-value"
 
 authentication = "authentication.txt"
 bhm_data_local = "data/bhm.json.zst"
@@ -536,7 +536,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 				dcc.Dropdown(
 					id="program_dropdown",
 					options=[
-						{"label": i, "value": i} for i in [*programs.keys(), "(other)"]],
+						{"label": i, "value": i} for i in [*programs.keys(), "(other)"]], # type: ignore[arg-type]
 					placeholder="Program",
 				)]),
 
@@ -621,7 +621,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 					html.H4("z stepping"),
 				),
 				dcc.Dropdown(
-					id="redshift_step", options=["any", 0.1, 0.01, 0.001, 0.0001],
+					id="redshift_step", options=["any", 0.1, 0.01, 0.001, 0.0001], # type: ignore[arg-type]
 					value=None, placeholder="Any",
 				)]),
 
@@ -790,7 +790,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 				dcc.Checklist(id="line_list_emi", options=[
 					# Set up emission-line active plotting dictionary with values set to the transition wavelengths
 					{"label": f"{i[2]: <10}\t(%sÅ)" % round(float(i[1])),
-					 "value": f"{i[1]}"} for i in spec_line_emi],
+					 "value": f"{i[1]}"} for i in spec_line_emi], # type: ignore[arg-type]
 					value=spec_line_emi[numpy.bool_(numpy.int_(spec_line_emi[:, 0])), 1].tolist(), # values are wavelengths
 					style={"columnCount": "2"},
 					inputStyle={"marginRight": "5px"},
@@ -806,7 +806,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 				dcc.Checklist(id="line_list_abs", options=[
 					# Set up absorption-line active plotting dictionary with values set to the transition names
 					{"label": f"{i[3]: <10}\t(%sÅ)" % round(float(i[2].split()[0])),
-					 "value": f"{i[2].split()[0]}"} for i in spec_line_abs],
+					 "value": f"{i[2].split()[0]}"} for i in spec_line_abs], # type: ignore[arg-type]
 					value=[s.split()[0] for s in spec_line_abs[numpy.bool_(numpy.int_(spec_line_abs[:, 0])), 2]], # wavelengths
 					style={"columnCount": "2"},
 					inputStyle={"marginRight": "5px"},
@@ -1204,7 +1204,7 @@ def make_multiepoch_spectra(field_d, cat_d, field_i, cat_i, extra_obj, redshift,
 				y=convolve(fluxes[i], Box1DKernel(smooth)),
 				error_y_width=0, error_y_thickness=1, error_y_type="data", # σ
 				error_y_array=delta[i] if delta[i].size and "e" in checklist else None,
-				name=names[i], opacity=1 / 2, mode="lines", **kws)) # type: ignore[arg-type]
+				name=names[i], opacity=1 / 2, mode="lines", **kws))
 			# create "ghost trace" spanning the displayed observed wavelength range:
 			fig.add_trace(Scatter(
 				x=[x_min, x_max], y=[NaN, NaN], showlegend=False))
