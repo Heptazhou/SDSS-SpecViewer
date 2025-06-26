@@ -6,7 +6,6 @@ Excelsior!
 
 import json
 import math
-import os
 import sys
 from base64 import b64decode
 from builtins import isinstance as isa
@@ -19,7 +18,6 @@ from re import IGNORECASE, fullmatch
 from tempfile import TemporaryDirectory as mktempdir
 from threading import RLock as ReentrantLock
 from traceback import print_exc
-from typing import Any, Optional
 
 import dash
 import numpy
@@ -39,17 +37,17 @@ import util
 from util import identity, sdss_iau, sdss_sas_fits
 
 
-def fetch(url: str, auth: Optional[tuple[str, str]] = None) -> bytes:
+def fetch(url: str, auth: None | tuple[str, str] = None) -> bytes:
 	try:
 		rv = requests.get(url, auth=auth)
 	except ChunkedEncodingError: # Connection broken: IncompleteRead
 		rv = requests.get(url, auth=auth)
+	if (rv.status_code != 404): print(rv.status_code, url)
 	rv.raise_for_status() # HTTPError
-	print(rv.status_code, url)
 	return rv.content
-def write(f: str, x: bytes) -> None:
+def write(f: str, x: bytes):
 	with open(f, "wb") as io: io.write(x)
-def json_zstd(f: str) -> dict:
+def json_zstd(f: str):
 	with zstd(f) as io: return json.load(io)
 
 # mypy: disable-error-code="assignment, func-returns-value"
@@ -58,30 +56,21 @@ authentication = "authentication.txt"
 bhm_data_local = "data/bhm.json.zst"
 bhm_meta_local = "data/bhm.meta.json"
 
-if Path(bhm_data_local).is_file():
-	url = "https://github.com/Heptazhou/SDSS-SpecViewer/releases/download/v1.0.0/bhm.meta.json"
-	try:
-		bhm_data = json_zstd(bhm_data_local)
-		if json.load(BytesIO(fetch(url)))["date"] > bhm_data["hdr"]["date"]:
-			os.remove(bhm_data_local)
-	except:
-		print_exc()
-		os.remove(bhm_data_local)
+while True:
+	remote = "https://github.com/Heptazhou/SDSS-SpecViewer/releases/download/v1.0.0/"
+	if Path(bhm_data_local).is_file():
+		try:
+			lcl_data = json_zstd(bhm_data_local)
+			rmt_meta = json.load(BytesIO(fetch(remote + "bhm.meta.json")))
+			if lcl_data["hdr"]["date"] >= rmt_meta["date"]: break
+		except: print_exc()
+	write(bhm_data_local, fetch(remote + "bhm.json.zst"))
 
-while not Path(bhm_data_local).is_file():
-	url = "https://github.com/Heptazhou/SDSS-SpecViewer/releases/download/v1.0.0/bhm.json.zst"
-	write(bhm_data_local, fetch(url))
-	try:
-		bhm_data = json_zstd(bhm_data_local)
-	except:
-		print_exc()
-		os.remove(bhm_data_local)
-
-metadata: dict[str, Any      ] = bhm_data["hdr"]
-programs: dict[str, list[int]] = bhm_data["prg"]
-fieldIDs: dict[str, list[int]] = bhm_data["fld"]
-sdss_IDs: dict[str, list[int]] = bhm_data["sid"]
-catalogs: dict[str, list[int]] = bhm_data["cat"]
+metadata: dict[str, list | dict | str | int] = lcl_data["hdr"]
+programs: dict[str, list[int]] = lcl_data["prg"]
+fieldIDs: dict[str, list[int]] = lcl_data["fld"]
+sdss_IDs: dict[str, list[int]] = lcl_data["sid"]
+catalogs: dict[str, list[int]] = lcl_data["cat"]
 
 print({k: v for k, v in metadata.items() if k in ["date", "dims", "nrow", "size"]})
 
@@ -150,7 +139,7 @@ def SDSSV_fetch(username: str, password: str, field: int | str, mjd: int, obj: i
 	if not branch or branch == "legacy":
 		for v in ("26", "104", "103") if branch == "legacy" \
 			else ("master", "v6_2_1", "v6_2_0", "v6_1_3", "v6_0_9", "v6_1_0"):
-			# some objects seem to only exist in v6.1.0 so we have to keep it here :(
+			# some object seems to only exist in v6.1.0 so we have to keep it here :(
 			try: return SDSSV_fetch(username, password, field, mjd, obj, v)
 			except HTTPError: pass
 			except Exception: print_exc()
