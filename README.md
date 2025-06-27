@@ -24,6 +24,7 @@ Please install the following Python packages to use this tool, with the minimum 
 +	plotly   >= 5.0.0
 +	pyzstd   >= 0.15.9
 +	requests >= 2.23.0
+<!-- ^ keep consistent with pyproject.toml -->
 
 > [!NOTE]
 > Python v3.10 or higher is required ([status of Python versions](https://devguide.python.org/versions/)).

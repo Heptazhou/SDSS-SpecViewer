@@ -15,13 +15,14 @@
 using Exts
 
 @time if abspath(PROGRAM_FILE) == @__FILE__
+	run(`pixi add "setuptools~=80.8.0"`, devnull)
 	run(`pixi update`, devnull)
 	f = "pixi.lock"
 	s = readstr(f)
 	s = replace(s, r"^( +)- [^: ]+\K:(?= )"m => "\0")
 	s = replace(s, r"^( +)(?:\w+): \[\]\n"m => "")
 	s = replace(s, r"^( +)license(?:_family)?: .+\n"m => "")
-	s = replace(s, [Regex(s"^( +)(?:\w+):\K(\n\1- )([^\n\0]+)" * s"\2(.+)"^(n-1) * s"$(?!\2)", "m") =>
+	s = replace(s, [Regex(s"^( +)(?:\w+):\K(\n\1- )([^\n\0]+)" * s"\2(.+)"^(n - 1) * s"$(?!\2)", "m") =>
 		SubstitutionString(" [" * join(("\"\\$(i+2)\"" for i ∈ 1:n), ", ") * "]") for n ∈ 1:32]...)
 	s = replace(s, string("\0") => ":")
 	write(f, s)
