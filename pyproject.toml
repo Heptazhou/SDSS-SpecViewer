@@ -36,6 +36,7 @@ dependencies = [
 ]
 name = "SpecViewer"
 requires-python = ">=3.10"
+version = "0.1.0"
 
 [tool.coverage]
 # https://coverage.readthedocs.io/en/latest/
@@ -45,13 +46,18 @@ run.data_file = "util/__pycache__/.coverage"
 run.omit = ["*_test.py"]
 run.source = ["util"]
 
+[tool.isort]
+# https://pycqa.github.io/isort/docs/configuration/options.html
+comment_prefix = " #"
+line_length = 256
+
 [tool.mypy]
 # https://mypy.readthedocs.io/en/stable/
-cache_dir = "util/__pycache__/mypy"
+cache_dir = "util/__pycache__/mypy/"
 sqlite_cache = true
 warn_unused_ignores = true
 
 [tool.pytest.ini_options]
 # https://docs.pytest.org/en/stable/
-cache_dir = "util/__pycache__/pytest"
+cache_dir = "util/__pycache__/pytest/"
 testpaths = "util"

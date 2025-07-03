@@ -1,4 +1,4 @@
-from .math import mod, modf60, rem, signbit
+from .math import Inf, mod, modf60, nextfloat, prevfloat, rem, signbit
 
 
 def testset_mf60() -> None:
@@ -67,7 +67,21 @@ def testset_rem4() -> None:
 	assert rem(+70, -50) == +20
 	assert rem(+80, -50) == +30
 
+def testset_prev() -> None:
+	assert prevfloat(-1.0) == -1.0000000000000002
+	assert prevfloat(-Inf) == -Inf
+	assert prevfloat(+0.0) == -5.0e-324
+	assert prevfloat(+1.0) == +0.9999999999999999
+
+def testset_next() -> None:
+	assert nextfloat(-0.0) == +5.0e-324
+	assert nextfloat(-1.0) == -0.9999999999999999
+	assert nextfloat(+1.0) == +1.0000000000000002
+	assert nextfloat(+Inf) == +Inf
+
 def testset_sign() -> None:
 	assert signbit(-0.0) == True
+	assert signbit(-1.0) == True
 	assert signbit(+0.0) == False
+	assert signbit(+1.0) == False
 

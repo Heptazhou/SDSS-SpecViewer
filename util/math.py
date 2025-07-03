@@ -13,8 +13,9 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from math import ceil, copysign, floor, fmod
+from math import inf as Inf
 from math import isclose as isapprox
-from math import modf, trunc
+from math import modf, nextafter, trunc
 from typing import overload
 
 
@@ -60,6 +61,11 @@ def rem(x: int | float, y: int | float) -> int | float:
 def modf60(x: float) -> tuple[float, float]:
 	f, i = modf(roundapprox(x))
 	return 60 * f, roundfloat(i)
+
+def prevfloat(x: float) -> float:
+	return nextafter(x, -Inf)
+def nextfloat(x: float) -> float:
+	return nextafter(x, +Inf)
 
 def roundapprox(x: float) -> float:
 	i = roundfloat(x)

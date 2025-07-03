@@ -5,36 +5,37 @@ Excelsior!
 """
 
 import json
-import math
 import sys
 from base64 import b64decode
 from builtins import isinstance as isa
 from collections import defaultdict
 from functools import lru_cache
-from io import BytesIO
+from io import BytesIO as IOBuffer
+from math import log10
 from math import nan as NaN
 from pathlib import Path
 from re import IGNORECASE, fullmatch
 from tempfile import TemporaryDirectory as mktempdir
 from threading import RLock as ReentrantLock
+from time import sleep
 from traceback import print_exc
 
 import dash
 import numpy
 import requests
-from astropy.convolution import Box1DKernel, convolve  # type: ignore[import-untyped]
-from astropy.io import fits as FITS  # type: ignore[import-untyped]
-from astropy.io.fits import BinTableHDU, FITS_rec, HDUList  # type: ignore[import-untyped]
+from astropy.convolution import Box1DKernel, convolve # type: ignore[import-untyped]
+from astropy.io.fits import BinTableHDU, FITS_rec, HDUList # type: ignore[import-untyped]
+from astropy.io.fits import open as FITS
 from dash import dcc, html
 from dash.dependencies import Input, Output, State
 from numpy import mean, median, sqrt, std
 from numpy.typing import NDArray
-from plotly.graph_objects import Figure, Scatter  # type: ignore[import-untyped]
+from plotly.graph_objects import Figure, Scatter # type: ignore[import-untyped]
 from pyzstd import open as zstd
 from requests.exceptions import ChunkedEncodingError, HTTPError
 
 import util
-from util import identity, sdss_iau, sdss_sas_fits
+from util import identity, nextfloat, sdss_iau, sdss_sas_fits
 
 
 def fetch(url: str, auth: None | tuple[str, str] = None) -> bytes:
@@ -47,13 +48,13 @@ def fetch(url: str, auth: None | tuple[str, str] = None) -> bytes:
 	return rv.content
 def isfile(f: str) -> bool:
 	return Path(f).is_file()
-def write(f: str, x: bytes):
-	with open(f, "wb") as io: io.write(x)
+def write(f: str, x: bytes) -> int:
+	with open(f, "wb") as io: return io.write(x)
 def json_zstd(f: str):
 	if f.endswith(e := ".zst") and isfile(g := f[:-len(e)]):
 		with zstd(f) as io:     # only if a decompressed file already exists
 			write(g, io.read()) # replace it with latest data (compressed)
-		return json.load(open(g))
+		return json.load(open(g, newline=""))
 	with zstd(f) as io: return json.load(io)
 
 # mypy: disable-error-code="assignment, func-returns-value"
@@ -67,10 +68,12 @@ while True:
 	if isfile(bhm_data_local):
 		try:
 			lcl_data = json_zstd(bhm_data_local)
-			rmt_meta = json.load(BytesIO(fetch(remote + "bhm.meta.json")))
-			if lcl_data["hdr"]["date"] >= rmt_meta["date"]: break
+			rmt_meta = json.load(IOBuffer(fetch(remote + "bhm.meta.json")))
+			if lcl_data["hdr"]["date"] >= rmt_meta["date"]: break # already latest
+		except HTTPError: break # skip update
 		except: print_exc()
-	write(bhm_data_local, fetch(remote + "bhm.json.zst"))
+	try: write(bhm_data_local, fetch(remote + "bhm.json.zst"))
+	except HTTPError: sleep(1) # retry after delay
 
 metadata: dict[str, list | dict | str | int] = lcl_data["hdr"]
 programs: dict[str, list[int]] = lcl_data["prg"]
@@ -159,7 +162,7 @@ def SDSSV_fetch(username: str, password: str, field: int | str, mjd: int, obj: i
 	# print(url)
 
 	numpy.seterr(divide="ignore") # Python does not comply with IEEE 754 :(
-	fits: HDUList = FITS.open(BytesIO(locked_fetch(url))) # prevent duplicated requests
+	fits: HDUList = FITS(IOBuffer(locked_fetch(url))) # prevent duplicated requests
 	hdu2: BinTableHDU = fits["COADD"] if "COADD" in fits else fits[1]
 	hdu3: BinTableHDU = fits["SPALL"] if "SPALL" in fits else fits[2] # SPECOBJ
 	meta: FITS_rec = hdu3.data
@@ -339,7 +342,7 @@ def fetch_catID(field: int | str, catID: int | str, extra="", match_sdss_id=True
 ###
 try:
 	print("Reading authentication file.")
-	with open(authentication, "r", newline="") as io:
+	with open(authentication, newline="") as io:
 		lines = io.readlines()
 		username = lines[0].strip()
 		password = lines[1].strip()
@@ -350,8 +353,7 @@ except: # any error from above will fall through to here.
 	sys.stdout.write("\r\x1bc\r") # "\ec"
 	sys.stdout.flush()
 finally:
-	with open(authentication, "w", newline="") as io:
-		io.write(f"{username}\n{password}\n")
+	write(authentication, f"{username}\n{password}\n".encode())
 
 try:
 	# raise Exception()
@@ -947,7 +949,7 @@ def set_redshift_stepping(z, step):
 		type = "text"
 	else:
 		type = "number"
-		if z: z = f"%0.{-int(math.log10(float(step)))}f" % float(z)
+		if z: z = f"%0.{-int(log10(float(step)))}f" % float(z)
 	return z, type, step
 
 # set extra object(s) list to plot for comparison
@@ -1011,29 +1013,29 @@ def hide_file_upload(checklist: list[str]):
 	Input("file_ul", "filename"),
 	Input("file_ul", "last_modified"))
 def process_upload(sto: dict, contents: list[str], filename: list[str], timestamp: list[float]):
-# read in spectrum from text file with "dlm" as delimeter between wavelength, flux, error
+	# read in spectrum from csv/tsv/wsv file for wavelength, flux, error (optional)
 	if not contents: return sto
 	if not sto: sto = dict()
-	with mktempdir(prefix="py_", ignore_cleanup_errors=True) as _tmpdir:
-		tmpdir = Path(_tmpdir)
-		for s, _f, t in zip(contents, filename, timestamp):
+	with mktempdir(prefix="py_", ignore_cleanup_errors=True) as tmpdir:
+		d = Path(tmpdir)
+		for s, f, t in zip(contents, filename, timestamp):
 			try:
-				# print((s[:100], _f, t)) # For testing
-				f, dlm = tmpdir / _f, None # default dlm of "None" is a space
+				# print((s[:100], f, t)) # for testing
+				path, type = d / f, None # default file type is tsv/wsv
 				mime, data = s.split(",", 1)
 				head, data = 0, b64decode(data).decode()
+				assert fullmatch(r"data:.*;base64", mime)
 				for line in data.splitlines():
-					# use , as delimiter if , is present. Next line of code's fullmatch will match:
-					# start-of-line whitespace(0 or more)  [plus or minus](0 or 1)  number(1 or more)  anything(0 or more),  anything(0 or more)
-					if fullmatch(r"^\s*[+-]?\d+.*,.*", line): dlm = ","
-					# if line starts with only whitespace [+-] numbers, it's not a header line:
-					if fullmatch(r"^\s*[+-]?\d+.*", line): break
+					# use comma as delimiter if present in (1st) data line; next line of code will match:
+					# [whitespace]... [plus|minus] <number>... [anything]... <comma> <anything>...
+					if fullmatch(r"\s*[+-]?\d+.*,.+", line): type = "," # csv
+					# if line starts with some number, consider as end of header lines:
+					if fullmatch(r"\s*[+-]?\d+.*", line): break
 					# lines that fail the above criterion are added to the count of header lines:
 					head += 1
-				with open(f, mode="w+") as io:
-					io.write(data)
-				a = numpy.genfromtxt(f, dtype=None, delimiter=dlm, skip_header=head).transpose()
-				sto[f.stem] = a
+				write(str(path), data.encode())
+				a = numpy.genfromtxt(path, dtype=None, delimiter=type, skip_header=head).transpose()
+				sto[path.stem] = a
 				# print(a)
 			except: print_exc()
 	return sto
@@ -1154,11 +1156,11 @@ def make_multiepoch_spectra(field_d, cat_d, field_i, cat_i, extra_obj, redshift,
 	layout_axis = dict(fixedrange=True)
 	layout = dict(yaxis=layout_axis, xaxis=layout_axis, xaxis2=layout_axis)
 	xscale, xtype = identity, "linear"
-	if "l" in checklist: xscale, xtype = math.log10, "log"
+	if "l" in checklist: xscale, xtype = log10, "log"
 
 	fieldid, catalogid = str(field_d or field_i), str(cat_d or cat_i)
 	smooth, z = int(smooth or smooth_default), float(redshift or redshift_default)
-	if (1 + z) <= 0: z = math.nextafter(-1, 0) # z ∈ (-1, +∞)
+	if (1 + z) <= 0: z = nextfloat(-1) # z ∈ (-1, +∞)
 
 	names, waves, fluxes, delta = list[str](), list[NDArray](), list[NDArray](), list[NDArray]()
 	if user_data:
