@@ -1019,15 +1019,16 @@ def process_upload(sto: dict, contents: list[str], filename: list[str], timestam
 		for s, _f, t in zip(contents, filename, timestamp):
 			try:
 				# print((s[:100], _f, t))
-				f = tmpdir / _f
+				f, dlm = tmpdir / _f, None
 				mime, data = s.split(",", 1)
 				head, data = 0, b64decode(data).decode()
 				for line in data.splitlines():
+					if fullmatch(r"^\s*[+-]?\d+.*,.*", line): dlm = ","
 					if fullmatch(r"^\s*[+-]?\d+.*", line): break
 					head += 1
 				with open(f, mode="w+") as io:
 					io.write(data)
-				a = numpy.genfromtxt(f, dtype=None, skip_header=head).transpose()
+				a = numpy.genfromtxt(f, dtype=None, delimiter=dlm, skip_header=head).transpose()
 				sto[f.stem] = a
 				# print(a)
 			except: print_exc()
