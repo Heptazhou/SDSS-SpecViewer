@@ -1011,20 +1011,24 @@ def hide_file_upload(checklist: list[str]):
 	Input("file_ul", "filename"),
 	Input("file_ul", "last_modified"))
 def process_upload(sto: dict, contents: list[str], filename: list[str], timestamp: list[float]):
+# read in spectrum from text file with "dlm" as delimeter between wavelength, flux, error
 	if not contents: return sto
 	if not sto: sto = dict()
 	with mktempdir(prefix="py_", ignore_cleanup_errors=True) as _tmpdir:
 		tmpdir = Path(_tmpdir)
-		# print(tmpdir)
 		for s, _f, t in zip(contents, filename, timestamp):
 			try:
-				# print((s[:100], _f, t))
-				f, dlm = tmpdir / _f, None
+				# print((s[:100], _f, t)) # For testing
+				f, dlm = tmpdir / _f, None # default dlm of "None" is a space
 				mime, data = s.split(",", 1)
 				head, data = 0, b64decode(data).decode()
 				for line in data.splitlines():
+					# use , as delimiter if , is present. Next line of code's fullmatch will match:
+					# start-of-line whitespace(0 or more)  [plus or minus](0 or 1)  number(1 or more)  anything(0 or more),  anything(0 or more)
 					if fullmatch(r"^\s*[+-]?\d+.*,.*", line): dlm = ","
+					# if line starts with only whitespace [+-] numbers, it's not a header line:
 					if fullmatch(r"^\s*[+-]?\d+.*", line): break
+					# lines that fail the above criterion are added to the count of header lines:
 					head += 1
 				with open(f, mode="w+") as io:
 					io.write(data)
