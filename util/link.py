@@ -1,4 +1,4 @@
-from typing import Iterable
+from collections.abc import Iterable
 
 
 def object_links(ra: float, dec: float) -> Iterable[str]:
@@ -8,7 +8,7 @@ def object_links(ra: float, dec: float) -> Iterable[str]:
 	def f(x: dict) -> str:
 		return "?" + "&".join(f"{k}={v}" for (k, v) in x.items()) if x else ""
 
-	if None in (ra, dec):
+	if None in (ra, dec): # pyright: ignore[reportUnnecessaryContains]
 		return # pragma: no cover
 	if not (0 <= ra <= 360) or not (-90 <= dec <= 90):
 		print(f"[object_links] {(ra, dec)}")

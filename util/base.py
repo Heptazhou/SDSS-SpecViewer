@@ -1,4 +1,4 @@
-from builtins import isinstance as isa
+from builtins import isinstance as isa # pyright: ignore[reportUnusedImport]
 from typing import TypeVar
 
 T = TypeVar("T")
