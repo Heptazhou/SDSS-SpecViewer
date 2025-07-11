@@ -57,6 +57,30 @@ cache_dir = "util/__pycache__/mypy/"
 sqlite_cache = true
 warn_unused_ignores = true
 
+[tool.pyright]
+# https://github.com/microsoft/pyright/blob/main/docs/configuration.md
+deprecateTypingAliases = true
+enableTypeIgnoreComments = false
+include = ["util/", "sdssv_spec_appREMOTE.py"]
+pythonPlatform = "All"
+pythonVersion = "3.10"
+reportImportCycles = true
+reportMatchNotExhaustive = false
+reportMissingParameterType = false
+reportMissingTypeArgument = false
+reportMissingTypeStubs = false
+reportPropertyTypeMismatch = true
+reportShadowedImports = true
+reportUnknownArgumentType = false
+reportUnknownMemberType = false
+reportUnknownParameterType = false
+reportUnknownVariableType = false
+reportUnnecessaryTypeIgnoreComment = true
+reportUnreachable = true
+reportUnusedExpression = false
+reportUnusedVariable = false
+typeCheckingMode = "strict"
+
 [tool.pytest.ini_options]
 # https://docs.pytest.org/en/stable/
 cache_dir = "util/__pycache__/pytest/"

@@ -6,36 +6,40 @@ Excelsior!
 
 import json
 import sys
+import warnings
 from base64 import b64decode
-from builtins import isinstance as isa
 from collections import defaultdict
 from functools import lru_cache
 from io import BytesIO as IOBuffer
 from math import log10
 from math import nan as NaN
 from pathlib import Path
+from posixpath import basename
 from re import IGNORECASE, fullmatch
 from tempfile import TemporaryDirectory as mktempdir
 from threading import RLock as ReentrantLock
 from time import sleep
 from traceback import print_exc
+from typing import cast
 
-import dash
+with warnings.catch_warnings():
+	warnings.filterwarnings("ignore", category=DeprecationWarning)
+	import dash
+	from dash import dcc, html
+	from dash.dependencies import Input, Output, State
+
 import numpy
 import requests
 from astropy.convolution import Box1DKernel, convolve # type: ignore[import-untyped]
 from astropy.io.fits import BinTableHDU, FITS_rec, HDUList # type: ignore[import-untyped]
 from astropy.io.fits import open as FITS
-from dash import dcc, html
-from dash.dependencies import Input, Output, State
-from numpy import mean, median, sqrt, std
-from numpy.typing import NDArray
+from numpy import mean, median, ndarray, sqrt, std
 from plotly.graph_objects import Figure, Scatter # type: ignore[import-untyped]
 from pyzstd import open as zstd
 from requests.exceptions import ChunkedEncodingError, HTTPError
 
 import util
-from util import identity, nextfloat, sdss_iau, sdss_sas_fits
+from util import identity, isa, nextfloat, sdss_iau, sdss_sas_fits
 
 
 def fetch(url: str, auth: None | tuple[str, str] = None) -> bytes:
@@ -58,6 +62,7 @@ def json_zstd(f: str):
 	with zstd(f) as io: return json.load(io)
 
 # mypy: disable-error-code="assignment, func-returns-value"
+# pyright: reportArgumentType=false, reportAttributeAccessIssue=false, reportPossiblyUnboundVariable=false
 
 authentication = "authentication.txt"
 bhm_data_local = "data/bhm.json.zst"
@@ -121,19 +126,19 @@ def locked_fetch(url: str) -> bytes:
 	return r
 
 def SDSSV_fetch(username: str, password: str, field: int | str, mjd: int, obj: int | str, branch="") \
-	-> tuple[FITS_rec, NDArray, NDArray, NDArray]:
+	-> tuple[FITS_rec, ndarray, ndarray, ndarray]:
 	"""
 	Fetch spectral data for a SDSS-RM object on a
 	specific field on a specific MJD, using the user
 	supplied authentication.
 	"""
-	if type(field) == str:
+	if isa(field, str):
 		if fullmatch(r"\d+p", field):
 			field = field.rstrip("p")
 			branch = branch or "v6_0_4"
 		if fullmatch(r"\d+", field):
 			field = int(field)
-	if type(field) == int:
+	if isa(field, int):
 		# PBH: field numbers 1 to 3509 (and 8015 & 8033) indicate SDSS-I/II data, but 00000 reserved for eFEDS
 		match field:
 			case n if n <= 0:
@@ -162,18 +167,29 @@ def SDSSV_fetch(username: str, password: str, field: int | str, mjd: int, obj: i
 	# print(url)
 
 	numpy.seterr(divide="ignore") # Python does not comply with IEEE 754 :(
-	fits: HDUList = FITS(IOBuffer(locked_fetch(url))) # prevent duplicated requests
-	hdu2: BinTableHDU = fits["COADD"] if "COADD" in fits else fits[1]
-	hdu3: BinTableHDU = fits["SPALL"] if "SPALL" in fits else fits[2] # SPECOBJ
-	meta: FITS_rec = hdu3.data
-	wave: NDArray = hdu2.data["LOGLAM"] # lg(λ)
-	flux: NDArray = hdu2.data["FLUX"]   # f_λ
-	errs: NDArray = hdu2.data["IVAR"]   # τ = σ⁻²
-	wave = 10**wave                     # λ
-	errs = 1 / sqrt(errs)               # σ
+	fits = cast(HDUList, FITS(IOBuffer(locked_fetch(url)))) # prevent duplicated requests
+	hdu2 = fits["COADD"] if "COADD" in fits else fits[1]
+	hdu3 = fits["SPALL"] if "SPALL" in fits else fits[2] # SPECOBJ
+	assert isa(hdu2, BinTableHDU) and isa(hdu2.data, FITS_rec)
+	assert isa(hdu3, BinTableHDU) and isa(hdu3.data, FITS_rec)
+	meta = hdu3.data
+	wave = cast(ndarray, hdu2.data["LOGLAM"]) # lg(λ)
+	flux = cast(ndarray, hdu2.data["FLUX"  ]) # f_λ
+	errs = cast(ndarray, hdu2.data["IVAR"  ]) # τ = σ⁻²
+	wave = 10**wave                           # λ
+	errs = 1 / sqrt(errs)                     # σ
 	# print(f"meta: {type(meta)} = {str(meta)[:100]}")
 	# print(f"wave: {type(wave)} = {str(wave)[:100]}")
 	# print(f"flux: {type(flux)} = {str(flux)[:100]}")
+	if hasattr(meta, "RUN2D") and (RUN2D := meta["RUN2D"][0]) != branch:
+		print(f"Error: unexpected {RUN2D=} with {branch=} in `{basename(url)}`")
+		meta["RUN2D"][0] = ""
+	if hasattr(meta, "OBS") and (
+		(OBS := meta["OBS"][0]) not in ("APO", "LCO") or
+		(field == "allepoch_apo" and OBS != "APO") or
+		(field == "allepoch_lco" and OBS != "LCO")):
+		print(f"Error: unexpected {OBS=} with {field=} in `{basename(url)}`")
+		meta["OBS"][0] = ""
 	r = meta, wave, flux, errs
 	cache[(field, mjd, obj, branch)] = r
 	return r
@@ -199,7 +215,7 @@ def SDSSV_fetch_allepoch(username: str, password: str, mjd: int, obj: int | str)
 	raise HTTPError(f"[SDSSV_fetch] {(field, mjd, obj)}")
 
 def fetch_catID(field: int | str, catID: int | str, extra="", match_sdss_id=True) \
-	-> tuple[dict[str, int | float], list[str], list[NDArray], list[NDArray], list[NDArray]]:
+	-> tuple[dict[str, int | float], list[str], list[ndarray], list[ndarray], list[ndarray]]:
 	if not (extra or catID): # consider as incomplete user input
 		raise Exception()    # so abort quietly
 	if not (extra or catID and field):
@@ -211,7 +227,7 @@ def fetch_catID(field: int | str, catID: int | str, extra="", match_sdss_id=True
 	if (field, catID, extra, match_sdss_id) in cache:
 		return cache[(field, catID, extra, match_sdss_id)]
 
-	name, wave, flux, errs = list[str](), list[NDArray](), list[NDArray](), list[NDArray]()
+	name, wave, flux, errs = list[str](), list[ndarray](), list[ndarray](), list[ndarray]()
 
 	cats: list[int] = [int(catID)] if catID else []
 	meta: dict[str, list] = {
@@ -230,6 +246,14 @@ def fetch_catID(field: int | str, catID: int | str, extra="", match_sdss_id=True
 		cats = meta["CATALOGID"]
 	# print(f"[sdss_id] {catID} => {sdss_id} => {cats} # {match_sdss_id}")
 
+	def legend(name: str, meta: FITS_rec) -> str:
+		ver = str(meta["RUN2D"][0]) if hasattr(meta, "RUN2D") else ""
+		obs = str(meta["OBS"  ][0]) if hasattr(meta, "OBS"  ) else ""
+		ext = list[str]()
+		if ver: ext.append("@" + ver.replace("_", "."))
+		if obs: ext.append("(" + obs + ")")
+		name += "\n" + " ".join(ext) if ext else ""
+		return name if len(name) <= 20 else name.replace("\n", "<br />")
 	for x in extra.split(","):
 		x, ver = [*x.split("@", 1), ""][:2]
 		if not fullmatch(r"\d+p?-\d+-[^-](.*[^-])?", x): continue
@@ -241,7 +265,7 @@ def fetch_catID(field: int | str, catID: int | str, extra="", match_sdss_id=True
 			if str(e): print(e) if isa(e, HTTPError) else print_exc()
 			continue
 		mjd_final = str((dat[0]["MJD_FINAL"] if hasattr(dat[0], "MJD_FINAL") else dat[0]["MJD"])[0])
-		name.append(mjd_final + "*")
+		name.append(legend(f"{mjd_final}*", dat[0]))
 		wave.append(dat[1])
 		flux.append(dat[2])
 		errs.append(dat[3])
@@ -264,7 +288,7 @@ def fetch_catID(field: int | str, catID: int | str, extra="", match_sdss_id=True
 		meta["ZWARNING"].append(dat[0]["ZWARNING"][0])
 		mjd_final = str((dat[0]["MJD_FINAL"] if hasattr(dat[0], "MJD_FINAL") else dat[0]["MJD"])[0])
 		mjd_list = [mjd]
-		name.append(mjd_final)
+		name.append(legend(f"{mjd_final}", dat[0]))
 		wave.append(dat[1])
 		flux.append(dat[2])
 		errs.append(dat[3])
@@ -283,7 +307,7 @@ def fetch_catID(field: int | str, catID: int | str, extra="", match_sdss_id=True
 				meta["Z"       ].append(dat[0]["Z"       ][0])
 				meta["ZWARNING"].append(dat[0]["ZWARNING"][0])
 				mjd_final = str((dat[0]["MJD_FINAL"] if hasattr(dat[0], "MJD_FINAL") else dat[0]["MJD"])[0])
-				name.append(mjd_final)
+				name.append(legend(f"{mjd_final}", dat[0]))
 				wave.append(dat[1])
 				flux.append(dat[2])
 				errs.append(dat[3])
@@ -313,7 +337,7 @@ def fetch_catID(field: int | str, catID: int | str, extra="", match_sdss_id=True
 			except Exception as e:
 				# if str(e): print(e) if isa(e, HTTPError) else print_exc()
 				continue
-			name.append(f"allplate-{mjd}")
+			name.append(legend(f"allplate-{mjd}", dat[0]))
 			wave.append(dat[1])
 			flux.append(dat[2])
 			errs.append(dat[3])
@@ -326,7 +350,7 @@ def fetch_catID(field: int | str, catID: int | str, extra="", match_sdss_id=True
 			except Exception as e:
 				# if str(e): print(e) if isa(e, HTTPError) else print_exc()
 				continue
-			name.append(f"allFPS-{mjd}")
+			name.append(legend(f"allFPS-{mjd}", dat[0]))
 			wave.append(dat[1])
 			flux.append(dat[2])
 			errs.append(dat[3])
@@ -335,7 +359,7 @@ def fetch_catID(field: int | str, catID: int | str, extra="", match_sdss_id=True
 		raise HTTPError(f"[fetch_catID] {(field, catID, extra)}")
 	r = meta, name, wave, flux, errs
 	cache[(field, catID, extra, match_sdss_id)] = r
-	return r # type: ignore[return-value]
+	return r # type: ignore[return-value] # pyright: ignore[reportReturnType]
 
 ###
 ### Authentication
@@ -1162,12 +1186,14 @@ def make_multiepoch_spectra(field_d, cat_d, field_i, cat_i, extra_obj, redshift,
 	smooth, z = int(smooth or smooth_default), float(redshift or redshift_default)
 	if (1 + z) <= 0: z = nextfloat(-1) # z ∈ (-1, +∞)
 
-	names, waves, fluxes, delta = list[str](), list[NDArray](), list[NDArray](), list[NDArray]()
+	names, waves, fluxes, delta = list[str](), list[ndarray](), list[ndarray](), list[ndarray]()
 	if user_data:
 		for k, v in user_data.items():
 			try: #
 				name, wave, flux = str(k), numpy.asarray(v[0]), numpy.asarray(v[1])
 				errs = numpy.asarray(v[2] if 2 < len(v) else [])
+				if len(name) > 36: name = name[:33] + "..." # truncate name that is too long
+				if len(name) > 18: name = name[:18] + "<br />" + name[18:] # wrap to 2 lines
 				if mean(wave) <= 10: wave = 10**wave # λ
 				if median(wave) >= 5000: wave = wave / (1 + z) # consider as observed instead of rest frame
 				if len(errs) > 0:
