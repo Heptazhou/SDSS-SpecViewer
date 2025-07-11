@@ -7,7 +7,6 @@ Excelsior!
 import json
 import sys
 from base64 import b64decode
-from builtins import isinstance as isa
 from collections import defaultdict
 from functools import lru_cache
 from io import BytesIO as IOBuffer
@@ -35,7 +34,7 @@ from pyzstd import open as zstd
 from requests.exceptions import ChunkedEncodingError, HTTPError
 
 import util
-from util import identity, nextfloat, sdss_iau, sdss_sas_fits
+from util import identity, isa, nextfloat, sdss_iau, sdss_sas_fits
 
 
 def fetch(url: str, auth: None | tuple[str, str] = None) -> bytes:
@@ -127,13 +126,13 @@ def SDSSV_fetch(username: str, password: str, field: int | str, mjd: int, obj: i
 	specific field on a specific MJD, using the user
 	supplied authentication.
 	"""
-	if type(field) == str:
+	if isa(field, str):
 		if fullmatch(r"\d+p", field):
 			field = field.rstrip("p")
 			branch = branch or "v6_0_4"
 		if fullmatch(r"\d+", field):
 			field = int(field)
-	if type(field) == int:
+	if isa(field, int):
 		# PBH: field numbers 1 to 3509 (and 8015 & 8033) indicate SDSS-I/II data, but 00000 reserved for eFEDS
 		match field:
 			case n if n <= 0:

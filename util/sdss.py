@@ -1,5 +1,6 @@
 from re import fullmatch
 
+from .base import isa
 from .math import signbit
 from .unit import deg2dms, deg2hms
 
@@ -10,10 +11,10 @@ def sdss_sas_fits(field: int | str, mjd: int, obj: int | str, branch: str) -> st
 	"""
 	if not (field and mjd and obj and branch): # pragma: no cover
 		raise Exception((field, mjd, obj, branch))
-	if type(field) == str and fullmatch(r"\d+p?", field):
+	if isa(field, str) and fullmatch(r"\d+p?", field):
 		field = int(field.rstrip("p"))
 
-	if type(field) == int:
+	if isa(field, int):
 		group = f"{field // 1000}XXX".zfill(6)
 	else:
 		group = f"{field}"

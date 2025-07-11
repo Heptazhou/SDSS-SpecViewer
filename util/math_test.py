@@ -1,3 +1,4 @@
+from .base import isa
 from .math import Inf, mod, modf60, nextfloat, prevfloat, rem, signbit
 
 
@@ -8,16 +9,16 @@ def testset_mf60() -> None:
 	assert modf60(+5.00) == (+00.0, +5)
 
 def testset_mod0() -> None:
-	assert type(mod(1.0, 1.0)) == float
-	assert type(mod(1.0, 100)) == float
-	assert type(mod(100, 1.0)) == float
-	assert type(mod(100, 100)) == int
+	assert isa(mod(1.0, 1.0), float)
+	assert isa(mod(1.0, 100), float)
+	assert isa(mod(100, 1.0), float)
+	assert isa(mod(100, 100), int  )
 
 def testset_rem0() -> None:
-	assert type(rem(1.0, 1.0)) == float
-	assert type(rem(1.0, 100)) == float
-	assert type(rem(100, 1.0)) == float
-	assert type(rem(100, 100)) == int
+	assert isa(rem(1.0, 1.0), float)
+	assert isa(rem(1.0, 100), float)
+	assert isa(rem(100, 1.0), float)
+	assert isa(rem(100, 100), int  )
 
 def testset_mod1() -> None:
 	assert mod(+20, +50) == +20
