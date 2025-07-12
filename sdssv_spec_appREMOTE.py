@@ -6,6 +6,7 @@ Excelsior!
 
 import json
 import sys
+import warnings
 from base64 import b64decode
 from collections import defaultdict
 from functools import lru_cache
@@ -13,6 +14,7 @@ from io import BytesIO as IOBuffer
 from math import log10
 from math import nan as NaN
 from pathlib import Path
+from posixpath import basename
 from re import IGNORECASE, fullmatch
 from tempfile import TemporaryDirectory as mktempdir
 from threading import RLock as ReentrantLock
@@ -20,14 +22,17 @@ from time import sleep
 from traceback import print_exc
 from typing import cast
 
-import dash
+with warnings.catch_warnings():
+	warnings.filterwarnings("ignore", category=DeprecationWarning)
+	import dash
+	from dash import dcc, html
+	from dash.dependencies import Input, Output, State
+
 import numpy
 import requests
 from astropy.convolution import Box1DKernel, convolve # type: ignore[import-untyped]
 from astropy.io.fits import BinTableHDU, FITS_rec, HDUList # type: ignore[import-untyped]
 from astropy.io.fits import open as FITS
-from dash import dcc, html
-from dash.dependencies import Input, Output, State
 from numpy import mean, median, ndarray, sqrt, std
 from plotly.graph_objects import Figure, Scatter # type: ignore[import-untyped]
 from pyzstd import open as zstd
@@ -176,12 +181,15 @@ def SDSSV_fetch(username: str, password: str, field: int | str, mjd: int, obj: i
 	# print(f"meta: {type(meta)} = {str(meta)[:100]}")
 	# print(f"wave: {type(wave)} = {str(wave)[:100]}")
 	# print(f"flux: {type(flux)} = {str(flux)[:100]}")
-	if hasattr(meta, "RUN2D" ):
-		assert meta[ "RUN2D" ][0] == branch
-	if hasattr(meta, "OBS"   ):
-		assert meta[ "OBS"   ][0] in ("APO", "LCO")
-		if field == "allepoch_apo": assert meta["OBS"][0] == "APO"
-		if field == "allepoch_lco": assert meta["OBS"][0] == "LCO"
+	if hasattr(meta, "RUN2D") and (RUN2D := meta["RUN2D"][0]) != branch:
+		print(f"Error: unexpected {RUN2D=} with {branch=} in `{basename(url)}`")
+		meta["RUN2D"][0] = ""
+	if hasattr(meta, "OBS") and (
+		(OBS := meta["OBS"][0]) not in ("APO", "LCO") or
+		(field == "allepoch_apo" and OBS != "APO") or
+		(field == "allepoch_lco" and OBS != "LCO")):
+		print(f"Error: unexpected {OBS=} with {field=} in `{basename(url)}`")
+		meta["OBS"][0] = ""
 	r = meta, wave, flux, errs
 	cache[(field, mjd, obj, branch)] = r
 	return r
