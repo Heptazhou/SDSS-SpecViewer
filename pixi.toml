@@ -1,6 +1,6 @@
 
 [dependencies]
-astropy = ">=7.1.0,<8"
+astropy-base = ">=7.1.0,<8"
 coverage = ">=7.9.2,<8"
 dash = ">=3.1.1,<4"
 numpy = ">=2.3.1,<3"

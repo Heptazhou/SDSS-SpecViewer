@@ -1,6 +1,6 @@
 
 [tool.pixi.dependencies]
-astropy = "<=4.3.1"
+astropy-base = "<=4.3.1"
 coverage = "*"
 dash = "<=2.13.0"
 numpy = "<=1.21.4"
@@ -27,7 +27,7 @@ platforms = ["linux-64", "win-64", "osx-arm64"]
 
 [project]
 dependencies = [
-	"astropy",
+	"astropy", # astropy-base
 	"dash",
 	"numpy",
 	"plotly",

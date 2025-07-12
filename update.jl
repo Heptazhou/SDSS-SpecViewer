@@ -19,7 +19,7 @@ using Pkg: Pkg, Registry, RegistrySpec
 	Pkg.activate(@__DIR__)
 end
 
-let registry = getfield.(Registry.reachable_registries(), :name)
+let registry = Registry.reachable_registries() .|> x -> x.name
 	registry ∋ "0hjl" || Registry.add(RegistrySpec(url = "https://github.com/0h7z/0hjl.git"))
 	registry ∋ "General" || Registry.add("General")
 	cd(@__DIR__) do

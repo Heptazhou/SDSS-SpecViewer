@@ -18,12 +18,12 @@ You **must** have the proper SDSS-V Proprietary Data username and password in th
 
 ###	Dependencies
 Please install the following Python packages to use this tool, with the minimum required versions shown as such. See also the file [`pixi.toml`](pixi.toml) for a list of recommended package versions with which SpecViewer is guaranteed to work.
-+	astropy  >= 4.3.1
-+	dash     >= 2.13.0
-+	numpy    >= 1.21.4
-+	plotly   >= 5.0.0
-+	pyzstd   >= 0.15.9
-+	requests >= 2.23.0
++	astropy-base >= 4.3.1
++	dash         >= 2.13.0
++	numpy        >= 1.21.4
++	plotly       >= 5.0.0
++	pyzstd       >= 0.15.9
++	requests     >= 2.23.0
 <!-- ^ keep consistent with pyproject.toml -->
 
 > [!NOTE]
@@ -39,11 +39,11 @@ to run the tool. Otherwise, see the following.
 *****
 If you are using [conda](https://docs.conda.io/) or [mamba](https://mamba.readthedocs.io/), you may run (preferably, within a separate [environment](https://docs.conda.io/projects/conda/en/latest/user-guide/getting-started.html#creating-environments)):
 ```shell
-conda install astropy dash numpy plotly pyzstd requests types-requests
+conda install astropy-base dash numpy plotly pyzstd requests types-requests
 ```
 Also, to update:
 ```shell
-conda update astropy dash numpy plotly pyzstd requests types-requests
+conda update astropy-base dash numpy plotly pyzstd requests types-requests
 ```
 
 *****
