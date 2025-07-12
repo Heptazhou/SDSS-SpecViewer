@@ -4,9 +4,7 @@
 Excelsior!
 """
 
-import json
 import sys
-import warnings
 from base64 import b64decode
 from collections import defaultdict
 from functools import lru_cache
@@ -21,12 +19,7 @@ from threading import RLock as ReentrantLock
 from time import sleep
 from traceback import print_exc
 from typing import cast
-
-with warnings.catch_warnings():
-	warnings.filterwarnings("ignore", category=DeprecationWarning)
-	import dash
-	from dash import dcc, html
-	from dash.dependencies import Input, Output, State
+from warnings import catch_warnings, filterwarnings
 
 import numpy
 import requests
@@ -39,7 +32,13 @@ from pyzstd import open as zstd
 from requests.exceptions import ChunkedEncodingError, HTTPError
 
 import util
-from util import identity, isa, nextfloat, sdss_iau, sdss_sas_fits
+from util import identity, isa, isfile, json_parse, json_parsefile, nextfloat, sdss_iau, sdss_sas_fits, write
+
+with catch_warnings():
+	filterwarnings("ignore", category=DeprecationWarning) # todo v3.11
+	import dash
+	from dash import dcc, html
+	from dash.dependencies import Input, Output, State
 
 
 def fetch(url: str, auth: None | tuple[str, str] = None) -> bytes:
@@ -50,16 +49,12 @@ def fetch(url: str, auth: None | tuple[str, str] = None) -> bytes:
 	if (rv.status_code != 404): print(rv.status_code, url)
 	rv.raise_for_status() # HTTPError
 	return rv.content
-def isfile(f: str) -> bool:
-	return Path(f).is_file()
-def write(f: str, x: bytes) -> int:
-	with open(f, "wb") as io: return io.write(x)
-def json_zstd(f: str):
+def json_parsezst(f: str):
 	if f.endswith(e := ".zst") and isfile(g := f[:-len(e)]):
 		with zstd(f) as io:     # only if a decompressed file already exists
 			write(g, io.read()) # replace it with latest data (compressed)
-		return json.load(open(g, newline=""))
-	with zstd(f) as io: return json.load(io)
+		return json_parsefile(g)
+	with zstd(f) as io: return json_parse(io)
 
 # mypy: disable-error-code="assignment, func-returns-value"
 # pyright: reportArgumentType=false, reportAttributeAccessIssue=false, reportPossiblyUnboundVariable=false
@@ -72,8 +67,8 @@ while True:
 	remote = "https://github.com/Heptazhou/SDSS-SpecViewer/releases/download/v1.0.0/"
 	if isfile(bhm_data_local):
 		try:
-			lcl_data = json_zstd(bhm_data_local)
-			rmt_meta = json.load(IOBuffer(fetch(remote + "bhm.meta.json")))
+			lcl_data = json_parsezst(bhm_data_local)
+			rmt_meta = json_parse(fetch(remote + "bhm.meta.json"))
 			if lcl_data["hdr"]["date"] >= rmt_meta["date"]: break # already latest
 		except HTTPError: break # skip update
 		except: print_exc()
@@ -377,7 +372,7 @@ except: # any error from above will fall through to here.
 	sys.stdout.write("\r\x1bc\r") # "\ec"
 	sys.stdout.flush()
 finally:
-	write(authentication, f"{username}\n{password}\n".encode())
+	write(authentication, f"{username}\n{password}\n")
 
 try:
 	# raise Exception()
@@ -1057,7 +1052,7 @@ def process_upload(sto: dict, contents: list[str], filename: list[str], timestam
 					if fullmatch(r"\s*[+-]?\d+.*", line): break
 					# lines that fail the above criterion are added to the count of header lines:
 					head += 1
-				write(str(path), data.encode())
+				write(path, data)
 				a = numpy.genfromtxt(path, dtype=None, delimiter=type, skip_header=head).transpose()
 				sto[path.stem] = a
 				# print(a)
