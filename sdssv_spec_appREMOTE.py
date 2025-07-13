@@ -4,7 +4,6 @@
 Excelsior!
 """
 
-import sys
 from base64 import b64decode
 from collections import defaultdict
 from functools import lru_cache
@@ -22,13 +21,13 @@ from typing import cast
 from warnings import catch_warnings, filterwarnings
 
 import numpy
-import requests
 from astropy.convolution import Box1DKernel, convolve # type: ignore[import-untyped]
 from astropy.io.fits import BinTableHDU, FITS_rec, HDUList # type: ignore[import-untyped]
 from astropy.io.fits import open as FITS
 from numpy import mean, median, ndarray, sqrt, std
 from plotly.graph_objects import Figure, Scatter # type: ignore[import-untyped]
 from pyzstd import open as zstd
+from requests import request
 from requests.exceptions import ChunkedEncodingError, HTTPError
 
 import util
@@ -43,9 +42,9 @@ with catch_warnings():
 
 def fetch(url: str, auth: None | tuple[str, str] = None) -> bytes:
 	try:
-		rv = requests.get(url, auth=auth)
+		rv = request("GET", url, auth=auth)
 	except ChunkedEncodingError: # Connection broken: IncompleteRead
-		rv = requests.get(url, auth=auth)
+		rv = request("GET", url, auth=auth)
 	if (rv.status_code != 404): print(rv.status_code, url)
 	rv.raise_for_status() # HTTPError
 	return rv.content
@@ -63,15 +62,15 @@ bhm_data_local = "data/bhm.json.zst"
 bhm_meta_local = "data/bhm.meta.json"
 
 while True:
-	remote = "https://github.com/Heptazhou/SDSS-SpecViewer/releases/download/v1.0.0/"
+	remote = "https://github.com/Heptazhou/SDSS-SpecViewer/releases" + "/download/v1.0.0/"
 	if isfile(bhm_data_local):
 		try:
 			lcl_data = parse_json(unzstd(bhm_data_local))
-			rmt_meta = parse_json(fetch(remote + "bhm.meta.json"))
+			rmt_meta = parse_json(fetch(remote + basename(bhm_meta_local)))
 			if lcl_data["hdr"]["date"] >= rmt_meta["date"]: break # already latest
 		except HTTPError: break # skip update
 		except: print_exc()
-	try: write(bhm_data_local, fetch(remote + "bhm.json.zst"))
+	try: write(bhm_data_local, fetch(remote + basename(bhm_data_local)))
 	except HTTPError: sleep(1) # retry after delay
 
 metadata: dict[str, list | dict | str | int] = lcl_data["hdr"]
@@ -368,8 +367,7 @@ except: # any error from above will fall through to here.
 	print("authentication.txt broken or not exist. Please enter authentication.")
 	username = input("Enter SDSS-V username: ").strip()
 	password = input("Enter SDSS-V password: ").strip()
-	sys.stdout.write("\r\x1bc\r") # "\ec"
-	sys.stdout.flush()
+	print("\r\x1bc\r", end="", flush=True) # "\ec"
 finally:
 	write(authentication, f"{username}\n{password}\n")
 
