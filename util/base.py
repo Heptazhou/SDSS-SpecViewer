@@ -15,7 +15,7 @@
 import json as JSON
 from builtins import isinstance as isa
 from pathlib import Path
-from typing import IO, AnyStr, TypeVar
+from typing import TypeVar
 
 T = TypeVar("T")
 
@@ -30,15 +30,11 @@ def isfile(f: Path | str) -> bool:
 		return (f).is_file()
 	return Path(f).is_file()
 
-def json_parse(x: str | bytes | bytearray | IO[AnyStr]):
-	if not isa(x, str | bytes | bytearray):
-		assert x.readable()
-		return JSON.load(x)
-	else:
+def parse_json(x: str | bytes | bytearray):
+	if not isa(x, str):
 		return JSON.loads(x)
-def json_parsefile(f: Path | str):
-	with open(f, "rb") as io:
-		return json_parse(io)
+	with open(x, newline="") as io:
+		return JSON.load(io)
 
 def write(f: Path | str, x: bytes | str) -> int:
 	if isa(x, bytes):

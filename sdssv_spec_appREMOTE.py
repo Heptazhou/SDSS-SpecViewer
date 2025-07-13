@@ -32,7 +32,7 @@ from pyzstd import open as zstd
 from requests.exceptions import ChunkedEncodingError, HTTPError
 
 import util
-from util import identity, isa, isfile, json_parse, json_parsefile, nextfloat, sdss_iau, sdss_sas_fits, write
+from util import identity, isa, isfile, nextfloat, parse_json, sdss_iau, sdss_sas_fits, write
 
 with catch_warnings():
 	filterwarnings("ignore", category=DeprecationWarning) # todo v3.11
@@ -49,12 +49,11 @@ def fetch(url: str, auth: None | tuple[str, str] = None) -> bytes:
 	if (rv.status_code != 404): print(rv.status_code, url)
 	rv.raise_for_status() # HTTPError
 	return rv.content
-def json_parsezst(f: str):
-	if f.endswith(e := ".zst") and isfile(g := f[:-len(e)]):
-		with zstd(f) as io:     # only if a decompressed file already exists
-			write(g, io.read()) # replace it with latest data (compressed)
-		return json_parsefile(g)
-	with zstd(f) as io: return json_parse(io)
+def unzstd(f: str) -> bytes:
+	with zstd(f) as io: r = io.read()
+	# update (override) a decompressed file (if already exists) for consistency
+	if f.endswith(e := ".zst") and isfile(g := f[:-len(e)]): write(g, r)
+	return r
 
 # mypy: disable-error-code="assignment, func-returns-value"
 # pyright: reportArgumentType=false, reportAttributeAccessIssue=false, reportPossiblyUnboundVariable=false
@@ -67,8 +66,8 @@ while True:
 	remote = "https://github.com/Heptazhou/SDSS-SpecViewer/releases/download/v1.0.0/"
 	if isfile(bhm_data_local):
 		try:
-			lcl_data = json_parsezst(bhm_data_local)
-			rmt_meta = json_parse(fetch(remote + "bhm.meta.json"))
+			lcl_data = parse_json(unzstd(bhm_data_local))
+			rmt_meta = parse_json(fetch(remote + "bhm.meta.json"))
 			if lcl_data["hdr"]["date"] >= rmt_meta["date"]: break # already latest
 		except HTTPError: break # skip update
 		except: print_exc()
