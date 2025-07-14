@@ -23,7 +23,7 @@ using Exts
 	s = replace(s, r"^( +)(?:\w+): \[\]\n"m => "")
 	s = replace(s, r"^( +)license(?:_family)?: .+\n"m => "")
 	s = replace(s, [Regex(s"^( +)(?:\w+):\K(\n\1- )([^\n\0]+)" * s"\2(.+)"^(n - 1) * s"$(?!\2)", "m") =>
-		SubstitutionString(" [" * join(("\"\\$(i+2)\"" for i ∈ 1:n), ", ") * "]") for n ∈ 1:32]...)
+		SubstitutionString(" [" * join(("\"\\$(i + 2)\"" for i ∈ 1:n), ", ") * "]") for n ∈ 1:32]...)
 	s = replace(s, string("\0") => ":")
 	write(f, s)
 	run(`pixi ls -x`, devnull)

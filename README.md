@@ -16,7 +16,7 @@ This is a multi-epoch spectral viewer for SDSSV-BHM using [plotly/dash](https://
 You **must** have the proper SDSS-V Proprietary Data username and password in the `authentication.txt` (created upon first run) to use this tool, the program will prompt you to input required authentication if the file does not exist yet. The code will immediately check the authentication upon start up.
 
 ###	Installation
-Cloning this repository using Github Desktop is the best way to install this tool. Doing so will allow you to easily keep up to date with any updates.
+Cloning this repository using [GitHub Desktop](https://desktop.github.com/) is the best way to install this tool. Doing so will allow you to easily keep up to date with any updates.
 
 ###	Dependencies
 Please install the following Python packages to use this tool, with the minimum required versions shown as such. See also the file [`pixi.toml`](pixi.toml) for a list of recommended package versions with which SpecViewer is guaranteed to work.
@@ -67,7 +67,7 @@ python sdssv_spec_appREMOTE.py
 
 ###	Keeping up-to-date
 
-The bhm.json.zst compressed dictionary file is the backbone to this tool. (It can be uncompressed using unzstd if desired.) By running the `update_dictionaries.jl` file, it will look for FITS file(s) (e.g., `spAll-lite-master.fits`; note: `v6_1_1` or higher required) on your machine and update said dictionary file. Runtime with 1 input file was ~50s on AMD Zen 1, or ~30s on AMD Zen 3, FWIW. The compressed dictionary file is not included in this distribution to avoid issues with proprietary SDSS data, but will be generated when the program is run and SDSS authentication is provided.
+The bhm.json.zst compressed dictionary file is the backbone to this tool. (It can be uncompressed using [unzstd](https://man.archlinux.org/man/zstd.1) if desired.) By running the `update_dictionaries.jl` file, it will look for FITS file(s) (e.g., `spAll-lite-master.fits`; note: `v6_1_1` or higher required) on your machine and update said dictionary file. Runtime with 1 input file was ~50s on AMD Zen 1, or ~30s on AMD Zen 3, FWIW. The dictionary file is not included in this repository itself to avoid issues with [large](https://docs.github.com/repositories/working-with-files/managing-large-files/about-large-files-on-github)/[binary](https://stackoverflow.com/q/540535/) files.
 
 To update bhm.json.zst, install the latest version of [Julia](https://julialang.org/), and set environment variable `JULIA_NUM_THREADS=auto,auto` so you can omit the `-t auto` argument ([read more](https://docs.julialang.org/en/v1/manual/multi-threading/)).
 
@@ -75,9 +75,9 @@ Then, having the FITS files or archive files (each archive should contain only o
 ```shell
 julia -t auto update_dictionaries.jl
 ```
-Alternatively, provide paths as arguments:
+Alternatively, provide paths as arguments (use `-k` to keep raw file after compressed):
 ```shell
-julia -t auto update_dictionaries.jl <path/to/file>...
+julia -t auto update_dictionaries.jl [-k] <path/to/file>...
 ```
 PS: The filename(s) shall match the pattern `/\bspall\b.*\.fits(\.tmp)?$/i` and not match `/\ballepoch\b/i`.
 
