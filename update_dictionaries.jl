@@ -36,16 +36,18 @@ using Pkg: PlatformEngines
 using Serialization: deserialize, serialize
 using Zstd_jll: Zstd_jll
 
+const arg_keep = ARGS ∋ "-k" || isinteractive()
 const dropfirst(v) = @view v[2:end]
-const exe_7z = @try PlatformEngines.find7z() PlatformEngines.exe7z().exec[1]
+const exe_7zip::String = @try PlatformEngines.find7z() PlatformEngines.exe7z().exec[1]
+const exe_zstd::String = Zstd_jll.zstdmt().exec[1]
 const hdu2_nrow(fn) = FITS(f -> read_header(get(f, "SPALL", 2))["NAXIS2"], fn)
 const projecthash() = @try Context().env.manifest.other["project_hash"] ""
 const s_info(xs...) = @info string(xs...)
 const u_sort! = unique! ∘ sort!
 const u_sorted(x) = issorted(x) & allunique(x)
-const zstdcat = `$(Zstd_jll.zstdmt().exec[1]) -dcf`;
-const zstdin = `$(Zstd_jll.zstdmt().exec[1]) -q -`;
-const zstdmt = `$(Zstd_jll.zstdmt().exec[1]) -1 --long --zstd=strat=7,tlen=4096`;
+const zstdcat = `$exe_zstd -dcf`;
+const zstdin = `$exe_zstd -q -`;
+const zstdmt = `$exe_zstd -1 --long --zstd=strat=7,tlen=4096`;
 
 @kwdef struct File
 	name::String
@@ -118,8 +120,8 @@ const cols = ODict{Symbol, DataType}(
 	# :ZWARNING     => Int64,   # A flag for bad z fits in place of CLASS=UNKNOWN; see bitmasks
 )
 const fits = let
-	extracts(arc::String) = run(`$exe_7z x $arc`, devnull)
-	filename(arc::String) = readlines(`$exe_7z l -ba -slt $arc`)[1][8:end]
+	extracts(arc::String) = run(`$exe_7zip x $arc`, devnull)
+	filename(arc::String) = readlines(`$exe_7zip l -ba -slt $arc`)[1][8:end]
 	is_arc = endswith(r"\.([7gx]z|rar|zip)")
 	is_tmp = endswith(r"\.tmp")
 	d = ODict{String, String}()
@@ -296,7 +298,7 @@ end
 		write("bhm.meta.json", json(meta, 4))
 		write("bhm.json", json(ODict([:hdr => meta; data]), ~0))
 		run(`$zstdmt bhm.json -o bhm.json.zst -f`, devnull)
-		rm("bhm.json")
+		arg_keep || rm("bhm.json")
 	end
 end
 
