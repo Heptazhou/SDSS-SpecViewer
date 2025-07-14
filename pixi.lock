@@ -7,7 +7,7 @@ environments:
       linux-64:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/_libgcc_mutex-0.1-conda_forge.tar.bz2
       - conda: https://conda.anaconda.org/conda-forge/linux-64/_openmp_mutex-4.5-2_gnu.tar.bz2
-      - conda: https://conda.anaconda.org/conda-forge/linux-64/astropy-6.1.7-py313ha014f3b_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-64/astropy-base-7.1.0-py313h607aa3e_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/astropy-iers-data-0.2025.6.9.0.39.3-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/blinker-1.9.0-pyhff2d567_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/brotli-python-1.1.0-py313h46c70d0_3.conda
@@ -85,7 +85,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/zstandard-0.23.0-py313h536fd9c_2.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/zstd-1.5.7-hb8e6e7a_2.conda
       osx-arm64:
-      - conda: https://conda.anaconda.org/conda-forge/osx-arm64/astropy-6.1.7-py313h46657e6_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/osx-arm64/astropy-base-7.1.0-py313h61b28de_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/astropy-iers-data-0.2025.6.9.0.39.3-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/blinker-1.9.0-pyhff2d567_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/brotli-python-1.1.0-py313h928ef07_3.conda
@@ -157,7 +157,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/zstandard-0.23.0-py313h90d716c_2.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/zstd-1.5.7-h6491c7d_2.conda
       win-64:
-      - conda: https://conda.anaconda.org/conda-forge/win-64/astropy-6.1.7-py313h8e081ca_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/win-64/astropy-base-7.1.0-py313hbd89788_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/astropy-iers-data-0.2025.6.9.0.39.3-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/blinker-1.9.0-pyhff2d567_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/brotli-python-1.1.0-py313h5813708_3.conda
@@ -247,24 +247,27 @@ packages:
   constrains: ["openmp_impl 9999"]
   size: 23621
   timestamp: 1650670423406
-- conda: https://conda.anaconda.org/conda-forge/linux-64/astropy-6.1.7-py313ha014f3b_0.conda
-  sha256: b376848006b74d65519af8f0c2b864df41500e4a7e23169c1059e5f8180a3781
-  md5: 2f4d0cdb1234df00a04043801c12886f
-  depends: ["__glibc >=2.17,<3.0.a0", "astropy-iers-data >=0.2024.10.28.0.34.7", "importlib-metadata", "libgcc >=13", "numpy >=1.21,<3", "numpy >=1.23", "packaging >=19.0", "pyerfa >=2.0.1.1", "python >=3.13,<3.14.0a0", "python_abi 3.13.* *_cp313", "pyyaml >=3.13"]
-  size: 9343055
-  timestamp: 1732730371853
-- conda: https://conda.anaconda.org/conda-forge/osx-arm64/astropy-6.1.7-py313h46657e6_0.conda
-  sha256: d40ca12c81883d43e76362afc86ea387e1764e891c9114451f4e13b8c2292d4d
-  md5: fe264e8a4de0ea18b78aea12ed9308fc
-  depends: ["__osx >=11.0", "astropy-iers-data >=0.2024.10.28.0.34.7", "importlib-metadata", "numpy >=1.21,<3", "numpy >=1.23", "packaging >=19.0", "pyerfa >=2.0.1.1", "python >=3.13,<3.14.0a0", "python >=3.13,<3.14.0a0 *_cp313", "python_abi 3.13.* *_cp313", "pyyaml >=3.13"]
-  size: 9349014
-  timestamp: 1732730692685
-- conda: https://conda.anaconda.org/conda-forge/win-64/astropy-6.1.7-py313h8e081ca_0.conda
-  sha256: 8cd1caf0b91c89eb02f9df6972227a0dd22b441d8e1cf82a0949d31649e599ac
-  md5: 7dac1406aed5996410b0ae82f40cf439
-  depends: ["astropy-iers-data >=0.2024.10.28.0.34.7", "importlib-metadata", "numpy >=1.21,<3", "numpy >=1.23", "packaging >=19.0", "pyerfa >=2.0.1.1", "python >=3.13,<3.14.0a0", "python_abi 3.13.* *_cp313", "pyyaml >=3.13", "ucrt >=10.0.20348.0", "vc >=14.2,<15", "vc14_runtime >=14.29.30139"]
-  size: 9255958
-  timestamp: 1732730858461
+- conda: https://conda.anaconda.org/conda-forge/linux-64/astropy-base-7.1.0-py313h607aa3e_0.conda
+  sha256: 1f17d5cd7ea4a9c1063f75724ba2513e7034cee0b0abbaac581135345cd84152
+  md5: 123dfce277a15098a8f031173ded4ef0
+  depends: ["__glibc >=2.17,<3.0.a0", "astropy-iers-data >=0.2025.4.28.0.37.27", "libgcc >=13", "numpy >=1.21,<3", "numpy >=1.23.2", "packaging >=22.0.0", "pyerfa >=2.0.1.1", "python >=3.13,<3.14.0a0", "python_abi 3.13.* *_cp313", "pyyaml >=6.0.0"]
+  constrains: ["astropy >=7.0.0"]
+  size: 9583487
+  timestamp: 1748350676652
+- conda: https://conda.anaconda.org/conda-forge/osx-arm64/astropy-base-7.1.0-py313h61b28de_0.conda
+  sha256: 065097e29cb2779f1d0fd336f51188781390314a93918c900705c3213c523ae2
+  md5: 6b1704bb1137112d523e4c0914ad0686
+  depends: ["__osx >=11.0", "astropy-iers-data >=0.2025.4.28.0.37.27", "numpy >=1.21,<3", "numpy >=1.23.2", "packaging >=22.0.0", "pyerfa >=2.0.1.1", "python >=3.13,<3.14.0a0", "python >=3.13,<3.14.0a0 *_cp313", "python_abi 3.13.* *_cp313", "pyyaml >=6.0.0"]
+  constrains: ["astropy >=7.0.0"]
+  size: 9329210
+  timestamp: 1748350860434
+- conda: https://conda.anaconda.org/conda-forge/win-64/astropy-base-7.1.0-py313hbd89788_0.conda
+  sha256: dc5b17fb431d6ce35e6f6c4593bb3a71e60d01c3f11b5a414b5b7e8e2612446c
+  md5: c6dffad30454accf276f6ac3dc112c14
+  depends: ["astropy-iers-data >=0.2025.4.28.0.37.27", "numpy >=1.21,<3", "numpy >=1.23.2", "packaging >=22.0.0", "pyerfa >=2.0.1.1", "python >=3.13,<3.14.0a0", "python_abi 3.13.* *_cp313", "pyyaml >=6.0.0", "ucrt >=10.0.20348.0", "vc >=14.2,<15", "vc14_runtime >=14.29.30139"]
+  constrains: ["astropy >=7.0.0"]
+  size: 9594204
+  timestamp: 1748351195217
 - conda: https://conda.anaconda.org/conda-forge/noarch/astropy-iers-data-0.2025.6.9.0.39.3-pyhd8ed1ab_0.conda
   sha256: 9a451de9368bf8a4684755b678b2296156d7456d3e25a9980a7c7dbea9ec00f8
   md5: 1f01fb13853c21d656bed4b7cbde791b
