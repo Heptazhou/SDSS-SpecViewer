@@ -4,8 +4,9 @@
 Excelsior!
 """
 
-from base64 import b64decode
+from base64 import b64decode as base64decode
 from collections import defaultdict
+from dataclasses import dataclass
 from functools import lru_cache
 from io import BytesIO as IOBuffer
 from math import log10
@@ -17,7 +18,7 @@ from tempfile import TemporaryDirectory as mktempdir
 from threading import RLock as ReentrantLock
 from time import sleep
 from traceback import print_exc
-from typing import cast
+from typing import Any, cast
 from warnings import catch_warnings, filterwarnings
 
 import numpy
@@ -110,6 +111,13 @@ external_stylesheets = [ "https://codepen.io/chriddyp/pen/bWLwgP.css",
 ###
 ### Any necessary functions
 ###
+
+def some(x: Any) -> bool: return x not in (None, NaN, "")
+def get(hdu: FITS_rec, col: str, default: None = None):
+	if not hasattr(hdu, col): return default
+	ret = cast(ndarray, hdu[col])[0]
+	if isa(ret, str): ret = ret.strip()
+	return ret
 
 @lru_cache(64)
 def cached_fetch(url: str) -> bytes:
@@ -207,8 +215,47 @@ def SDSSV_fetch_allepoch(username: str, password: str, mjd: int, obj: int | str)
 	field = "allepoch*"
 	raise HTTPError(f"[SDSSV_fetch] {(field, mjd, obj)}")
 
+@dataclass
+class Meta:
+	cat: int = -1 # >0
+	iau: str = ""
+	lat: float = NaN # δ
+	lon: float = NaN # α
+	mjd: float = NaN
+	obs: str = ""
+	rc2: float = NaN # χ²ᵥ
+	run: str = ""
+	sid: int = -1 # >0
+	ver: str = ""
+	z: float = NaN
+	zwarn: int = -1 # ≥0
+
+	def __init__(self, hdu: None | FITS_rec = None) -> None:
+		if hdu is None: return
+		if some(x := get(hdu, "DEC"      )): self.lat = float(x)
+		if some(x := get(hdu, "RA"       )): self.lon = float(x)
+		if some(x := get(hdu, "RUN1D"    )): self.ver = str(x)
+		#
+		if some(x := get(hdu, "MJD"      )): self.mjd = float(x)
+		if some(x := get(hdu, "PLUG_DEC" )): self.lat = float(x)
+		if some(x := get(hdu, "PLUG_RA"  )): self.lon = float(x)
+		#
+		if some(x := get(hdu, "CATALOGID")): self.cat = int(x)
+		if some(x := get(hdu, "DECCAT"   )): self.lat = float(x)
+		if some(x := get(hdu, "MJD_FINAL")): self.mjd = float(x)
+		if some(x := get(hdu, "OBS"      )): self.obs = str(x)
+		if some(x := get(hdu, "PLATERUN" )): self.run = str(x)
+		if some(x := get(hdu, "RACAT"    )): self.lon = float(x)
+		if some(x := get(hdu, "RCHI2"    )): self.rc2 = float(x)
+		if some(x := get(hdu, "RUN2D"    )): self.ver = str(x)
+		if some(x := get(hdu, "SDSS_ID"  )): self.sid = int(x)
+		if some(x := get(hdu, "Z"        )): self.z = float(x)
+		if some(x := get(hdu, "ZWARNING" )): self.zwarn = int(x)
+		#
+		if some(a := self.lon) and some(d := self.lat): self.iau = sdss_iau(a, d)
+
 def fetch_catID(field: int | str, catID: int | str, extra="", match_sdss_id=True) \
-	-> tuple[dict[str, int | float], list[str], list[ndarray], list[ndarray], list[ndarray]]:
+	-> tuple[Meta, list[str], list[ndarray], list[ndarray], list[ndarray]]:
 	if not (extra or catID): # consider as incomplete user input
 		raise Exception()    # so abort quietly
 	if not (extra or catID and field):
@@ -222,30 +269,21 @@ def fetch_catID(field: int | str, catID: int | str, extra="", match_sdss_id=True
 
 	name, wave, flux, errs = list[str](), list[ndarray](), list[ndarray](), list[ndarray]()
 
+	info: list[Meta] = []
 	cats: list[int] = [int(catID)] if catID else []
-	meta: dict[str, list] = {
-		"CATALOGID": cats,
-		"DEC": [],
-		"RA": [],
-		"RCHI2": [],
-		"Z": [],
-		"ZWARNING": [],
-	}
+	cats_all = cats.copy()
 	if (sdss_id := catalogs.get(catID, [0])[0]) > 0:
-		for cat in sdss_IDs.get(f"{sdss_id}", []):
-			if not cat in meta["CATALOGID"]: meta["CATALOGID"].append(cat)
-		meta["CATALOGID"] = sorted(meta["CATALOGID"])
+		cats_all.extend(sdss_IDs.get(f"{sdss_id}", []))
+		cats_all = sorted(set(cats_all))
 	if match_sdss_id:
-		cats = meta["CATALOGID"]
+		cats = cats_all
 	# print(f"[sdss_id] {catID} => {sdss_id} => {cats} # {match_sdss_id}")
 
-	def legend(name: str, meta: FITS_rec) -> str:
-		ver = str(meta["RUN2D"][0]) if hasattr(meta, "RUN2D") else ""
-		obs = str(meta["OBS"  ][0]) if hasattr(meta, "OBS"  ) else ""
-		ext = list[str]()
-		if ver: ext.append("@" + ver.replace("_", "."))
-		if obs: ext.append("(" + obs + ")")
-		name += "\n" + " ".join(ext) if ext else ""
+	def legend(name: str, meta: Meta) -> str:
+		v = list[str]()
+		if meta.ver: v.append("@" + meta.ver.replace("_", "."))
+		if meta.obs: v.append("(" + meta.obs + ")")
+		name += "\n" + " ".join(v) if v else ""
 		return name if len(name) <= 20 else name.replace("\n", "<br />")
 	for x in extra.split(","):
 		x, ver = [*x.split("@", 1), ""][:2]
@@ -257,8 +295,9 @@ def fetch_catID(field: int | str, catID: int | str, extra="", match_sdss_id=True
 		except Exception as e:
 			if str(e): print(e) if isa(e, HTTPError) else print_exc()
 			continue
-		mjd_final = str((dat[0]["MJD_FINAL"] if hasattr(dat[0], "MJD_FINAL") else dat[0]["MJD"])[0])
-		name.append(legend(f"{mjd_final}*", dat[0]))
+		meta = Meta(dat[0])
+		name.append(legend(f"{meta.mjd}*", meta))
+		info.append(meta)
 		wave.append(dat[1])
 		flux.append(dat[2])
 		errs.append(dat[3])
@@ -272,19 +311,12 @@ def fetch_catID(field: int | str, catID: int | str, extra="", match_sdss_id=True
 			if str(e): print(e) if isa(e, HTTPError) else print_exc()
 			raise # re-raise
 		# print(f"{dat[0].columns=}")
-		meta_DEC = dat[0]["PLUG_DEC"][0] if hasattr(dat[0], "PLUG_DEC") else dat[0]["DEC"][0] if hasattr(dat[0], "DEC") else None
-		meta_R_A = dat[0]["PLUG_RA" ][0] if hasattr(dat[0], "PLUG_RA" ) else dat[0]["RA" ][0] if hasattr(dat[0], "RA" ) else None
-		meta["DEC"     ].append(dat[0]["DECCAT"  ][0] if hasattr(dat[0], "DECCAT") else meta_DEC)
-		meta["RA"      ].append(dat[0]["RACAT"   ][0] if hasattr(dat[0], "RACAT" ) else meta_R_A)
-		meta["RCHI2"   ].append(dat[0]["RCHI2"   ][0])
-		meta["Z"       ].append(dat[0]["Z"       ][0])
-		meta["ZWARNING"].append(dat[0]["ZWARNING"][0])
-		mjd_final = str((dat[0]["MJD_FINAL"] if hasattr(dat[0], "MJD_FINAL") else dat[0]["MJD"])[0])
-		mjd_list = [mjd]
-		name.append(legend(f"{mjd_final}", dat[0]))
+		info.append(Meta(dat[0]))
+		name.append(legend(f"{info[-1].mjd}", info[-1]))
 		wave.append(dat[1])
 		flux.append(dat[2])
 		errs.append(dat[3])
+		mjd_list = [mjd]
 	else:
 		mjd_list = []
 		for cat in cats:
@@ -292,35 +324,14 @@ def fetch_catID(field: int | str, catID: int | str, extra="", match_sdss_id=True
 				fid, mjd = divmod(abs(fieldmjd), 10**5)
 				if field != "all" and int(field) != fid: continue
 				dat = SDSSV_fetch(username, password, fid, mjd, cat)
-				meta_DEC = dat[0]["DEC"][0] if hasattr(dat[0], "DEC") else None
-				meta_R_A = dat[0]["RA" ][0] if hasattr(dat[0], "RA" ) else None
-				meta["DEC"     ].append(dat[0]["DECCAT"  ][0] if hasattr(dat[0], "DECCAT") else meta_DEC)
-				meta["RA"      ].append(dat[0]["RACAT"   ][0] if hasattr(dat[0], "RACAT" ) else meta_R_A)
-				meta["RCHI2"   ].append(dat[0]["RCHI2"   ][0])
-				meta["Z"       ].append(dat[0]["Z"       ][0])
-				meta["ZWARNING"].append(dat[0]["ZWARNING"][0])
-				mjd_final = str((dat[0]["MJD_FINAL"] if hasattr(dat[0], "MJD_FINAL") else dat[0]["MJD"])[0])
-				name.append(legend(f"{mjd_final}", dat[0]))
+				info.append(Meta(dat[0]))
+				name.append(legend(f"{info[-1].mjd}", info[-1]))
 				wave.append(dat[1])
 				flux.append(dat[2])
 				errs.append(dat[3])
 				if mjd not in mjd_list: mjd_list.append(mjd)
 		mjd_list.sort(reverse=True)
 	# print(mjd_list)
-
-	# todo
-	meta["DEC"     ] = meta["DEC"     ][-1] if meta["DEC"     ] else None
-	meta["RA"      ] = meta["RA"      ][-1] if meta["RA"      ] else None
-	meta["RCHI2"   ] = meta["RCHI2"   ][-1] if meta["RCHI2"   ] else None
-	meta["Z"       ] = meta["Z"       ][-1] if meta["Z"       ] else None
-	meta["ZWARNING"] = meta["ZWARNING"][-1] if meta["ZWARNING"] else None
-
-	meta["IAU_NAME"] = None
-	meta["SDSS_ID" ] = None
-	if None not in (a := meta["RA"], d := meta["DEC"]):
-		meta["IAU_NAME"] = sdss_iau(a, d) # type: ignore[arg-type]
-	if sdss_id > 0:
-		meta["SDSS_ID" ] = sdss_id
 
 	# allplate
 	for cat in cats:
@@ -330,7 +341,8 @@ def fetch_catID(field: int | str, catID: int | str, extra="", match_sdss_id=True
 			except Exception as e:
 				# if str(e): print(e) if isa(e, HTTPError) else print_exc()
 				continue
-			name.append(legend(f"allplate-{mjd}", dat[0]))
+			info.append(Meta(dat[0]))
+			name.append(legend(f"allplate-{mjd}", info[-1]))
 			wave.append(dat[1])
 			flux.append(dat[2])
 			errs.append(dat[3])
@@ -343,16 +355,17 @@ def fetch_catID(field: int | str, catID: int | str, extra="", match_sdss_id=True
 			except Exception as e:
 				# if str(e): print(e) if isa(e, HTTPError) else print_exc()
 				continue
-			name.append(legend(f"allFPS-{mjd}", dat[0]))
+			info.append(Meta(dat[0]))
+			name.append(legend(f"allFPS-{mjd}", info[-1]))
 			wave.append(dat[1])
 			flux.append(dat[2])
 			errs.append(dat[3])
 			break
-	if not (meta and name and wave and flux):
+	if not (info and name and wave and flux):
 		raise HTTPError(f"[fetch_catID] {(field, catID, extra)}")
-	r = meta, name, wave, flux, errs
+	r = info[-1], name, wave, flux, errs
 	cache[(field, catID, extra, match_sdss_id)] = r
-	return r # type: ignore[return-value] # pyright: ignore[reportReturnType]
+	return r
 
 ###
 ### Authentication
@@ -1048,7 +1061,7 @@ def process_upload(sto: dict, contents: list[str], filename: list[str], timestam
 				# print((s[:100], f, t)) # for testing
 				path, type = d / f, None # default file type is tsv/wsv
 				mime, data = s.split(",", 1)
-				head, data = 0, b64decode(data).decode()
+				head, data = 0, base64decode(data).decode()
 				assert fullmatch(r"data:.*;base64", mime)
 				for line in data.splitlines():
 					# use comma as delimiter if present in (1st) data line; next line of code will match:
@@ -1092,7 +1105,7 @@ def hide_spec_info2(checklist: list[str]):
 def show_spec_info(field_d, cat_d, field_i, cat_i, checklist: list[str]):
 	try:
 		meta = fetch_catID(field_d or field_i, cat_d or cat_i, match_sdss_id="s" in checklist)[0]
-		return meta["ZWARNING"], meta["Z"], meta["RCHI2"], meta["SDSS_ID"], meta["IAU_NAME"], meta["RA"], meta["DEC"]
+		return meta.zwarn, meta.z, meta.rc2, meta.sid, meta.iau, meta.lon, meta.lat
 	except Exception as e:
 		if str(e): print(f"[show_spec_info]  fetch_catID{([field_d, field_i], [cat_d, cat_i])}")
 		if str(e): print(e) if isa(e, HTTPError) else print_exc()
@@ -1107,7 +1120,7 @@ def show_spec_info(field_d, cat_d, field_i, cat_i, checklist: list[str]):
 def show_spec_info2(field_d, cat_d, field_i, cat_i, checklist: list[str]):
 	try:
 		meta = fetch_catID(field_d or field_i, cat_d or cat_i, match_sdss_id="s" in checklist)[0]
-		return str(meta["CATALOGID"])
+		return f"{meta.cat}" if meta.cat > 0 else None
 	except Exception as e:
 		if str(e): print(f"[show_spec_info2] fetch_catID{([field_d, field_i], [cat_d, cat_i])}")
 		if str(e): print(e) if isa(e, HTTPError) else print_exc()
@@ -1210,7 +1223,7 @@ def make_multiepoch_spectra(field_d, cat_d, field_i, cat_i, extra_obj, redshift,
 	try:
 		meta, name, wave, flux, errs = fetch_catID(fieldid, catalogid, extra_obj, match_sdss_id="s" in checklist)
 		names.extend(name), waves.extend(wave), fluxes.extend(flux), delta.extend(errs)
-		if meta["Z"] and not redshift and redshift_step == "any": redshift = meta["Z"]
+		if some(meta.z) and not redshift and redshift_step == "any": redshift = meta.z
 	except Exception as e:
 		if str(e): print(f"[make_multiepoch_spectra] fetch_catID{([field_d, field_i], [cat_d, cat_i], extra_obj)}")
 		if str(e): print(e) if isa(e, HTTPError) else print_exc()
