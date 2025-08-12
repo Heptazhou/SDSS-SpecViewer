@@ -435,8 +435,10 @@ spec_line_emi = numpy.asarray([
 	[0, 2748.7814, "Fe II"   ], # 2755.7365 2749.3216 2739.5474
 	[0, 2631.8295, "Fe II"   ], # 2611.8736 2607.0871 2599.3956 2598.3692 2585.8758 2493.2637
 	# [0, 2492.2473, "Fe I"    ], # 2522.8494 2490.6443 2488.1426 2483.2708
+	[0, 2423.8300, "[Ne IV]" ],
 	[0, 2414.0421, "Fe II"   ], # 2404.8858 2395.6254 2382.0376 2343.4951
 	[1, 2326.0000, "C II"    ],
+	[0, 2141.5700, "N II]"   ],
 	[1, 1908.7340, "C III]"  ],
 	[0, 1786.7520, "Fe II"   ],
 	[0, 1750.4600, "N III]"  ],
@@ -461,9 +463,16 @@ spec_line_abs = numpy.asarray([
 	[1, 2, "2803.5324 2796.3511          ", "Mg II"      ],
 	[0, 2, "2600.1725 2586.6496          ", "Fe II UV1"  ],
 	[0, 3, "2382.7642 2374.4603 2344.2130", "Fe II UV2+3"],
+	[0, 3, "2208.6666 2211.5815 2217.3593", "Si I,I*"    ],
+	[0, 3, "2165.0155 2174.3729 2185.3800", "Fe II UV79" ],
 	[0, 3, "2062.2110 2068.9040 2079.6520", "Fe III UV48"],
+	[0, 3, "2056.254  2062.263  2066.161 ", "Cr II"      ],
+	[0, 2, "2026.136  2062.664           ", "Zn II"      ],
 	[0, 3, "1926.3040 1914.0560 1895.4560", "Fe III UV34"],
 	[1, 2, "1862.7911 1854.7183          ", "Al III"     ],
+	[0, 3, "1808.0126 1816.9282 1817.4509", "Si II,II*"  ],
+	[0, 4, "1703.4049 1709.6001 1741.5486 1751.9102", "Ni II"],
+	[0, 3, "1748.2820 1754.8087 1788.4858", "Ni II*"     ],
 	[0, 1, "1670.7886                    ", "Al II"      ],
 	[0, 1, "1608.4511                    ", "Fe II 1608" ],
 	[1, 2, "1550.7785 1548.2049          ", "C IV"       ],
@@ -479,7 +488,7 @@ spec_line_abs = numpy.asarray([
 	[1, 1, "1025.7223                    ", "Ly β"       ],
 	[0, 1, "0972.5368                    ", "Ly γ"       ],
 	[0, 1, "0949.7431                    ", "Ly δ"       ],
-	[0, 1, "0937.8035                    ", "Ly ε"       ],
+	#[0, 1, "0937.8035                    ", "Ly ε"       ],
 	[1, 1, "0911.7600                    ", "Lyman limit"],
 ])
 
@@ -826,7 +835,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 			## label spectral lines (absorption) (2 columns)
 			html.Div(className="col-md-6 col-sm-9 col-xs-12", children=[
 				html.Label(
-					html.H4("Absorption lines", id="line_list_abs_h4", n_clicks=0),
+					html.H4("Absorption lines (mostly)", id="line_list_abs_h4", n_clicks=0),
 				),
 				dcc.Checklist(id="line_list_abs", options=[
 					# Set up absorption-line active plotting dictionary with values set to the transition names
