@@ -17,7 +17,7 @@ module SpecViewer
 include("const.jl")
 
 using Exts
-using Match: @match
+using Match: @match, @match_fail
 
 function branch2version(b::SymOrStr)::VersionNumber
 	branch2version(String(b))
@@ -98,7 +98,7 @@ function sas_redux(v::VersionNumber)::String
 		v"6.0.1" => sas_redux(:work, v)
 		v"6.0.2" => sas_redux(:work, v)
 		v"6.0.3" => sas_redux(:work, v)
-		v"6.0.4" => @match_fail sas_redux(:work, v) # -> dr18
+		v"6.0.4" => @match_fail# sas_redux(:work, v) # -> dr18
 		v"6.0.6" => sas_redux(:work, v)
 		v"6.0.7" => sas_redux(:work, v)
 		v"6.0.8" => sas_redux(:work, v)
@@ -117,10 +117,10 @@ function sas_redux(v::VersionNumber)::String
 		v"5.7.2"  => sas_redux(:dr12, v)
 		v"5.9.0"  => sas_redux(:dr13, v)
 		#
-		v"5.10.0" => @match_fail sas_redux(:dr14, v) # -> dr15
+		v"5.10.0" => @match_fail# sas_redux(:dr14, v) # -> dr15
 		v"5.10.0" => sas_redux(:dr15, v)
 		v"5.13.0" => sas_redux(:dr16, v)
-		v"5.13.2" => @match_fail sas_redux(:dr17, v) # -> dr18
+		v"5.13.2" => @match_fail# sas_redux(:dr17, v) # -> dr18
 		v"5.13.2" => sas_redux(:dr18, v)
 		v"6.0.4"  => sas_redux(:dr18, v)
 	end
