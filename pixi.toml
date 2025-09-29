@@ -1,16 +1,16 @@
 
 [dependencies]
 astropy-base = ">=7.1.0,<8"
-coverage = ">=7.10.2,<8"
-dash = ">=3.1.1,<4"
-numpy = ">=2.3.2,<3"
-plotly = ">=6.2.0,<7"
-pytest = ">=8.4.1,<9"
+coverage = ">=7.10.7,<8"
+dash = ">=3.2.0,<4"
+numpy = ">=2.3.3,<3"
+plotly = ">=6.3.0,<7"
+pytest = ">=8.4.2,<9"
 python = ">=3.13"
 pyzstd = ">=0.17.0,<0.18"
-requests = ">=2.32.4,<3"
+requests = ">=2.32.5,<3"
 setuptools = "~=80.8.0"
-types-requests = ">=2.32.4.20250611,<3"
+types-requests = ">=2.32.4.20250913,<3"
 
 [tasks]
 lcov = "coverage run -m pytest -q && coverage lcov && coverage report"
