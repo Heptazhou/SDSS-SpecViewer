@@ -87,6 +87,7 @@ PS: The filename(s) shall match the pattern `/\bspall\b.*\.fits(\.tmp)?$/i` and 
 +	You can also select the x-axis and/or y-axis range by clicking and dragging; HOWEVER, this method does not update the Y-axis range or X-axis range buttons and your selection will be reset if the smoothing or redshift is changed.
 +	Rest-frame wavelengths appear along the top of the plot and observed-frame wavelengths along the bottom of the plot.
 +	Emission-line labels appear above the top of the plot, and their wavelengths are shown with solid vertical lines. Absorption-line labels appear at the bottom of the plot, and their wavelengths are shown with dotted vertical lines. In both cases, the wavelength(s) of the line(s) associated with that label are shown when the cursor hovers over the label.
++	You can upload and add to the display a spectrum from a file with columns wavelength (or log wavelength), flux, and error. Wavelength units should be in Ang (or log Ang) and flux units in 1E-17 erg/s/cm2/Ang. Space, tab, and comma separated value files should be supported, as should comment lines (that don't start with numbers) at the start of the file. To load such a file, check the "file uploader" box. Note that an SDSS or SDSS-V spectrum must also be loaded for the uploaded spectrum to display.
 
 
 ##	Wish list of features to be added
