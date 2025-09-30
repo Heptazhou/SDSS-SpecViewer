@@ -17,7 +17,7 @@ module SpecViewer
 include("const.jl")
 
 using Exts
-using Match: @match
+using Match: @match, @match_fail
 
 function branch2version(b::SymOrStr)::VersionNumber
 	branch2version(String(b))
