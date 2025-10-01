@@ -254,6 +254,14 @@ class Meta:
 		#
 		if some(a := self.lon) and some(d := self.lat): self.iau = sdss_iau(a, d)
 
+@dataclass
+class Data:
+	meta: Meta
+	name: str
+	wave: ndarray
+	flux: ndarray
+	errs: ndarray
+
 def fetch_catID(field: int | str, catID: int | str, extra="", match_sdss_id=True) \
 	-> tuple[Meta, list[str], list[ndarray], list[ndarray], list[ndarray]]:
 	if not (extra or catID): # consider as incomplete user input
@@ -267,9 +275,7 @@ def fetch_catID(field: int | str, catID: int | str, extra="", match_sdss_id=True
 	if (field, catID, extra, match_sdss_id) in cache:
 		return cache[(field, catID, extra, match_sdss_id)]
 
-	name, wave, flux, errs = list[str](), list[ndarray](), list[ndarray](), list[ndarray]()
-
-	info: list[Meta] = []
+	data: list[Data] = []
 	cats: list[int] = [int(catID)] if catID else []
 	cats_all = cats.copy()
 	if (sdss_id := catalogs.get(catID, [0])[0]) > 0:
@@ -297,11 +303,7 @@ def fetch_catID(field: int | str, catID: int | str, extra="", match_sdss_id=True
 			if str(e): print(e) if isa(e, HTTPError) else print_exc()
 			continue
 		meta = Meta(dat[0])
-		info.append(meta)
-		name.append(legend(meta, f"{meta.mjd}*"))
-		wave.append(dat[1])
-		flux.append(dat[2])
-		errs.append(dat[3])
+		data.append(Data(meta, wave=dat[1], flux=dat[2], errs=dat[3], name=legend(meta, f"{meta.mjd}*")))
 	if fullmatch(r"\d+p?-\d+", field):
 		obj, ver = [*catID.split("@", 1), ""][:2]
 		fid, mjd = field.split("-", 1)
@@ -313,11 +315,7 @@ def fetch_catID(field: int | str, catID: int | str, extra="", match_sdss_id=True
 			raise # re-raise
 		# print(f"{dat[0].columns=}")
 		meta = Meta(dat[0])
-		info.append(meta)
-		name.append(legend(meta))
-		wave.append(dat[1])
-		flux.append(dat[2])
-		errs.append(dat[3])
+		data.append(Data(meta, wave=dat[1], flux=dat[2], errs=dat[3], name=legend(meta)))
 		mjd_list = [mjd]
 	else:
 		mjd_list = []
@@ -327,48 +325,43 @@ def fetch_catID(field: int | str, catID: int | str, extra="", match_sdss_id=True
 				if field != "all" and int(field) != fid: continue
 				dat = SDSSV_fetch(username, password, fid, mjd, cat)
 				meta = Meta(dat[0])
-				info.append(meta)
-				name.append(legend(meta))
-				wave.append(dat[1])
-				flux.append(dat[2])
-				errs.append(dat[3])
+				data.append(Data(meta, wave=dat[1], flux=dat[2], errs=dat[3], name=legend(meta)))
 				if mjd not in mjd_list: mjd_list.append(mjd)
 		mjd_list.sort(reverse=True)
 	# print(mjd_list)
+	data.sort(key=lambda x: x.meta.mjd)
 
 	# allplate
-	for cat in cats:
-		for mjd in (x for x in mjd_list if x <= 59392):
+	for mjd in (x for x in mjd_list if x <= 59392):
+		for cat in cats:
 			try:
 				dat = SDSSV_fetch_allepoch(username, password, mjd, cat)
 			except Exception as e:
 				# if str(e): print(e) if isa(e, HTTPError) else print_exc()
 				continue
 			meta = Meta(dat[0])
-			info.append(meta)
-			name.append(legend(meta, f"allplate-{mjd}"))
-			wave.append(dat[1])
-			flux.append(dat[2])
-			errs.append(dat[3])
+			data.append(Data(meta, wave=dat[1], flux=dat[2], errs=dat[3], name=legend(meta, f"allplate-{mjd}")))
 			break
 	# allFPS
-	for cat in cats:
-		for mjd in (x for x in mjd_list if x >= 59393):
+	for mjd in (x for x in mjd_list if x >= 59393):
+		for cat in cats:
 			try:
 				dat = SDSSV_fetch_allepoch(username, password, mjd, cat)
 			except Exception as e:
 				# if str(e): print(e) if isa(e, HTTPError) else print_exc()
 				continue
 			meta = Meta(dat[0])
-			info.append(meta)
-			name.append(legend(meta, f"allFPS-{mjd}"))
-			wave.append(dat[1])
-			flux.append(dat[2])
-			errs.append(dat[3])
+			data.append(Data(meta, wave=dat[1], flux=dat[2], errs=dat[3], name=legend(meta, f"allFPS-{mjd}")))
 			break
+	# data = sorted(data, key=lambda x: x.meta.mjd)
+	info = data[-1].meta
+	name = list(map(lambda x: x.name, data))
+	wave = list(map(lambda x: x.wave, data))
+	flux = list(map(lambda x: x.flux, data))
+	errs = list(map(lambda x: x.errs, data))
 	if not (info and name and wave and flux):
 		raise HTTPError(f"[fetch_catID] {(field, catID, extra)}")
-	r = info[-1], name, wave, flux, errs
+	r = info, name, wave, flux, errs
 	cache[(field, catID, extra, match_sdss_id)] = r
 	return r
 
