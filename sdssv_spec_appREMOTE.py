@@ -279,12 +279,13 @@ def fetch_catID(field: int | str, catID: int | str, extra="", match_sdss_id=True
 		cats = cats_all
 	# print(f"[sdss_id] {catID} => {sdss_id} => {cats} # {match_sdss_id}")
 
-	def legend(name: str, meta: Meta) -> str:
-		v = list[str]()
-		if meta.ver: v.append("@" + meta.ver.replace("_", "."))
-		if meta.obs: v.append("(" + meta.obs + ")")
-		name += "\n" + " ".join(v) if v else ""
-		return name if len(name) <= 20 else name.replace("\n", "<br />")
+	def legend(meta: Meta, base: str = "") -> str:
+		base = base or f"{meta.mjd}"
+		attr = list[str]() # showable attribute(s)
+		if meta.ver: attr.append("@" + meta.ver.replace("_", "."))
+		if meta.obs: attr.append("(" + meta.obs + ")")
+		if attr: base += "\n" + " ".join(attr)
+		return base if len(base) <= 20 else base.replace("\n", "<br />")
 	for x in extra.split(","):
 		x, ver = [*x.split("@", 1), ""][:2]
 		if not fullmatch(r"\d+p?-\d+-[^-](.*[^-])?", x): continue
@@ -296,8 +297,8 @@ def fetch_catID(field: int | str, catID: int | str, extra="", match_sdss_id=True
 			if str(e): print(e) if isa(e, HTTPError) else print_exc()
 			continue
 		meta = Meta(dat[0])
-		name.append(legend(f"{meta.mjd}*", meta))
 		info.append(meta)
+		name.append(legend(meta, f"{meta.mjd}*"))
 		wave.append(dat[1])
 		flux.append(dat[2])
 		errs.append(dat[3])
@@ -311,8 +312,9 @@ def fetch_catID(field: int | str, catID: int | str, extra="", match_sdss_id=True
 			if str(e): print(e) if isa(e, HTTPError) else print_exc()
 			raise # re-raise
 		# print(f"{dat[0].columns=}")
-		info.append(Meta(dat[0]))
-		name.append(legend(f"{info[-1].mjd}", info[-1]))
+		meta = Meta(dat[0])
+		info.append(meta)
+		name.append(legend(meta))
 		wave.append(dat[1])
 		flux.append(dat[2])
 		errs.append(dat[3])
@@ -324,8 +326,9 @@ def fetch_catID(field: int | str, catID: int | str, extra="", match_sdss_id=True
 				fid, mjd = divmod(abs(fieldmjd), 10**5)
 				if field != "all" and int(field) != fid: continue
 				dat = SDSSV_fetch(username, password, fid, mjd, cat)
-				info.append(Meta(dat[0]))
-				name.append(legend(f"{info[-1].mjd}", info[-1]))
+				meta = Meta(dat[0])
+				info.append(meta)
+				name.append(legend(meta))
 				wave.append(dat[1])
 				flux.append(dat[2])
 				errs.append(dat[3])
@@ -341,8 +344,9 @@ def fetch_catID(field: int | str, catID: int | str, extra="", match_sdss_id=True
 			except Exception as e:
 				# if str(e): print(e) if isa(e, HTTPError) else print_exc()
 				continue
-			info.append(Meta(dat[0]))
-			name.append(legend(f"allplate-{mjd}", info[-1]))
+			meta = Meta(dat[0])
+			info.append(meta)
+			name.append(legend(meta, f"allplate-{mjd}"))
 			wave.append(dat[1])
 			flux.append(dat[2])
 			errs.append(dat[3])
@@ -355,8 +359,9 @@ def fetch_catID(field: int | str, catID: int | str, extra="", match_sdss_id=True
 			except Exception as e:
 				# if str(e): print(e) if isa(e, HTTPError) else print_exc()
 				continue
-			info.append(Meta(dat[0]))
-			name.append(legend(f"allFPS-{mjd}", info[-1]))
+			meta = Meta(dat[0])
+			info.append(meta)
+			name.append(legend(meta, f"allFPS-{mjd}"))
 			wave.append(dat[1])
 			flux.append(dat[2])
 			errs.append(dat[3])
@@ -474,14 +479,14 @@ spec_line_abs = numpy.asarray([
 	[1, 2, "3969.5910 3934.7770          ", "Ca II"      ],
 	[0, 1, "2852.9642                    ", "Mg I"       ],
 	[1, 2, "2803.5324 2796.3511          ", "Mg II"      ],
-	[0, 2, "2600.1725 2586.6496          ", "Fe II UV1"  ],
-	[0, 3, "2382.7642 2374.4603 2344.2130", "Fe II UV2+3"],
+	[0, 2, "2600.1725 2586.6496          ", "Fe II uv1"  ],
+	[0, 3, "2382.7642 2374.4603 2344.2130", "Fe II uv23" ],
 	[0, 3, "2208.6666 2211.5815 2217.3593", "Si I,I*"    ],
-	[0, 3, "2165.0155 2174.3729 2185.3800", "Fe II UV79" ],
-	[0, 3, "2062.2110 2068.9040 2079.6520", "Fe III UV48"],
+	[0, 3, "2165.0155 2174.3729 2185.3800", "Fe II uv79" ],
+	[0, 3, "2062.2110 2068.9040 2079.6520", "Fe III uv48"],
 	[0, 3, "2056.254  2062.263  2066.161 ", "Cr II"      ],
 	[0, 2, "2026.136  2062.664           ", "Zn II"      ],
-	[0, 3, "1926.3040 1914.0560 1895.4560", "Fe III UV34"],
+	[0, 3, "1926.3040 1914.0560 1895.4560", "Fe III uv34"],
 	[1, 2, "1862.7911 1854.7183          ", "Al III"     ],
 	[0, 3, "1808.0126 1816.9282 1817.4509", "Si II,II*"  ],
 	[0, 4, "1703.4049 1709.6001 1741.5486 1751.9102", "Ni II"],
@@ -502,7 +507,7 @@ spec_line_abs = numpy.asarray([
 	[0, 1, "0972.5368                    ", "Ly γ"       ],
 	[0, 1, "0949.7431                    ", "Ly δ"       ],
 	# [0, 1, "0937.8035                    ", "Ly ε"       ],
-	[1, 1, "0911.7600                    ", "Lyman limit"],
+	[1, 1, "0911.7600                    ", "Ly ∞"      ],
 ])
 
 # print(spec_line_emi[numpy.bool_(numpy.int_(spec_line_emi[:, 0])), 2].tolist())
