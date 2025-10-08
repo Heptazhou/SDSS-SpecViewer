@@ -329,11 +329,11 @@ def fetch_catID(field: int | str, catID: int | str, extra="", match_sdss_id=True
 				if mjd not in mjd_list: mjd_list.append(mjd)
 		mjd_list.sort(reverse=True)
 	# print(mjd_list)
-	data.sort(key=lambda x: x.meta.mjd)
+	# data.sort(key=lambda x: x.meta.mjd)
 
 	# allplate
-	for mjd in (x for x in mjd_list if x <= 59392):
-		for cat in cats:
+	for cat in cats:
+		for mjd in (x for x in mjd_list if x <= 59392):
 			try:
 				dat = SDSSV_fetch_allepoch(username, password, mjd, cat)
 			except Exception as e:
@@ -343,8 +343,8 @@ def fetch_catID(field: int | str, catID: int | str, extra="", match_sdss_id=True
 			data.append(Data(meta, wave=dat[1], flux=dat[2], errs=dat[3], name=legend(meta, f"allplate-{mjd}")))
 			break
 	# allFPS
-	for mjd in (x for x in mjd_list if x >= 59393):
-		for cat in cats:
+	for cat in cats:
+		for mjd in (x for x in mjd_list if x >= 59393):
 			try:
 				dat = SDSSV_fetch_allepoch(username, password, mjd, cat)
 			except Exception as e:
@@ -353,7 +353,7 @@ def fetch_catID(field: int | str, catID: int | str, extra="", match_sdss_id=True
 			meta = Meta(dat[0])
 			data.append(Data(meta, wave=dat[1], flux=dat[2], errs=dat[3], name=legend(meta, f"allFPS-{mjd}")))
 			break
-	# data = sorted(data, key=lambda x: x.meta.mjd)
+	data.sort(key=lambda x: x.meta.mjd + (1e6 if x.name.startswith("all") else 0))
 	info = data[-1].meta
 	name = list(map(lambda x: x.name, data))
 	wave = list(map(lambda x: x.wave, data))
