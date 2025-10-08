@@ -27,9 +27,9 @@ from astropy.io.fits import BinTableHDU, FITS_rec, HDUList # type: ignore[import
 from astropy.io.fits import open as FITS
 from numpy import mean, median, ndarray, sqrt, std
 from plotly.graph_objects import Figure, Scatter # type: ignore[import-untyped]
-from pyzstd import open as zstd
+from pyzstd import open as ZSTD
 from requests import request
-from requests.exceptions import ChunkedEncodingError, HTTPError
+from requests.exceptions import ChunkedEncodingError, ConnectionError, HTTPError
 
 import util
 from util import identity, isa, isfile, nextfloat, parse_json, sdss_iau, sdss_sas_fits, write
@@ -46,11 +46,15 @@ def fetch(url: str, auth: None | tuple[str, str] = None) -> bytes:
 		rv = request("GET", url, auth=auth)
 	except ChunkedEncodingError: # Connection broken: IncompleteRead
 		rv = request("GET", url, auth=auth)
+	except ConnectionError as e: # ConnectTimeout | SSLError
+		print(e)
+		sleep(1)
+		return fetch(url, auth)
 	if (rv.status_code != 404): print(rv.status_code, url)
 	rv.raise_for_status() # HTTPError
 	return rv.content
 def unzstd(f: str) -> bytes:
-	with zstd(f) as io: r = io.read()
+	with ZSTD(f) as io: r = io.read()
 	# update (override) a decompressed file (if already exists) for consistency
 	if f.endswith(e := ".zst") and isfile(g := f[:-len(e)]): write(g, r)
 	return r
@@ -89,8 +93,8 @@ print({k: v for k, v in metadata.items() if k in ["date", "dims", "nrow", "size"
 redshift_default = 0
 
 # global dict to save results of `SDSSV_fetch` and `fetch_catID`
-cache: dict[tuple, tuple] = {}
-queue: dict[str, ReentrantLock] = defaultdict(ReentrantLock)
+fetch_cache: dict[tuple, tuple] = {}
+fetch_queue: dict[str, ReentrantLock] = defaultdict(ReentrantLock)
 
 # default y-axis range of spectrum plots
 y_max_default = 20
@@ -123,7 +127,7 @@ def get(hdu: FITS_rec, col: str, default: None = None):
 def cached_fetch(url: str) -> bytes:
 	return fetch(url, (username, password) if url.startswith("https://data.sdss5.org/sas/sdsswork/") else None)
 def locked_fetch(url: str) -> bytes:
-	with queue[url]: r = cached_fetch(url)
+	with fetch_queue[url]: r = cached_fetch(url)
 	return r
 
 def SDSSV_fetch(username: str, password: str, field: int | str, mjd: int, obj: int | str, branch="") \
@@ -161,8 +165,8 @@ def SDSSV_fetch(username: str, password: str, field: int | str, mjd: int, obj: i
 		raise HTTPError(f"[SDSSV_fetch] {(field, mjd, obj)}")
 	if not (field and mjd and obj):
 		raise HTTPError(f"[SDSSV_fetch] {(field, mjd, obj, branch)}")
-	if (field, mjd, obj, branch) in cache:
-		return cache[(field, mjd, obj, branch)]
+	if (field, mjd, obj, branch) in fetch_cache:
+		return fetch_cache[(field, mjd, obj, branch)]
 
 	url = sdss_sas_fits(field, mjd, obj, branch)
 	# print(url)
@@ -192,7 +196,7 @@ def SDSSV_fetch(username: str, password: str, field: int | str, mjd: int, obj: i
 		print(f"Error: unexpected {OBS=} with {field=} in `{basename(url)}`")
 		meta["OBS"][0] = ""
 	r = meta, wave, flux, errs
-	cache[(field, mjd, obj, branch)] = r
+	fetch_cache[(field, mjd, obj, branch)] = r
 	return r
 
 def SDSSV_fetch_allepoch(username: str, password: str, mjd: int, obj: int | str):
@@ -262,24 +266,28 @@ class Data:
 	flux: ndarray
 	errs: ndarray
 
-def fetch_catID(field: int | str, catID: int | str, extra="", match_sdss_id=True) \
+def fetch_catID(field: int | str, catID: int | str, extra: str = "", sdss_id: str = "", match_sdss_id: bool = True) \
 	-> tuple[Meta, list[str], list[ndarray], list[ndarray], list[ndarray]]:
-	if not (extra or catID): # consider as incomplete user input
+	if not (sdss_id or extra or catID): # consider as incomplete user input
 		raise Exception()    # so abort quietly
-	if not (extra or catID and field):
-		raise Exception((field, catID, extra))
+	if not (sdss_id or extra or catID and field):
+		raise Exception((field, catID, extra, sdss_id))
 	field = str(field).replace(" ", "")
 	catID = str(catID).replace(" ", "")
 	extra = str(extra).replace(" ", "")
 	if match_sdss_id and not fullmatch(r"\d+p?-\d+", field): field = "all"
-	if (field, catID, extra, match_sdss_id) in cache:
-		return cache[(field, catID, extra, match_sdss_id)]
+	if (field, catID, extra, match_sdss_id) in fetch_cache:
+		return fetch_cache[(field, catID, extra, sdss_id, match_sdss_id)]
 
 	data: list[Data] = []
 	cats: list[int] = [int(catID)] if catID else []
 	cats_all = cats.copy()
-	if (sdss_id := catalogs.get(catID, [0])[0]) > 0:
-		cats_all.extend(sdss_IDs.get(f"{sdss_id}", []))
+	if fullmatch(r"\d+", sdss_id) and (sid := int(sdss_id)) > 0:
+		match_sdss_id, field = True, "all" # force match_sdss_id
+		cats_all.extend(sdss_IDs.get(f"{sid}", []))
+		cats_all = sorted(set(cats_all))
+	if (sid := catalogs.get(catID, [0])[0]) > 0:
+		cats_all.extend(sdss_IDs.get(f"{sid}", []))
 		cats_all = sorted(set(cats_all))
 	if match_sdss_id:
 		cats = cats_all
@@ -354,15 +362,16 @@ def fetch_catID(field: int | str, catID: int | str, extra="", match_sdss_id=True
 			data.append(Data(meta, wave=dat[1], flux=dat[2], errs=dat[3], name=legend(meta, f"allFPS-{mjd}")))
 			break
 	data.sort(key=lambda x: x.meta.mjd + (1e6 if x.name.startswith("all") else 0))
+	if not data: raise HTTPError(f"[fetch_catID] {(field, catID, extra, sdss_id)}")
 	info = data[-1].meta
 	name = list(map(lambda x: x.name, data))
 	wave = list(map(lambda x: x.wave, data))
 	flux = list(map(lambda x: x.flux, data))
 	errs = list(map(lambda x: x.errs, data))
 	if not (info and name and wave and flux):
-		raise HTTPError(f"[fetch_catID] {(field, catID, extra)}")
+		raise HTTPError(f"[fetch_catID] {(field, catID, extra, sdss_id)}")
 	r = info, name, wave, flux, errs
-	cache[(field, catID, extra, match_sdss_id)] = r
+	fetch_cache[(field, catID, extra, sdss_id, match_sdss_id)] = r
 	return r
 
 ###
@@ -391,9 +400,11 @@ try:
 	# url = SDSSV_buildURL("102236", "60477", "63050394846126565", "")
 	# print(url)
 	print("Verification succeeded.")
-	print("Try loading http://127.0.0.1:8050/?<field>-<mjd>-<catid>")
+	print("Try loading http://127.0.0.1:8050/?<sdss_id>")
+	print("         or http://127.0.0.1:8050/?<field>-<mjd>-<catid>")
 	print("         or http://127.0.0.1:8050/?<field>-<mjd>-<catid>&prev=<plate>-<mjd>-<fiber>@<branch>")
-	print("       e.g. http://127.0.0.1:8050/?101126-60477-63050394846126565")
+	print("       e.g. http://127.0.0.1:8050/?55772170")
+	print("         or http://127.0.0.1:8050/?101126-60477-63050394846126565")
 	print("         or http://127.0.0.1:8050/?104623-60251-63050395075696130&prev=7670-57328-0918#m=5&x=3565,10350&y=0,18&z=2.66")
 except:
 	username, password = "", ""
@@ -632,7 +643,7 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 					placeholder="CatalogID", value="",
 				)], id="catalogid_dropdown_div", hidden=False),
 
-			## SDSS ID
+			## SDSS ID (read-only)
 			html.Div(className="col-lg-3 col-md-3 col-sm-4 col-xs-6", children=[
 				html.Label(
 					html.H4("SDSS ID", style={"color": "grey"}),
@@ -641,6 +652,15 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 					id="spec_info_sdss_id", placeholder="N/A", value="", readOnly=True,
 					style={"height": "36px", "width": "100%"}, inputMode="numeric",
 				)], title="Read only"),
+
+			## SDSS ID
+			html.Div(className="col-xs-6", children=[
+				html.Label(
+					html.H4("SDSS ID"),
+				),
+				dcc.Input(
+					id="sdss_id_input", type="text", value="", style={"height": "36px", "width": "100%"},
+				)], id="sdss_id_input_div", hidden=True),
 
 			## extra object(s) list input (hidden, but can be used directly otherwise)
 			html.Div(className="col-xs-6", title="comma-seperated list", children=[
@@ -892,14 +912,18 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 	Output("fieldid_input", "value"),
 	Output("catalogid_input", "value"),
 	Output("redshift_input", "value", allow_duplicate=True),
+	Output("sdss_id_input", "value"),
 	Input("window_location", "search"),
 	Input("program_dropdown", "value"),
 	State("extra_func_list", "value"),
 	prevent_initial_call="initial_duplicate")
 def set_input_or_dropdown(search: str, program: str, checklist: list[str]):
-	fid_mjd, catalog, redshift = "", "", ""
+	fid_mjd, catalog, redshift, sdss_id = "", "", "", ""
 	for x in search.lstrip("?").split("&"):
 		if program and program != "(other)": break
+		if fullmatch(r"\d+", x): # sdssid
+			program = "(other)"
+			sdss_id = x
 		if not fullmatch(r"\d+p?-\d+-[^-](.*[^-])?", x): continue
 		program = "(other)"
 		fid_mjd = "-".join(x.split("-", 2)[:2])
@@ -914,7 +938,7 @@ def set_input_or_dropdown(search: str, program: str, checklist: list[str]):
 			program = prog
 
 	tt, ff = (True, True), (False, False)
-	ret = search, program, fid_mjd, catalog, redshift
+	ret = search, program, fid_mjd, catalog, redshift, sdss_id
 	# return *ff, *ff, *ret
 	if program == "(other)":
 		return *ff, *tt, *ret
@@ -1104,10 +1128,11 @@ def hide_spec_info2(checklist: list[str]):
 	Input("catalogid_dropdown", "value"),
 	Input("fieldid_input", "value"),
 	Input("catalogid_input", "value"),
+	Input("sdss_id_input", "value"),
 	Input("extra_func_list", "value"))
-def show_spec_info(field_d, cat_d, field_i, cat_i, checklist: list[str]):
+def show_spec_info(field_d, cat_d, field_i, cat_i, sdss_id, checklist: list[str]):
 	try:
-		meta = fetch_catID(field_d or field_i, cat_d or cat_i, match_sdss_id="s" in checklist)[0]
+		meta = fetch_catID(field_d or field_i, cat_d or cat_i, "", sdss_id, match_sdss_id="s" in checklist)[0]
 		return meta.zwarn, meta.z, meta.rc2, meta.sid, meta.iau, meta.lon, meta.lat
 	except Exception as e:
 		if str(e): print(f"[show_spec_info]  fetch_catID{([field_d, field_i], [cat_d, cat_i])}")
@@ -1119,10 +1144,11 @@ def show_spec_info(field_d, cat_d, field_i, cat_i, checklist: list[str]):
 	Input("catalogid_dropdown", "value"),
 	Input("fieldid_input", "value"),
 	Input("catalogid_input", "value"),
+	Input("sdss_id_input", "value"),
 	Input("extra_func_list", "value"))
-def show_spec_info2(field_d, cat_d, field_i, cat_i, checklist: list[str]):
+def show_spec_info2(field_d, cat_d, field_i, cat_i, sdss_id, checklist: list[str]):
 	try:
-		meta = fetch_catID(field_d or field_i, cat_d or cat_i, match_sdss_id="s" in checklist)[0]
+		meta = fetch_catID(field_d or field_i, cat_d or cat_i, "", sdss_id, match_sdss_id="s" in checklist)[0]
 		return f"{meta.cat}" if meta.cat > 0 else None
 	except Exception as e:
 		if str(e): print(f"[show_spec_info2] fetch_catID{([field_d, field_i], [cat_d, cat_i])}")
@@ -1181,6 +1207,7 @@ def line_list_abs_select_all(clk: int, val: list, opt: list):
 	Input("extra_obj_input", "value"),
 	Input("redshift_input", "value"), # redshift_dropdown
 	Input("redshift_input", "step"),
+	Input("sdss_id_input", "value"),
 	Input("axis_y_max", "value"),
 	Input("axis_y_min", "value"),
 	Input("axis_x_max", "value"),
@@ -1191,7 +1218,7 @@ def line_list_abs_select_all(clk: int, val: list, opt: list):
 	Input("extra_func_list", "value"),
 	Input("dash-user-upload", "data"))
 # The list of inputs above applies to the following function
-def make_multiepoch_spectra(field_d, cat_d, field_i, cat_i, extra_obj, redshift, redshift_step,
+def make_multiepoch_spectra(field_d, cat_d, field_i, cat_i, extra_obj, redshift, redshift_step, sdss_id,
                             y_max, y_min, x_max, x_min, list_emi, list_abs, smooth,
                             checklist: list[str], user_data: dict):
 	layout_axis = dict(fixedrange=True)
@@ -1224,13 +1251,13 @@ def make_multiepoch_spectra(field_d, cat_d, field_i, cat_i, extra_obj, redshift,
 	noop_size = len(names)
 
 	try:
-		meta, name, wave, flux, errs = fetch_catID(fieldid, catalogid, extra_obj, match_sdss_id="s" in checklist)
+		meta, name, wave, flux, errs = fetch_catID(fieldid, catalogid, extra_obj, sdss_id, match_sdss_id="s" in checklist)
 		names.extend(name), waves.extend(wave), fluxes.extend(flux), delta.extend(errs)
-		if some(meta.z) and not redshift and redshift_step == "any": redshift = meta.z
+		if not z and some(meta.z) and redshift_step == "any": z = meta.z
 	except Exception as e:
-		if str(e): print(f"[make_multiepoch_spectra] fetch_catID{([field_d, field_i], [cat_d, cat_i], extra_obj)}")
+		if str(e): print(f"[make_multiepoch_spectra] fetch_catID{([field_d, field_i], [cat_d, cat_i], extra_obj, sdss_id)}")
 		if str(e): print(e) if isa(e, HTTPError) else print_exc()
-		return Figure(layout=layout), redshift
+		return Figure(layout=layout), z
 
 	try:
 
@@ -1304,7 +1331,7 @@ def make_multiepoch_spectra(field_d, cat_d, field_i, cat_i, extra_obj, redshift,
 
 	except: print_exc()
 
-	return fig, redshift
+	return fig, z
 
 
 if __name__ == "__main__":
