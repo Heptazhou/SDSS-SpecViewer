@@ -413,6 +413,7 @@ except:
 # https://github.com/sdss/idlspec2d/blob/master/etc/emlines.par
 # https://physics.nist.gov/PhysRefData/Handbook/Tables/irontable2.htm
 # the first column means whether to show this line or not by default
+# the second column is the multiplicity
 # the third column is the wavelength list, the first one must be unique
 spec_line_emi = numpy.asarray([
 	# [1, 1, "7753.1900          ", "[Ar III]"],
@@ -423,8 +424,7 @@ spec_line_emi = numpy.asarray([
 	[0, 1, "5877.2990          ", "He I"    ],
 	# [0, 1, "5577.3390          ", "[O I]"   ],
 	# [0, 1, "5411.5200          ", "He II"   ],
-	[1, 1, "5008.2390          ", "[O III]" ],
-	[1, 1, "4960.2950          ", "[O III]" ],
+	[1, 2, "5008.2390 4960.2950", "[O III]" ],
 	[1, 1, "4862.6830          ", "H β"     ],
 	[0, 1, "4685.6800          ", "He II"   ],
 	[0, 1, "4363.2090          ", "[O III]" ],
@@ -438,10 +438,8 @@ spec_line_emi = numpy.asarray([
 	# [0, 1, "3850.8100          ", "Fe I"    ], # 3886.2822 3859.9114 3820.4253
 	# [0, 1, "3739.3497          ", "Fe I"    ], # 3758.2329 3749.4854 3748.2622 3745.5613 3737.1316 3734.8638 3719.9348
 	[1, 1, "3728.4830          ", "[O II]"  ], # 3729.8740 3727.0920
-	[0, 1, "3426.8400          ", "[Ne V]"  ],
-	[0, 1, "3346.8200          ", "[Ne V]"  ],
 	# [0, 1, "3524.9583          ", "Fe I"    ], # 3581.1931 3440.606
-	# [0, 1, "3524.9583          ", "Fe I"    ], # 3581.1931 3440.606
+	[0, 2, "3426.8400 3346.8200", "[Ne V]"  ],
 	[1, 1, "2799.9410          ", "Mg II"   ], # 2803.5300 2796.3520
 	[0, 1, "2748.7814          ", "Fe II"   ], # 2755.7365 2749.3216 2739.5474
 	[0, 1, "2631.8295          ", "Fe II"   ], # 2611.8736 2607.0871 2599.3956 2598.3692 2585.8758 2493.2637
@@ -840,10 +838,10 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 					html.H4("Emission lines", id="line_list_emi_h4", n_clicks=0),
 				),
 				dcc.Checklist(id="line_list_emi", options=[
-					# Set up emission-line active plotting dictionary with values set to the transition wavelengths
-					{"label": f"{i[2]: <10}\t(%sÅ)" % round(float(i[1])),
-					 "value": f"{i[1]}"} for i in spec_line_emi], # type: ignore[arg-type]
-					value=spec_line_emi[numpy.bool_(numpy.int_(spec_line_emi[:, 0])), 1].tolist(), # values are wavelengths
+					# Set up emission-line active plotting dictionary with values set to the transition names
+					{"label": f"{i[3]: <10}\t(%sÅ)" % round(float(i[2].split()[0])),
+					 "value": f"{i[2].split()[0]}"} for i in spec_line_emi], # type: ignore[arg-type]
+					value=[s.split()[0] for s in spec_line_emi[numpy.bool_(numpy.int_(spec_line_emi[:, 0])), 2]], # wavelengths
 					style={"columnCount": "2"},
 					inputStyle={"marginRight": "5px"},
 					labelStyle={"whiteSpace": "pre-wrap"},
@@ -1271,12 +1269,15 @@ def make_multiepoch_spectra(field_d, cat_d, field_i, cat_i, extra_obj, redshift,
 
 		# Line labels for x-axis
 		for l in spec_line_emi: # emission
-			j, x = l[2], l[1] # j is the label, x is the wavelength
-			if x not in list_emi: continue # skip if the wavelength is not in the active plotting dictionary
-			x = float(x)
-			if (rest_x_min <= x and x <= rest_x_max):
-				fig.add_vline(x=x, line_dash="solid", opacity=1 / 4)
-				fig.add_annotation(x=xscale(x), y=y_max, text=j, hovertext=f" {j} ({x} Å)", textangle=70)
+			j, xs = l[3], l[2].split() # j is the label, xs is the wavelength list
+			labeled = False # reset labeling flag
+			if xs[0] not in list_emi: continue # skip if the transition is not in the active plotting dictionary
+			for x in (xs := list(map(float, xs))): # for each wavelength in the wavelength list
+				if (rest_x_min <= x and x <= rest_x_max):
+					fig.add_vline(x=x, line_dash="solid", opacity=1 / 4)
+					# label the first entry in the list of wavelengths
+					labeled or fig.add_annotation(x=xscale(x), y=y_max, text=j, hovertext=f" {j} ({xs} Å)", textangle=70)
+					labeled = True
 
 		for l in spec_line_abs: # absorption
 			j, xs = l[3], l[2].split() # j is the label, xs is the wavelength list
