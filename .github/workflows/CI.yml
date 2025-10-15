@@ -36,7 +36,7 @@ jobs:
           - "lts"
           - "1"
           - "pre"
-          - "nightly"
+          - "1.12-nightly"
     steps:
       - uses: actions/checkout@v4
         with:
