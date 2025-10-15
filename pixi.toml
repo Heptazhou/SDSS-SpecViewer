@@ -1,12 +1,12 @@
 
 [dependencies]
-astropy-base = ">=7.1.0,<8"
+astropy-base = ">=7.1.1,<8"
 coverage = ">=7.10.7,<8"
 dash = ">=3.2.0,<4"
 numpy = ">=2.3.3,<3"
 plotly = ">=6.3.1,<7"
 pytest = ">=8.4.2,<9"
-python = ">=3.13"
+python = ">=3.13,<3.14"
 pyzstd = ">=0.18.0,<0.19"
 requests = ">=2.32.5,<3"
 setuptools = "~=80.8.0"
