@@ -221,6 +221,7 @@ def SDSSV_fetch_allepoch(username: str, password: str, mjd: int, obj: int | str)
 
 @dataclass
 class Meta:
+	cats: list[int]
 	cat: int = -1 # >0
 	iau: str = ""
 	lat: float = NaN # δ
@@ -364,6 +365,7 @@ def fetch_catID(field: int | str, catID: int | str, extra: str = "", sdss_id: st
 	data.sort(key=lambda x: x.meta.mjd + (1e6 if x.name.startswith("all") else 0))
 	if not data: raise HTTPError(f"[fetch_catID] {(field, catID, extra, sdss_id)}")
 	info = data[-1].meta
+	info.cats = cats_all
 	name = list(map(lambda x: x.name, data))
 	wave = list(map(lambda x: x.wave, data))
 	flux = list(map(lambda x: x.flux, data))
@@ -1149,7 +1151,7 @@ def show_spec_info(field_d, cat_d, field_i, cat_i, sdss_id, checklist: list[str]
 def show_spec_info2(field_d, cat_d, field_i, cat_i, sdss_id, checklist: list[str]):
 	try:
 		meta = fetch_catID(field_d or field_i, cat_d or cat_i, "", sdss_id, match_sdss_id="s" in checklist)[0]
-		return f"{meta.cat}" if meta.cat > 0 else None
+		return f"{meta.cats}"
 	except Exception as e:
 		if str(e): print(f"[show_spec_info2] fetch_catID{([field_d, field_i], [cat_d, cat_i])}")
 		if str(e): print(e) if isa(e, HTTPError) else print_exc()
