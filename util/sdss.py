@@ -47,8 +47,10 @@ def sdss_sas_fits(field: int | str, mjd: int, obj: int | str, branch: str) -> st
 			path = "https://data.sdss.org/sas/dr16/sdss/spectro/redux"
 		case "v5_13_2" | "v6_0_4":
 			path = "https://data.sdss.org/sas/dr18/spectro/sdss/redux"
+		case "v6_1_3" if field != "allepoch_lco":
+			path = "https://data.sdss.org/sas/dr19/spectro/sdss/redux"
 		case "26" | "103" | "104":
-			path = "https://data.sdss.org/sas/dr18/spectro/sdss/redux"
+			path = "https://data.sdss.org/sas/dr19/spectro/sdss/redux"
 		case _:
 			path = "https://data.sdss5.org/sas/sdsswork/bhm/boss/spectro/redux"
 

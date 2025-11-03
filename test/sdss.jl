@@ -117,28 +117,44 @@ end
 	@test lite(plate, mjd, fiber, b) ≡ "https://data.sdss.org/sas/dr18/spectro/sdss/redux/v5_13_2/spectra/lite/3586/" * fits
 	@test spec(plate, mjd, fiber, b) ≡ full(plate, mjd, fiber, b)
 
-	b = 26
-	plate, mjd, fiber, fits = 0266, 51602, 0001, "spec-0266-51602-0001.fits"
-	@test full(plate, mjd, fiber, b) ≡ "https://data.sdss.org/sas/dr18/spectro/sdss/redux/26/spectra/full/0266/" * fits
-	@test lite(plate, mjd, fiber, b) ≡ "https://data.sdss.org/sas/dr18/spectro/sdss/redux/26/spectra/lite/0266/" * fits
-	@test spec(plate, mjd, fiber, b) ≡ "https://data.sdss.org/sas/dr18/spectro/sdss/redux/26/spectra/0266/" * fits
-
-	b = 103
-	plate, mjd, fiber, fits = 1960, 53289, 0001, "spec-1960-53289-0001.fits"
-	@test full(plate, mjd, fiber, b) ≡ "https://data.sdss.org/sas/dr18/spectro/sdss/redux/103/spectra/full/1960/" * fits
-	@test lite(plate, mjd, fiber, b) ≡ "https://data.sdss.org/sas/dr18/spectro/sdss/redux/103/spectra/lite/1960/" * fits
-	@test spec(plate, mjd, fiber, b) ≡ "https://data.sdss.org/sas/dr18/spectro/sdss/redux/103/spectra/1960/" * fits
-
-	b = 104
-	plate, mjd, fiber, fits = 2640, 54806, 0001, "spec-2640-54806-0001.fits"
-	@test full(plate, mjd, fiber, b) ≡ "https://data.sdss.org/sas/dr18/spectro/sdss/redux/104/spectra/full/2640/" * fits
-	@test lite(plate, mjd, fiber, b) ≡ "https://data.sdss.org/sas/dr18/spectro/sdss/redux/104/spectra/lite/2640/" * fits
-	@test spec(plate, mjd, fiber, b) ≡ "https://data.sdss.org/sas/dr18/spectro/sdss/redux/104/spectra/2640/" * fits
-
 	b = v"6.0.4"
 	field, mjd, catid, fits = 15143, 59205, 04544940698, "spec-15143-59205-04544940698.fits"
 	@test full(field, mjd, catid, b) ≡ "https://data.sdss.org/sas/dr18/spectro/sdss/redux/v6_0_4/spectra/full/15143p/59205/" * fits
 	@test lite(field, mjd, catid, b) ≡ "https://data.sdss.org/sas/dr18/spectro/sdss/redux/v6_0_4/spectra/lite/15143p/59205/" * fits
+	@test spec(field, mjd, catid, b) ≡ full(field, mjd, catid, b) ≡ full(field, mjd, catid, version2branch(b))
+end
+
+@testset "dr19" begin
+	b = 26
+	plate, mjd, fiber, fits = 0266, 51602, 0001, "spec-0266-51602-0001.fits"
+	@test full(plate, mjd, fiber, b) ≡ "https://data.sdss.org/sas/dr19/spectro/sdss/redux/26/spectra/full/0266/" * fits
+	@test lite(plate, mjd, fiber, b) ≡ "https://data.sdss.org/sas/dr19/spectro/sdss/redux/26/spectra/lite/0266/" * fits
+	@test spec(plate, mjd, fiber, b) ≡ "https://data.sdss.org/sas/dr19/spectro/sdss/redux/26/spectra/0266/" * fits
+
+	b = 103
+	plate, mjd, fiber, fits = 1960, 53289, 0001, "spec-1960-53289-0001.fits"
+	@test full(plate, mjd, fiber, b) ≡ "https://data.sdss.org/sas/dr19/spectro/sdss/redux/103/spectra/full/1960/" * fits
+	@test lite(plate, mjd, fiber, b) ≡ "https://data.sdss.org/sas/dr19/spectro/sdss/redux/103/spectra/lite/1960/" * fits
+	@test spec(plate, mjd, fiber, b) ≡ "https://data.sdss.org/sas/dr19/spectro/sdss/redux/103/spectra/1960/" * fits
+
+	b = 104
+	plate, mjd, fiber, fits = 2640, 54806, 0001, "spec-2640-54806-0001.fits"
+	@test full(plate, mjd, fiber, b) ≡ "https://data.sdss.org/sas/dr19/spectro/sdss/redux/104/spectra/full/2640/" * fits
+	@test lite(plate, mjd, fiber, b) ≡ "https://data.sdss.org/sas/dr19/spectro/sdss/redux/104/spectra/lite/2640/" * fits
+	@test spec(plate, mjd, fiber, b) ≡ "https://data.sdss.org/sas/dr19/spectro/sdss/redux/104/spectra/2640/" * fits
+
+	b = v"6.1.3"
+	field, mjd, catid, fits = 015000, 59146, 4375786564, "spec-015000-59146-4375786564.fits"
+	@test full(field, mjd, catid, b) ≡ "https://data.sdss.org/sas/dr19/spectro/sdss/redux/v6_1_3/spectra/full/015000/59146/" * fits
+	@test lite(field, mjd, catid, b) ≡ "https://data.sdss.org/sas/dr19/spectro/sdss/redux/v6_1_3/spectra/lite/015000/59146/" * fits
+	@test spec(field, mjd, catid, b) ≡ full(field, mjd, catid, b) ≡ full(field, mjd, catid, version2branch(b))
+	field, mjd, catid, fits = :allepoch, 60000, 27021598054114233, "spec-allepoch-60000-27021598054114233.fits"
+	@test full(field, mjd, catid, b) ≡ "https://data.sdss.org/sas/dr19/spectro/sdss/redux/v6_1_3/spectra/full/allepoch/60000/" * fits
+	@test lite(field, mjd, catid, b) ≡ "https://data.sdss.org/sas/dr19/spectro/sdss/redux/v6_1_3/spectra/lite/allepoch/60000/" * fits
+	@test spec(field, mjd, catid, b) ≡ full(field, mjd, catid, b) ≡ full(field, mjd, catid, version2branch(b))
+	field, mjd, catid, fits = :allepoch_lco, 60000, 27021598048679601, "spec-allepoch_lco-60000-27021598048679601.fits"
+	@test full(field, mjd, catid, b) ≠ "https://data.sdss.org/sas/dr19/spectro/sdss/redux/v6_1_3/spectra/full/allepoch_lco/60000/" * fits
+	@test lite(field, mjd, catid, b) ≠ "https://data.sdss.org/sas/dr19/spectro/sdss/redux/v6_1_3/spectra/lite/allepoch_lco/60000/" * fits
 	@test spec(field, mjd, catid, b) ≡ full(field, mjd, catid, b) ≡ full(field, mjd, catid, version2branch(b))
 end
 
@@ -161,12 +177,12 @@ end
 
 	b = v"6.1.3"
 	field, mjd, catid, fits = 015000, 59146, 4375786564, "spec-015000-59146-4375786564.fits"
-	@test full(field, mjd, catid, b) ≡ "https://data.sdss5.org/sas/sdsswork/bhm/boss/spectro/redux/v6_1_3/spectra/full/015000/59146/" * fits
-	@test lite(field, mjd, catid, b) ≡ "https://data.sdss5.org/sas/sdsswork/bhm/boss/spectro/redux/v6_1_3/spectra/lite/015000/59146/" * fits
+	@test full(field, mjd, catid, b) ≠ "https://data.sdss5.org/sas/sdsswork/bhm/boss/spectro/redux/v6_1_3/spectra/full/015000/59146/" * fits
+	@test lite(field, mjd, catid, b) ≠ "https://data.sdss5.org/sas/sdsswork/bhm/boss/spectro/redux/v6_1_3/spectra/lite/015000/59146/" * fits
 	@test spec(field, mjd, catid, b) ≡ full(field, mjd, catid, b) ≡ full(field, mjd, catid, version2branch(b))
 	field, mjd, catid, fits = :allepoch, 60000, 27021598054114233, "spec-allepoch-60000-27021598054114233.fits"
-	@test full(field, mjd, catid, b) ≡ "https://data.sdss5.org/sas/sdsswork/bhm/boss/spectro/redux/v6_1_3/spectra/full/allepoch/60000/" * fits
-	@test lite(field, mjd, catid, b) ≡ "https://data.sdss5.org/sas/sdsswork/bhm/boss/spectro/redux/v6_1_3/spectra/lite/allepoch/60000/" * fits
+	@test full(field, mjd, catid, b) ≠ "https://data.sdss5.org/sas/sdsswork/bhm/boss/spectro/redux/v6_1_3/spectra/full/allepoch/60000/" * fits
+	@test lite(field, mjd, catid, b) ≠ "https://data.sdss5.org/sas/sdsswork/bhm/boss/spectro/redux/v6_1_3/spectra/lite/allepoch/60000/" * fits
 	@test spec(field, mjd, catid, b) ≡ full(field, mjd, catid, b) ≡ full(field, mjd, catid, version2branch(b))
 	field, mjd, catid, fits = :allepoch_lco, 60000, 27021598048679601, "spec-allepoch_lco-60000-27021598048679601.fits"
 	@test full(field, mjd, catid, b) ≡ "https://data.sdss5.org/sas/sdsswork/bhm/boss/spectro/redux/v6_1_3/spectra/full/allepoch_lco/60000/" * fits

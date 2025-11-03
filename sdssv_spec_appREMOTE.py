@@ -235,7 +235,7 @@ class Meta:
 	z: float = NaN
 	zwarn: int = -1 # ≥0
 
-	def __init__(self, hdu: None | FITS_rec = None) -> None:
+	def __init__(self, hdu: None | FITS_rec = None, is_all_epoch: bool = False) -> None:
 		if hdu is None: return
 		if some(x := get(hdu, "DEC"      )): self.lat = float(x)
 		if some(x := get(hdu, "RA"       )): self.lon = float(x)
@@ -258,6 +258,7 @@ class Meta:
 		if some(x := get(hdu, "ZWARNING" )): self.zwarn = int(x)
 		#
 		if some(a := self.lon) and some(d := self.lat): self.iau = sdss_iau(a, d)
+		if some(x := get(hdu, "MJD")) and is_all_epoch: self.mjd = max(float(x), self.mjd)
 
 @dataclass
 class Data:
@@ -352,7 +353,7 @@ def fetch_catID(field: int | str, catID: int | str, extra: str = "", sdss_id: st
 			except Exception as e:
 				# if str(e): print(e) if isa(e, HTTPError) else print_exc()
 				continue
-			meta = Meta(dat[0])
+			meta = Meta(dat[0], True)
 			data.append(Data(meta, wave=dat[1], flux=dat[2], errs=dat[3], name=legend(meta, f"allplate-{mjd}")))
 			break
 	# allFPS
@@ -363,7 +364,7 @@ def fetch_catID(field: int | str, catID: int | str, extra: str = "", sdss_id: st
 			except Exception as e:
 				# if str(e): print(e) if isa(e, HTTPError) else print_exc()
 				continue
-			meta = Meta(dat[0])
+			meta = Meta(dat[0], True)
 			data.append(Data(meta, wave=dat[1], flux=dat[2], errs=dat[3], name=legend(meta, f"allFPS-{mjd}")))
 			break
 	data.sort(key=lambda x: x.meta.mjd + (1e6 if x.name.startswith("all") else 0))
@@ -408,10 +409,11 @@ try:
 	print("Verification succeeded.")
 	print("Try loading http://127.0.0.1:8050/?<sdss_id>")
 	print("         or http://127.0.0.1:8050/?<field>-<mjd>-<catid>")
-	print("         or http://127.0.0.1:8050/?<field>-<mjd>-<catid>&prev=<plate>-<mjd>-<fiber>@<branch>")
+	print("         or http://127.0.0.1:8050/?<field>-<mjd>-<catid>&extra=<plate>-<mjd>-<fiber>@<branch>")
 	print("       e.g. http://127.0.0.1:8050/?55772170")
 	print("         or http://127.0.0.1:8050/?101126-60477-63050394846126565")
 	print("         or http://127.0.0.1:8050/?104623-60251-63050395075696130&prev=7670-57328-0918#m=5&x=3565,10350&y=0,18&z=2.66")
+	print("         or http://127.0.0.1:8050/?0831-52294-0228&ext=4604-55983-0870,8296-57375-0827#y=0,22&z=0.36")
 except:
 	username, password = "", ""
 	print("Verification failed.")
