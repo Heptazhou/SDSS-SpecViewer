@@ -270,29 +270,33 @@ class Data:
 def fetch_catID(field: int | str, catID: int | str, extra: str = "", sdss_id: str = "", match_sdss_id: bool = True) \
 	-> tuple[Meta, list[str], list[ndarray], list[ndarray], list[ndarray]]:
 	if not (sdss_id or extra or catID): # consider as incomplete user input
-		raise Exception()    # so abort quietly
+		raise Exception()               # so abort quietly
 	if not (sdss_id or extra or catID and field):
 		raise Exception((field, catID, extra, sdss_id))
 	field = str(field).replace(" ", "")
 	catID = str(catID).replace(" ", "")
 	extra = str(extra).replace(" ", "")
-	if match_sdss_id and not fullmatch(r"\d+p?-\d+", field): field = "all"
-	if (field, catID, extra, match_sdss_id) in fetch_cache:
-		return fetch_cache[(field, catID, extra, sdss_id, match_sdss_id)]
 
 	data: list[Data] = []
 	cats: list[int] = [int(catID)] if catID else []
 	cats_all = cats.copy()
-	if fullmatch(r"\d+", sdss_id) and (sid := int(sdss_id)) > 0:
-		match_sdss_id, field = True, "all" # force match_sdss_id
+	sid = catalogs.get(catID, [0])[0]
+	if fullmatch(r"\d+", sdss_id):
+		sid = int(sdss_id) or sid
+		match_sdss_id = True # force match_sdss_id
+	if sid > 0:
 		cats_all.extend(sdss_IDs.get(f"{sid}", []))
 		cats_all = sorted(set(cats_all))
-	if (sid := catalogs.get(catID, [0])[0]) > 0:
-		cats_all.extend(sdss_IDs.get(f"{sid}", []))
-		cats_all = sorted(set(cats_all))
-	if match_sdss_id:
+	if sid > 0 and match_sdss_id:
 		cats = cats_all
-	# print(f"[sdss_id] {catID} => {sdss_id} => {cats} # {match_sdss_id}")
+		field, catID = "all", ""
+	else:
+		sid = 0
+		match_sdss_id = False
+	_key = (field, catID, extra, sid, match_sdss_id)
+	if _key in fetch_cache:
+		return fetch_cache[_key]
+	# print(f"[sdss_id] {catID} => {sid} => {cats} # {match_sdss_id}")
 
 	def legend(meta: Meta, base: str = "") -> str:
 		base = base or f"{meta.mjd}"
@@ -304,8 +308,8 @@ def fetch_catID(field: int | str, catID: int | str, extra: str = "", sdss_id: st
 	for x in extra.split(","):
 		x, ver = [*x.split("@", 1), ""][:2]
 		if not fullmatch(r"\d+p?-\d+-[^-](.*[^-])?", x): continue
-		fid, mjd, obj = x.split("-", 2)
-		mjd = int(mjd)
+		fid, mjd_, obj = x.split("-", 2)
+		mjd = int(mjd_)
 		try:
 			dat = SDSSV_fetch(username, password, fid, mjd, obj, ver)
 		except Exception as e:
@@ -315,8 +319,8 @@ def fetch_catID(field: int | str, catID: int | str, extra: str = "", sdss_id: st
 		data.append(Data(meta, wave=dat[1], flux=dat[2], errs=dat[3], name=legend(meta, f"{meta.mjd}*")))
 	if fullmatch(r"\d+p?-\d+", field):
 		obj, ver = [*catID.split("@", 1), ""][:2]
-		fid, mjd = field.split("-", 1)
-		mjd = int(mjd)
+		fid, mjd_ = field.split("-", 1)
+		mjd = int(mjd_)
 		try:
 			dat = SDSSV_fetch(username, password, fid, mjd, obj, ver)
 		except Exception as e:
@@ -373,7 +377,7 @@ def fetch_catID(field: int | str, catID: int | str, extra: str = "", sdss_id: st
 	if not (info and name and wave and flux):
 		raise HTTPError(f"[fetch_catID] {(field, catID, extra, sdss_id)}")
 	r = info, name, wave, flux, errs
-	fetch_cache[(field, catID, extra, sdss_id, match_sdss_id)] = r
+	fetch_cache[_key] = r
 	return r
 
 ###
