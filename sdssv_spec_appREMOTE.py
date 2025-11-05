@@ -33,7 +33,7 @@ from requests import request
 from requests.exceptions import ChunkedEncodingError, ConnectionError, HTTPError
 
 import util
-from util import identity, isa, isfile, nextfloat, parse_json, sdss_iau, sdss_sas_fits, write
+from util import identity, isa, isfile, nextfloat, parse_json, sdss_iau, sdss_sas_fits, sdss_zwarn, write
 
 ### Import several important functions from util/sdss.py etc.
 
@@ -47,15 +47,15 @@ with catch_warnings():
 
 ### Fetch an SDSS spectrum and print out its URL and its speclink URL
 
-def fetch(url: str, auth: None | tuple[str, str] = None, speclink: str = "") -> bytes:
+def fetch(url: str, auth: None | tuple[str, str] = None, speclink: str = "", timeout: float = 5) -> bytes:
 	try:
-		rv = request("GET", url, auth=auth)
+		rv = request("GET", url, auth=auth, timeout=timeout)
 	except ChunkedEncodingError: # Connection broken: IncompleteRead
-		rv = request("GET", url, auth=auth)
-	except ConnectionError as e: # ConnectTimeout | SSLError
+		rv = request("GET", url, auth=auth, timeout=timeout)
+	except ConnectionError as e: # ConnectTimeout | ProxyError | SSLError
 		print(e)
 		sleep(1)
-		return fetch(url, auth, speclink)
+		return fetch(url, auth, speclink, timeout=min(60, 2 * timeout))
 	if (rv.status_code != 404):
 		print(rv.status_code, url)
 		if speclink: print("   ", speclink)
@@ -166,19 +166,20 @@ def SDSSV_fetch(username: str, password: str, field: int | str, mjd: int, obj: i
 				branch = branch or "v5_13_2"
 	field, obj = str(field), str(obj) # ensure type
 
-	# Program will try all the branches below in the order listed
+	_key = (field, mjd, obj, branch)
+	if _key in fetch_cache:
+		return fetch_cache[_key]
+	if not (field and mjd and obj):
+		raise HTTPError(f"[SDSSV_fetch] {_key}")
 	if not branch or branch == "legacy":
+		# try all the branches below in the order listed
 		for v in ("26", "104", "103") if branch == "legacy" \
 			else ("master", "v6_2_1", "v6_2_0", "v6_1_3", "v6_0_9", "v6_1_0"):
 			# some object seems to only exist in v6.1.0 so we have to keep it here :(
 			try: return SDSSV_fetch(username, password, field, mjd, obj, v)
 			except HTTPError: pass
 			except Exception: print_exc()
-		raise HTTPError(f"[SDSSV_fetch] {(field, mjd, obj)}")
-	if not (field and mjd and obj):
-		raise HTTPError(f"[SDSSV_fetch] {(field, mjd, obj, branch)}")
-	if (field, mjd, obj, branch) in fetch_cache:
-		return fetch_cache[(field, mjd, obj, branch)]
+		raise HTTPError(f"[SDSSV_fetch] {_key}")
 
 	url, speclink = sdss_sas_fits(field, mjd, obj, branch) # speclink added PBH 2025-11-06
 
@@ -198,17 +199,17 @@ def SDSSV_fetch(username: str, password: str, field: int | str, mjd: int, obj: i
 	# print(f"meta: {type(meta)} = {str(meta)[:100]}")
 	# print(f"wave: {type(wave)} = {str(wave)[:100]}")
 	# print(f"flux: {type(flux)} = {str(flux)[:100]}")
-	if hasattr(meta, "RUN2D") and (RUN2D := meta["RUN2D"][0]) != branch:
+	if some(RUN2D := get(meta, "RUN2D")) and RUN2D != branch:
 		print(f"Error: unexpected {RUN2D=} with {branch=} in `{basename(url)}`")
 		meta["RUN2D"][0] = ""
-	if hasattr(meta, "OBS") and (
-		(OBS := meta["OBS"][0]) not in ("APO", "LCO") or
-		(field == "allepoch_apo" and OBS != "APO") or
-		(field == "allepoch_lco" and OBS != "LCO")):
+	if some(OBS := get(meta, "OBS")) and (
+		field == "allepoch_apo" and OBS != "APO" or
+		field == "allepoch_lco" and OBS != "LCO" or
+		OBS not in ("APO", "LCO")):
 		print(f"Error: unexpected {OBS=} with {field=} in `{basename(url)}`")
 		meta["OBS"][0] = ""
 	r = meta, wave, flux, errs
-	fetch_cache[(field, mjd, obj, branch)] = r
+	fetch_cache[_key] = r
 	return r
 
 def SDSSV_fetch_allepoch(username: str, password: str, mjd: int, obj: int | str):
@@ -810,7 +811,8 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 	html.Div(className="row", children=[
 		html.Div(className="col-xs-12", children=[
 			dcc.Graph(
-				id="spectra_plot",
+				id="spectra_plot", responsive=True,
+				config=dict(showTips=False),
 				style={
 					"position": "relative", "overflow": "hidden",
 					"height": "max(450px, min(64vw, 80vh))", "width": "100%"},
@@ -1119,7 +1121,7 @@ def hide_file_upload(checklist: list[str]):
 def process_upload(sto: dict, contents: list[str], filename: list[str], timestamp: list[float]):
 	# read in spectrum from csv/tsv/wsv file for wavelength, flux, error (optional)
 	if not contents: return sto
-	if not sto: sto = dict()
+	if not sto: sto = {}
 	with mktempdir(prefix="py_", ignore_cleanup_errors=True) as tmpdir:
 		d = Path(tmpdir)
 		for s, f, t in zip(contents, filename, timestamp):
@@ -1172,7 +1174,8 @@ def hide_spec_info2(checklist: list[str]):
 def show_spec_info(field_d, cat_d, field_i, cat_i, sdss_id, checklist: list[str]):
 	try:
 		meta = fetch_catID(field_d or field_i, cat_d or cat_i, "", sdss_id, match_sdss_id="s" in checklist)[0]
-		return meta.zwarn, meta.z, meta.rc2, meta.sid, meta.iau, meta.lon, meta.lat
+		warn = f"{x} ({s})" if (s := ", ".join(sdss_zwarn(x := meta.zwarn))) else f"{x}"
+		return warn, meta.z, meta.rc2, meta.sid, meta.iau, meta.lon, meta.lat
 	except Exception as e:
 		if str(e): print(f"[show_spec_info]  fetch_catID{([field_d, field_i], [cat_d, cat_i])}")
 		if str(e): print(e) if isa(e, HTTPError) else print_exc()
@@ -1314,10 +1317,12 @@ def make_multiepoch_spectra(field_d, cat_d, field_i, cat_i, extra_obj, redshift,
 		fig = Figure(layout=layout)
 		fig.layout.yaxis.range = [y_min, y_max]
 		fig.layout.xaxis.range = [xscale(rest_x_min), xscale(rest_x_max)]
+		ntraces = len(names)
+		visible = "legendonly" if ntraces > 10 else True
 
 		# For each spectrum in the list
-		for i in range(len(names)):
-			kws = {}
+		for i in range(ntraces):
+			kws = dict(visible=(ntraces == i + 1) or visible) # always show the last one
 			scaledfluxes[i] = fluxes[i]
 			if fullmatch(r"allplate-\d+.*", names[i], IGNORECASE):
 				kws["line_color"] = "#606060"
@@ -1380,5 +1385,8 @@ def make_multiepoch_spectra(field_d, cat_d, field_i, cat_i, extra_obj, redshift,
 if __name__ == "__main__":
 	# app.run(threaded=True, debug=True)
 	# app.run(host="0.0.0.0", port="8050", threaded=True, debug=True, dev_tools_ui=dash.__version__ >= "3")
-	app.run(host="127.0.0.1", port="8050", threaded=True, debug=True, dev_tools_ui=dash.__version__ >= "3")
+	if dash.__version__ >= "3":
+		app.run(host="127.0.0.1", port="8050", threaded=True, debug=True, dev_tools_disable_version_check=True)
+	else:
+		app.run(host="127.0.0.1", port="8050", threaded=True, debug=True, dev_tools_ui=False)
 

@@ -1,3 +1,4 @@
+from collections.abc import Iterable
 from re import fullmatch
 
 from .base import isa
@@ -92,4 +93,17 @@ def sdss_iau(α: float, δ: float) -> str:
 
 	pm = "-" if signbit(d) else "+"
 	return f"J{lon}{pm}{lat}"
+
+def sdss_zwarn(x: int) -> Iterable[str]:
+	assert x >= 0
+	if x & 2**0: yield "sky"
+	if x & 2**1: yield "little_coverage"
+	if x & 2**2: yield "small_delta_chi2"
+	if x & 2**3: yield "negative_model"
+	if x & 2**4: yield "many_outliers"
+	if x & 2**5: yield "z_fitlimit"
+	if x & 2**6: yield "negative_emission"
+	if x & 2**7: yield "unplugged"
+	if x & 2**8: yield "bad_target"
+	if x & 2**9: yield "nodata"
 

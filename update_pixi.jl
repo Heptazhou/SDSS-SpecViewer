@@ -1,4 +1,4 @@
-# Copyright (C) 2025 Heptazhou <zhou@0h7z.com>
+# Copyright (C) 2025-2026 Heptazhou <zhou@0h7z.com>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -15,6 +15,7 @@
 using Exts
 
 @time if abspath(PROGRAM_FILE) == @__FILE__
+	run(`pixi add "dash~=3.2.0"`, devnull)
 	run(`pixi add "setuptools~=80.8.0"`, devnull)
 	run(`pixi update`, devnull)
 	f = "pixi.lock"
