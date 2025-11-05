@@ -32,7 +32,7 @@ from requests import request
 from requests.exceptions import ChunkedEncodingError, ConnectionError, HTTPError
 
 import util
-from util import identity, isa, isfile, nextfloat, parse_json, sdss_iau, sdss_sas_fits, write
+from util import identity, isa, isfile, nextfloat, parse_json, sdss_iau, sdss_sas_fits, sdss_zwarn, write
 
 with catch_warnings():
 	filterwarnings("ignore", category=DeprecationWarning) # todo v3.11
@@ -1141,7 +1141,8 @@ def hide_spec_info2(checklist: list[str]):
 def show_spec_info(field_d, cat_d, field_i, cat_i, sdss_id, checklist: list[str]):
 	try:
 		meta = fetch_catID(field_d or field_i, cat_d or cat_i, "", sdss_id, match_sdss_id="s" in checklist)[0]
-		return meta.zwarn, meta.z, meta.rc2, meta.sid, meta.iau, meta.lon, meta.lat
+		warn = f"{x} ({s})" if (s := ", ".join(sdss_zwarn(x := meta.zwarn))) else f"{x}"
+		return warn, meta.z, meta.rc2, meta.sid, meta.iau, meta.lon, meta.lat
 	except Exception as e:
 		if str(e): print(f"[show_spec_info]  fetch_catID{([field_d, field_i], [cat_d, cat_i])}")
 		if str(e): print(e) if isa(e, HTTPError) else print_exc()

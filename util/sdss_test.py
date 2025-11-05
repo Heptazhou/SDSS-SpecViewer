@@ -1,5 +1,6 @@
 from .sdss import sdss_iau
 from .sdss import sdss_sas_fits as func
+from .sdss import sdss_zwarn
 
 
 def testset_dr19_026() -> None:
@@ -117,4 +118,22 @@ def testset_iau_name_01() -> None:
 def testset_iau_name_02() -> None:
 	assert sdss_iau(188.737_042, -1.396) == "J123456.89-012345.6"
 	assert sdss_iau(188.737_042, +1.396) == "J123456.89+012345.6"
+
+def testset_sdss_zwarn_0000() -> None:
+	assert sorted(map(str.upper, sdss_zwarn(   0))) == []
+
+def testset_sdss_zwarn_0036() -> None:
+	assert sorted(map(str.upper, sdss_zwarn(  36))) == ["SMALL_DELTA_CHI2", "Z_FITLIMIT"]
+
+def testset_sdss_zwarn_0072() -> None:
+	assert sorted(map(str.upper, sdss_zwarn(  72))) == ["NEGATIVE_EMISSION", "NEGATIVE_MODEL"]
+
+def testset_sdss_zwarn_0128() -> None:
+	assert sorted(map(str.upper, sdss_zwarn( 128))) == ["UNPLUGGED"]
+
+def testset_sdss_zwarn_0257() -> None:
+	assert sorted(map(str.upper, sdss_zwarn( 257))) == ["BAD_TARGET", "SKY"]
+
+def testset_sdss_zwarn_0514() -> None:
+	assert sorted(map(str.upper, sdss_zwarn( 514))) == ["LITTLE_COVERAGE", "NODATA"]
 
