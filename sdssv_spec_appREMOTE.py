@@ -41,15 +41,15 @@ with catch_warnings():
 	from dash.dependencies import Input, Output, State
 
 
-def fetch(url: str, auth: None | tuple[str, str] = None) -> bytes:
+def fetch(url: str, auth: None | tuple[str, str] = None, timeout: float = 5) -> bytes:
 	try:
-		rv = request("GET", url, auth=auth)
+		rv = request("GET", url, auth=auth, timeout=timeout)
 	except ChunkedEncodingError: # Connection broken: IncompleteRead
-		rv = request("GET", url, auth=auth)
+		rv = request("GET", url, auth=auth, timeout=timeout)
 	except ConnectionError as e: # ConnectTimeout | ProxyError | SSLError
 		print(e)
 		sleep(1)
-		return fetch(url, auth)
+		return fetch(url, auth, timeout=min(60, 2 * timeout))
 	if (rv.status_code != 404): print(rv.status_code, url)
 	rv.raise_for_status() # HTTPError
 	return rv.content
@@ -790,7 +790,8 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 	html.Div(className="row", children=[
 		html.Div(className="col-xs-12", children=[
 			dcc.Graph(
-				id="spectra_plot",
+				id="spectra_plot", responsive=True,
+				config=dict(showTips=False),
 				style={
 					"position": "relative", "overflow": "hidden",
 					"height": "max(450px, min(64vw, 80vh))", "width": "100%"},
@@ -1088,7 +1089,7 @@ def hide_file_upload(checklist: list[str]):
 def process_upload(sto: dict, contents: list[str], filename: list[str], timestamp: list[float]):
 	# read in spectrum from csv/tsv/wsv file for wavelength, flux, error (optional)
 	if not contents: return sto
-	if not sto: sto = dict()
+	if not sto: sto = {}
 	with mktempdir(prefix="py_", ignore_cleanup_errors=True) as tmpdir:
 		d = Path(tmpdir)
 		for s, f, t in zip(contents, filename, timestamp):
@@ -1283,10 +1284,12 @@ def make_multiepoch_spectra(field_d, cat_d, field_i, cat_i, extra_obj, redshift,
 		fig = Figure(layout=layout)
 		fig.layout.yaxis.range = [y_min, y_max]
 		fig.layout.xaxis.range = [xscale(rest_x_min), xscale(rest_x_max)]
+		ntraces = len(names)
+		visible = "legendonly" if ntraces > 10 else True
 
 		# For each spectrum in the list
-		for i in range(len(names)):
-			kws = {}
+		for i in range(ntraces):
+			kws = dict(visible=(ntraces == i + 1) or visible) # always show the last one
 			if fullmatch(r"allplate-\d+.*", names[i], IGNORECASE):
 				kws["line_color"] = "#606060"
 			if fullmatch(r"allFPS-\d+.*", names[i], IGNORECASE):
