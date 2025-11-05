@@ -23,7 +23,7 @@ from warnings import catch_warnings, filterwarnings
 
 import numpy
 from astropy.convolution import Box1DKernel, convolve # type: ignore[import-untyped]
-from astropy.io.fits import BinTableHDU, FITS_rec, HDUList # type: ignore[import-untyped]
+from astropy.io.fits import BinTableHDU, FITS_rec # type: ignore[import-untyped]
 from astropy.io.fits import open as FITS
 from numpy import mean, median, ndarray, sqrt, std
 from plotly.graph_objects import Figure, Scatter # type: ignore[import-untyped]
@@ -46,7 +46,7 @@ def fetch(url: str, auth: None | tuple[str, str] = None) -> bytes:
 		rv = request("GET", url, auth=auth)
 	except ChunkedEncodingError: # Connection broken: IncompleteRead
 		rv = request("GET", url, auth=auth)
-	except ConnectionError as e: # ConnectTimeout | SSLError
+	except ConnectionError as e: # ConnectTimeout | ProxyError | SSLError
 		print(e)
 		sleep(1)
 		return fetch(url, auth)
@@ -154,25 +154,25 @@ def SDSSV_fetch(username: str, password: str, field: int | str, mjd: int, obj: i
 				branch = branch or "v5_13_2"
 	field, obj = str(field), str(obj) # ensure type
 
-	# Program will try all the branches below in the order listed
+	_key = (field, mjd, obj, branch)
+	if _key in fetch_cache:
+		return fetch_cache[_key]
+	if not (field and mjd and obj):
+		raise HTTPError(f"[SDSSV_fetch] {_key}")
 	if not branch or branch == "legacy":
+		# try all the branches below in the order listed
 		for v in ("26", "104", "103") if branch == "legacy" \
 			else ("master", "v6_2_1", "v6_2_0", "v6_1_3", "v6_0_9", "v6_1_0"):
 			# some object seems to only exist in v6.1.0 so we have to keep it here :(
 			try: return SDSSV_fetch(username, password, field, mjd, obj, v)
 			except HTTPError: pass
 			except Exception: print_exc()
-		raise HTTPError(f"[SDSSV_fetch] {(field, mjd, obj)}")
-	if not (field and mjd and obj):
-		raise HTTPError(f"[SDSSV_fetch] {(field, mjd, obj, branch)}")
-	if (field, mjd, obj, branch) in fetch_cache:
-		return fetch_cache[(field, mjd, obj, branch)]
-
+		raise HTTPError(f"[SDSSV_fetch] {_key}")
 	url = sdss_sas_fits(field, mjd, obj, branch)
 	# print(url)
 
 	numpy.seterr(divide="ignore") # Python does not comply with IEEE 754 :(
-	fits = cast(HDUList, FITS(IOBuffer(locked_fetch(url)))) # prevent duplicated requests
+	fits = FITS(IOBuffer(locked_fetch(url))) # prevent duplicated requests
 	hdu2 = fits["COADD"] if "COADD" in fits else fits[1]
 	hdu3 = fits["SPALL"] if "SPALL" in fits else fits[2] # SPECOBJ
 	assert isa(hdu2, BinTableHDU) and isa(hdu2.data, FITS_rec)
@@ -186,17 +186,17 @@ def SDSSV_fetch(username: str, password: str, field: int | str, mjd: int, obj: i
 	# print(f"meta: {type(meta)} = {str(meta)[:100]}")
 	# print(f"wave: {type(wave)} = {str(wave)[:100]}")
 	# print(f"flux: {type(flux)} = {str(flux)[:100]}")
-	if hasattr(meta, "RUN2D") and (RUN2D := meta["RUN2D"][0]) != branch:
+	if some(RUN2D := get(meta, "RUN2D")) and RUN2D != branch:
 		print(f"Error: unexpected {RUN2D=} with {branch=} in `{basename(url)}`")
 		meta["RUN2D"][0] = ""
-	if hasattr(meta, "OBS") and (
-		(OBS := meta["OBS"][0]) not in ("APO", "LCO") or
-		(field == "allepoch_apo" and OBS != "APO") or
-		(field == "allepoch_lco" and OBS != "LCO")):
+	if some(OBS := get(meta, "OBS")) and (
+		field == "allepoch_apo" and OBS != "APO" or
+		field == "allepoch_lco" and OBS != "LCO" or
+		OBS not in ("APO", "LCO")):
 		print(f"Error: unexpected {OBS=} with {field=} in `{basename(url)}`")
 		meta["OBS"][0] = ""
 	r = meta, wave, flux, errs
-	fetch_cache[(field, mjd, obj, branch)] = r
+	fetch_cache[_key] = r
 	return r
 
 def SDSSV_fetch_allepoch(username: str, password: str, mjd: int, obj: int | str):
