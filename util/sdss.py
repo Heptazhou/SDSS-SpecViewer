@@ -66,7 +66,7 @@ def sdss_sas_fits(field: int | str, mjd: int, obj: int | str, branch: str) -> st
 			url = f"{path}/{branch}/spectra/lite/{field6 }/{mjd}/{file(field6, obj  )}"
 		case _:                                  # v6.2.0+
 			url = f"{path}/{branch}/spectra/{daily}/lite/{group}/{field6}/{mjd}/{file(field6, obj)}"
-			if (branch == "v6_2_1" or branch == "master") and daily != "allepoch":
+			if (branch == "v6_2_1" or branch == "master"): # create speclink only for v6_2_1 spectra
 				speclink = f"{path}/v6_2_1/images/{daily}/v6_2_1/{group}/{field6}/{field6}-{mjd}/{spile(field6, obj)}"
         
 	return url, speclink # speclink added PBH 2025-11-06
