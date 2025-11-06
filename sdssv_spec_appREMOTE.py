@@ -41,7 +41,7 @@ with catch_warnings():
 	from dash.dependencies import Input, Output, State
 
 
-def fetch(url: str, auth: None | tuple[str, str] = None) -> bytes:
+def fetch(url: str, speclink: str, auth: None | tuple[str, str] = None) -> bytes:
 	try:
 		rv = request("GET", url, auth=auth)
 	except ChunkedEncodingError: # Connection broken: IncompleteRead
@@ -50,7 +50,9 @@ def fetch(url: str, auth: None | tuple[str, str] = None) -> bytes:
 		print(e)
 		sleep(1)
 		return fetch(url, auth)
-	if (rv.status_code != 404): print(rv.status_code, url)
+	if (rv.status_code != 404): 
+		print(rv.status_code, url) 
+		if speclink!="": print(speclink) 
 	rv.raise_for_status() # HTTPError
 	return rv.content
 def unzstd(f: str) -> bytes:
@@ -71,11 +73,11 @@ while True:
 	if isfile(bhm_data_local):
 		try:
 			lcl_data = parse_json(unzstd(bhm_data_local))
-			rmt_meta = parse_json(fetch(remote + basename(bhm_meta_local)))
+			rmt_meta = parse_json(fetch(remote + basename(bhm_meta_local), ""))
 			if lcl_data["hdr"]["date"] >= rmt_meta["date"]: break # already latest
 		except HTTPError: break # skip update
 		except: print_exc()
-	try: write(bhm_data_local, fetch(remote + basename(bhm_data_local)))
+	try: write(bhm_data_local, fetch(remote + basename(bhm_data_local), ""))
 	except HTTPError: sleep(1) # retry after delay
 
 metadata: dict[str, list | dict | str | int] = lcl_data["hdr"]
@@ -124,10 +126,10 @@ def get(hdu: FITS_rec, col: str, default: None = None):
 	return ret
 
 @lru_cache(64)
-def cached_fetch(url: str) -> bytes:
-	return fetch(url, (username, password) if url.startswith("https://data.sdss5.org/sas/sdsswork/") else None)
-def locked_fetch(url: str) -> bytes:
-	with fetch_queue[url]: r = cached_fetch(url)
+def cached_fetch(url: str, speclink: str) -> bytes:
+	return fetch(url, speclink, (username, password) if url.startswith("https://data.sdss5.org/sas/sdsswork/") else None)
+def locked_fetch(url: str, speclink: str) -> bytes:
+	with fetch_queue[url]: r = cached_fetch(url, speclink)
 	return r
 
 def SDSSV_fetch(username: str, password: str, field: int | str, mjd: int, obj: int | str, branch="") \
@@ -168,11 +170,10 @@ def SDSSV_fetch(username: str, password: str, field: int | str, mjd: int, obj: i
 	if (field, mjd, obj, branch) in fetch_cache:
 		return fetch_cache[(field, mjd, obj, branch)]
 
-	url = sdss_sas_fits(field, mjd, obj, branch)
-	# print(url)
+	url, speclink = sdss_sas_fits(field, mjd, obj, branch) # speclink added PBH 2025-11-06
 
 	numpy.seterr(divide="ignore") # Python does not comply with IEEE 754 :(
-	fits = cast(HDUList, FITS(IOBuffer(locked_fetch(url)))) # prevent duplicated requests
+	fits = cast(HDUList, FITS(IOBuffer(locked_fetch(url,speclink)))) # prevent duplicated requests
 	hdu2 = fits["COADD"] if "COADD" in fits else fits[1]
 	hdu3 = fits["SPALL"] if "SPALL" in fits else fits[2] # SPECOBJ
 	assert isa(hdu2, BinTableHDU) and isa(hdu2.data, FITS_rec)
@@ -494,7 +495,7 @@ spec_line_abs = numpy.asarray([
 	[0, 1, "2852.9642                    ", "Mg I"       ],
 	[1, 2, "2803.5324 2796.3511          ", "Mg II"      ],
 	[0, 2, "2600.1725 2586.6496          ", "Fe II uv1"  ],
-	[0, 3, "2382.7642 2374.4603 2344.2130", "Fe II uv23" ],
+	[0, 3, "2382.7642 2374.4603 2344.2130", "Fe II uv2+3" ],
 	[0, 3, "2208.6666 2211.5815 2217.3593", "Si I,I*"    ],
 	[0, 3, "2165.0155 2174.3729 2185.3800", "Fe II uv79" ],
 	[0, 3, "2062.2110 2068.9040 2079.6520", "Fe III uv48"],
