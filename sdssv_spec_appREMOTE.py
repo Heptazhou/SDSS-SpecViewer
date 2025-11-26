@@ -23,7 +23,7 @@ from warnings import catch_warnings, filterwarnings
 
 import numpy
 from astropy.convolution import Box1DKernel, convolve # type: ignore[import-untyped]
-from astropy.io.fits import BinTableHDU, FITS_rec, HDUList # type: ignore[import-untyped]
+from astropy.io.fits import BinTableHDU, FITS_rec # type: ignore[import-untyped]
 from astropy.io.fits import open as FITS
 from numpy import mean, median, ndarray, sqrt, std
 from plotly.graph_objects import Figure, Scatter # type: ignore[import-untyped]
@@ -41,7 +41,7 @@ with catch_warnings():
 	from dash.dependencies import Input, Output, State
 
 
-def fetch(url: str, speclink: str, auth: None | tuple[str, str] = None) -> bytes:
+def fetch(url: str, auth: None | tuple[str, str] = None, speclink: str = "") -> bytes:
 	try:
 		rv = request("GET", url, auth=auth)
 	except ChunkedEncodingError: # Connection broken: IncompleteRead
@@ -49,10 +49,10 @@ def fetch(url: str, speclink: str, auth: None | tuple[str, str] = None) -> bytes
 	except ConnectionError as e: # ConnectTimeout | SSLError
 		print(e)
 		sleep(1)
-		return fetch(url, auth)
-	if (rv.status_code != 404): 
-		print(rv.status_code, url) 
-		if speclink!="": print(speclink) 
+		return fetch(url, auth, speclink)
+	if (rv.status_code != 404):
+		print(rv.status_code, url)
+		if speclink: print("   ", speclink)
 	rv.raise_for_status() # HTTPError
 	return rv.content
 def unzstd(f: str) -> bytes:
@@ -73,11 +73,11 @@ while True:
 	if isfile(bhm_data_local):
 		try:
 			lcl_data = parse_json(unzstd(bhm_data_local))
-			rmt_meta = parse_json(fetch(remote + basename(bhm_meta_local), ""))
+			rmt_meta = parse_json(fetch(remote + basename(bhm_meta_local)))
 			if lcl_data["hdr"]["date"] >= rmt_meta["date"]: break # already latest
 		except HTTPError: break # skip update
 		except: print_exc()
-	try: write(bhm_data_local, fetch(remote + basename(bhm_data_local), ""))
+	try: write(bhm_data_local, fetch(remote + basename(bhm_data_local)))
 	except HTTPError: sleep(1) # retry after delay
 
 metadata: dict[str, list | dict | str | int] = lcl_data["hdr"]
@@ -127,7 +127,7 @@ def get(hdu: FITS_rec, col: str, default: None = None):
 
 @lru_cache(64)
 def cached_fetch(url: str, speclink: str) -> bytes:
-	return fetch(url, speclink, (username, password) if url.startswith("https://data.sdss5.org/sas/sdsswork/") else None)
+	return fetch(url, (username, password) if url.startswith("https://data.sdss5.org/sas/sdsswork/") else None, speclink)
 def locked_fetch(url: str, speclink: str) -> bytes:
 	with fetch_queue[url]: r = cached_fetch(url, speclink)
 	return r
@@ -173,7 +173,7 @@ def SDSSV_fetch(username: str, password: str, field: int | str, mjd: int, obj: i
 	url, speclink = sdss_sas_fits(field, mjd, obj, branch) # speclink added PBH 2025-11-06
 
 	numpy.seterr(divide="ignore") # Python does not comply with IEEE 754 :(
-	fits = cast(HDUList, FITS(IOBuffer(locked_fetch(url,speclink)))) # prevent duplicated requests
+	fits = FITS(IOBuffer(locked_fetch(url, speclink))) # prevent duplicated requests
 	hdu2 = fits["COADD"] if "COADD" in fits else fits[1]
 	hdu3 = fits["SPALL"] if "SPALL" in fits else fits[2] # SPECOBJ
 	assert isa(hdu2, BinTableHDU) and isa(hdu2.data, FITS_rec)
@@ -338,7 +338,11 @@ def fetch_catID(field: int | str, catID: int | str, extra: str = "", sdss_id: st
 			for fieldmjd in catalogs.get(f"{cat}", [0])[1:]: # {13'FIELD,5'MJD}
 				fid, mjd = divmod(abs(fieldmjd), 10**5)
 				if field != "all" and int(field) != fid: continue
-				dat = SDSSV_fetch(username, password, fid, mjd, cat)
+				try:
+					dat = SDSSV_fetch(username, password, fid, mjd, cat)
+				except Exception as e:
+					if str(e): print(e) if isa(e, HTTPError) else print_exc()
+					continue
 				meta = Meta(dat[0])
 				data.append(Data(meta, wave=dat[1], flux=dat[2], errs=dat[3], name=legend(meta)))
 				if mjd not in mjd_list: mjd_list.append(mjd)

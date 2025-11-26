@@ -5,7 +5,7 @@ from .math import signbit
 from .unit import deg2dms, deg2hms
 
 
-def sdss_sas_fits(field: int | str, mjd: int, obj: int | str, branch: str) -> str:
+def sdss_sas_fits(field: int | str, mjd: int, obj: int | str, branch: str) -> tuple[str, str]:
 	"""
 	A function to build the url that will be used to fetch the data.
 	"""
@@ -23,10 +23,12 @@ def sdss_sas_fits(field: int | str, mjd: int, obj: int | str, branch: str) -> st
 	else:
 		daily = "daily"
 
+	def spec(field: str, obj: int | str) -> str:
+		return f"spec-image-{field}-{mjd}-{obj}.png"
+
 	def file(field: str, obj: int | str) -> str:
 		return f"spec-{field}-{mjd}-{obj}.fits"
-	def spile(field: str, obj: int | str) -> str:
-		return f"spec-image-{field}-{mjd}-{obj}.png"
+
 	field4 = str(field).zfill(4)
 	field6 = str(field).zfill(6)
 	obj04 = str(obj).zfill( 4)
@@ -56,7 +58,6 @@ def sdss_sas_fits(field: int | str, mjd: int, obj: int | str, branch: str) -> st
 		case _:
 			path = "https://data.sdss5.org/sas/sdsswork/bhm/boss/spectro/redux"
 
-	speclink="" # speclink added PBH 2025-11-06
 	match branch:
 		case v if fullmatch(r"v5_(\d+_\d+)", v) or v in ("26", "103", "104"):
 			url = f"{path}/{branch}/spectra/lite/{field4       }/{file(field4, obj04)}"
@@ -66,12 +67,15 @@ def sdss_sas_fits(field: int | str, mjd: int, obj: int | str, branch: str) -> st
 			url = f"{path}/{branch}/spectra/lite/{field6 }/{mjd}/{file(field6, obj  )}"
 		case _:                                  # v6.2.0+
 			url = f"{path}/{branch}/spectra/{daily}/lite/{group}/{field6}/{mjd}/{file(field6, obj)}"
-			if (branch == "v6_2_1" or branch == "master"): # create speclink only for v6_2_1 spectra
-				speclink = f"{path}/v6_2_1/images/{daily}/v6_2_1/{group}/{field6}/{field6}-{mjd}/{spile(field6, obj)}"
-        
-	return url, speclink # speclink added PBH 2025-11-06
+	match branch: # speclink added PBH 2025-11-06
+		case "v6_2_1" | "master": # create speclink only for v6.2.1+ spectra
+			img = f"{path}/v6_2_1/images/{daily}/v6_2_1/{group}/{field6}/{field6}-{mjd}/{spec(field6, obj)}"
+		case _:
+			img = f""
+
+	return url, img
 # speclink example:
-# https://data.sdss5.org/sas/sdsswork/bhm/boss/spectro/redux/v6_2_1/images/daily/v6_2_1/109XXX/109167/109167-60973/spec-image-109167-60973-63050395805349051.png 
+# https://data.sdss5.org/sas/sdsswork/bhm/boss/spectro/redux/v6_2_1/images/daily/v6_2_1/109XXX/109167/109167-60973/spec-image-109167-60973-63050395805349051.png
 
 def sdss_iau(α: float, δ: float) -> str:
 	def _str(x: float, tpl="00") -> str:

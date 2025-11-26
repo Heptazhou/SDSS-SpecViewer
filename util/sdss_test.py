@@ -1,6 +1,7 @@
-from .sdss import sdss_iau
-from .sdss import sdss_sas_fits as func
+from .sdss import sdss_iau, sdss_sas_fits
 
+
+def func(*xs) -> str: return sdss_sas_fits(*xs)[0]
 
 def testset_dr19_026() -> None:
 	b = "26"
