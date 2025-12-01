@@ -79,7 +79,7 @@ def sdss_sas_fits(field: int | str, mjd: int, obj: int | str, branch: str) -> tu
 
 def sdss_iau(α: float, δ: float) -> str:
 	"""
-	A function to generate the IAU-format string for a given RA,DEC
+	A function to generate the IAU-format string for a given RA & DEC
 	"""
 	def _str(x: float, tpl="00") -> str:
 		return f"{x:+010.6f}"[1:len(tpl) + 1]

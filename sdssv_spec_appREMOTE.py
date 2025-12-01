@@ -32,10 +32,11 @@ from pyzstd import open as ZSTD
 from requests import request
 from requests.exceptions import ChunkedEncodingError, ConnectionError, HTTPError
 
-### Import several important functions from util/sdss.py etc.
-
 import util
 from util import identity, isa, isfile, nextfloat, parse_json, sdss_iau, sdss_sas_fits, write
+
+### Import several important functions from util/sdss.py etc.
+
 
 with catch_warnings():
 	filterwarnings("ignore", category=DeprecationWarning) # todo v3.11
@@ -44,7 +45,7 @@ with catch_warnings():
 	from dash.dependencies import Input, Output, State
 
 
-### Fetch an SDSS spectrum and print out its URL and its speclink URL 
+### Fetch an SDSS spectrum and print out its URL and its speclink URL
 
 def fetch(url: str, auth: None | tuple[str, str] = None, speclink: str = "") -> bytes:
 	try:
@@ -69,13 +70,11 @@ def unzstd(f: str) -> bytes:
 # mypy: disable-error-code="assignment, func-returns-value"
 # pyright: reportArgumentType=false, reportAttributeAccessIssue=false, reportPossiblyUnboundVariable=false
 
-### PBH ? for ZZZ: edit the next line into a correct description of the "while True:" block, if needed, then delete this line
-# check that the local bhm.json and bhm.meta.json files are up to date; if not, update them
-
 authentication = "authentication.txt"
 bhm_data_local = "data/bhm.json.zst"
 bhm_meta_local = "data/bhm.meta.json"
 
+# check that the local bhm.json and bhm.json.zst files are up to date; if not, update them
 while True:
 	remote = "https://github.com/Heptazhou/SDSS-SpecViewer/releases" + "/download/v1.0.0/"
 	if isfile(bhm_data_local):
@@ -143,7 +142,7 @@ def locked_fetch(url: str, speclink: str) -> bytes:
 def SDSSV_fetch(username: str, password: str, field: int | str, mjd: int, obj: int | str, branch="") \
 	-> tuple[FITS_rec, ndarray, ndarray, ndarray]:
 	"""
-	Fetch spectral data for a SDSS-RM object in a specific field 
+	Fetch spectral data for a SDSS-RM object in a specific field
 	on a specific MJD, using the user supplied authentication.
 	"""
 	if isa(field, str):
@@ -277,11 +276,10 @@ class Data:
 	errs: ndarray
 
 def fetch_catID(field: int | str, catID: int | str, extra: str = "", sdss_id: str = "", match_sdss_id: bool = True) \
-	"""
-	PBH ? for ZZZ: is next line accurate?
-	Fetch and display all catalog IDs for an object given an sdss_id or a field/MJD/catID combination
-	"""
 	-> tuple[Meta, list[str], list[ndarray], list[ndarray], list[ndarray]]:
+	"""
+	Fetch all the needed data for an object
+	"""
 	if not (sdss_id or extra or catID): # consider as incomplete user input
 		raise Exception()               # so abort quietly
 	if not (sdss_id or extra or catID and field):
@@ -472,7 +470,7 @@ spec_line_emi = numpy.asarray([
 	[0, 1, "3869.8500          ", "[Ne III]"],
 	# [0, 1, "3850.8100          ", "Fe I"    ], # 3886.2822 3859.9114 3820.4253
 	# [0, 1, "3739.3497          ", "Fe I"    ], # 3758.2329 3749.4854 3748.2622 3745.5613 3737.1316 3734.8638 3719.9348
-	#[1, 1, "3728.4830          ", "[O II]"  ], # 3729.8740 3727.0920
+	# [1, 1, "3728.4830          ", "[O II]"  ], # 3729.8740 3727.0920
 	[1, 2, "3729.8740 3727.0920", "[O II]"  ], # 3729.8740 3727.0920
 	# [0, 1, "3524.9583          ", "Fe I"    ], # 3581.1931 3440.606
 	[0, 2, "3426.8400 3346.8200", "[Ne V]"  ],
