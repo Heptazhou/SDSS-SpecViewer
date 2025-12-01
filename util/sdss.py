@@ -78,6 +78,9 @@ def sdss_sas_fits(field: int | str, mjd: int, obj: int | str, branch: str) -> tu
 # https://data.sdss5.org/sas/sdsswork/bhm/boss/spectro/redux/v6_2_1/images/daily/v6_2_1/109XXX/109167/109167-60973/spec-image-109167-60973-63050395805349051.png
 
 def sdss_iau(α: float, δ: float) -> str:
+	"""
+	A function to generate the IAU-format string for a given RA,DEC
+	"""
 	def _str(x: float, tpl="00") -> str:
 		return f"{x:+010.6f}"[1:len(tpl) + 1]
 
