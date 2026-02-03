@@ -114,6 +114,10 @@ y_min_default = 0
 smooth_default = 1
 smooth_max = 435 # corresponds to 30,000 km/s
 
+# Allepoch scaling
+scale_default = 1
+scale_max = 100 
+
 ### css files
 external_stylesheets = [ "https://codepen.io/chriddyp/pen/bWLwgP.css",
                          "https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css",
@@ -190,6 +194,7 @@ def SDSSV_fetch(username: str, password: str, field: int | str, mjd: int, obj: i
 	errs = cast(ndarray, hdu2.data["IVAR"  ]) # τ = σ⁻²
 	wave = 10**wave                           # λ
 	errs = 1 / sqrt(errs)                     # σ
+	## PBH testing optional scaling for allepoch coadds only
 	# print(f"meta: {type(meta)} = {str(meta)[:100]}")
 	# print(f"wave: {type(wave)} = {str(wave)[:100]}")
 	# print(f"flux: {type(flux)} = {str(flux)[:100]}")
@@ -861,14 +866,25 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 
 			]),
 
-			## spectral smoothing
+                        ## spectral smoothing
+                        html.Div(className="col-lg-6 col-md-3 col-sm-4 col-xs-6", children=[
+                                html.Label(
+                                        html.H4("Smoothing"),
+                                ),
+                                dcc.Input(
+                                        id="smooth_input", type="number", step=2, min=1, value=smooth_default, placeholder="SmoothWidth",
+                                        style={"height": "36px", "width": "100%"}, max=smooth_max,
+                                ), # PBH: closes dcc.Input
+                        ]), # PBH: closes html.Div
+
+			## allepoch scaling
 			html.Div(className="col-lg-6 col-md-3 col-sm-4 col-xs-6", children=[
 				html.Label(
-					html.H4("Smoothing"),
+					html.H4("Allepoch scaling"),
 				),
 				dcc.Input(
-					id="smooth_input", type="number", step=2, min=1, value=smooth_default, placeholder="SmoothWidth",
-					style={"height": "36px", "width": "100%"}, max=smooth_max,
+					id="scale_input", type="number", step=0.001, min=0.001, value=scale_default, placeholder="ScaleWidth",
+					style={"height": "36px", "width": "100%"}, max=scale_max,
 				), # PBH: closes dcc.Input
 			]), # PBH: closes html.Div
 
@@ -1062,6 +1078,7 @@ def set_extra_obj(search: str):
 	Output("redshift_input", "value", allow_duplicate=True),
 	Output("redshift_step", "value"),
 	Output("smooth_input", "value"),
+	Output("scale_input", "value"),
 	State("axis_y_max", "value"),
 	State("axis_y_min", "value"),
 	State("axis_x_max", "value"),
@@ -1238,11 +1255,12 @@ def line_list_abs_select_all(clk: int, val: list, opt: list):
 	Input("line_list_emi", "value"),
 	Input("line_list_abs", "value"),
 	Input("smooth_input", "value"),
+	Input("scale_input", "value"),
 	Input("extra_func_list", "value"),
 	Input("dash-user-upload", "data"))
 # The list of inputs above applies to the following function
 def make_multiepoch_spectra(field_d, cat_d, field_i, cat_i, extra_obj, redshift, redshift_step, sdss_id,
-                            y_max, y_min, x_max, x_min, list_emi, list_abs, smooth,
+                            y_max, y_min, x_max, x_min, list_emi, list_abs, smooth, scale,
                             checklist: list[str], user_data: dict):
 	layout_axis = dict(fixedrange=True)
 	layout = dict(yaxis=layout_axis, xaxis=layout_axis, xaxis2=layout_axis)
@@ -1253,7 +1271,7 @@ def make_multiepoch_spectra(field_d, cat_d, field_i, cat_i, extra_obj, redshift,
 	smooth, z = int(smooth or smooth_default), float(redshift or redshift_default)
 	if (1 + z) <= 0: z = nextfloat(-1) # z ∈ (-1, +∞)
 
-	names, waves, fluxes, delta = list[str](), list[ndarray](), list[ndarray](), list[ndarray]()
+	names, waves, fluxes, scaledfluxes, delta = list[str](), list[ndarray](), list[ndarray](), list[ndarray](), list[ndarray]()
 	if user_data:
 		for k, v in user_data.items():
 			try: #
@@ -1269,13 +1287,13 @@ def make_multiepoch_spectra(field_d, cat_d, field_i, cat_i, extra_obj, redshift,
 						numpy.seterr(divide="ignore") # :(
 						errs = 1 / sqrt(errs) # σ
 				# print((name, wave, flux, errs))
-				names.append(name), waves.append(wave), fluxes.append(flux), delta.append(errs)
+				names.append(name), waves.append(wave), fluxes.append(flux), scaledfluxes.append(flux), delta.append(errs)
 			except: print_exc()
 	noop_size = len(names)
 
 	try:
 		meta, name, wave, flux, errs = fetch_catID(fieldid, catalogid, extra_obj, sdss_id, match_sdss_id="s" in checklist)
-		names.extend(name), waves.extend(wave), fluxes.extend(flux), delta.extend(errs)
+		names.extend(name), waves.extend(wave), fluxes.extend(flux), scaledfluxes.extend(flux), delta.extend(errs)
 		if not z and some(meta.z) and redshift_step == "any": z = meta.z
 	except Exception as e:
 		if str(e): print(f"[make_multiepoch_spectra] fetch_catID{([field_d, field_i], [cat_d, cat_i], extra_obj, sdss_id)}")
@@ -1301,14 +1319,17 @@ def make_multiepoch_spectra(field_d, cat_d, field_i, cat_i, extra_obj, redshift,
 		# For each spectrum in the list
 		for i in range(len(names)):
 			kws = {}
+			scaledfluxes[i] = fluxes[i]
 			if fullmatch(r"allplate-\d+.*", names[i], IGNORECASE):
 				kws["line_color"] = "#606060"
+				scaledfluxes[i] = fluxes[i] * scale
 			if fullmatch(r"allFPS-\d+.*", names[i], IGNORECASE):
 				kws["line_color"] = "#000000"
+				scaledfluxes[i] = fluxes[i] * scale
 			# create trace of smoothed spectra
 			fig.add_trace(Scatter(
 				x=waves[i] if i < noop_size else waves[i] / (1 + z),
-				y=convolve(fluxes[i], Box1DKernel(smooth)),
+				y=convolve(scaledfluxes[i], Box1DKernel(smooth)),
 				error_y_width=0, error_y_thickness=1, error_y_type="data", # σ
 				error_y_array=delta[i] if delta[i].size and "e" in checklist else None,
 				name=names[i], opacity=1 / 2, mode="lines", **kws))
