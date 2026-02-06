@@ -1385,5 +1385,8 @@ def make_multiepoch_spectra(field_d, cat_d, field_i, cat_i, extra_obj, redshift,
 if __name__ == "__main__":
 	# app.run(threaded=True, debug=True)
 	# app.run(host="0.0.0.0", port="8050", threaded=True, debug=True, dev_tools_ui=dash.__version__ >= "3")
-	app.run(host="127.0.0.1", port="8050", threaded=True, debug=True, dev_tools_ui=dash.__version__ >= "3")
+	if dash.__version__ >= "3":
+		app.run(host="127.0.0.1", port="8050", threaded=True, debug=True, dev_tools_disable_version_check=True)
+	else:
+		app.run(host="127.0.0.1", port="8050", threaded=True, debug=True, dev_tools_ui=False)
 
