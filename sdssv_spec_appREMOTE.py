@@ -116,7 +116,7 @@ smooth_max = 435 # corresponds to 30,000 km/s
 
 # Allepoch scaling
 scale_default = 1
-scale_max = 100 
+scale_max = 100
 
 ### css files
 external_stylesheets = [ "https://codepen.io/chriddyp/pen/bWLwgP.css",
@@ -132,7 +132,7 @@ external_stylesheets = [ "https://codepen.io/chriddyp/pen/bWLwgP.css",
 def some(x: Any) -> bool: return x not in (None, NaN, "")
 def get(hdu: FITS_rec, col: str, default: None = None):
 	if not hasattr(hdu, col): return default
-	ret = cast(ndarray, hdu[col])[0]
+	ret = cast(ndarray, hdu[col]).item(0) # stupid numpy.char.chararray :(
 	if isa(ret, str): ret = ret.strip()
 	return ret
 
@@ -1078,7 +1078,6 @@ def set_extra_obj(search: str):
 	Output("redshift_input", "value", allow_duplicate=True),
 	Output("redshift_step", "value"),
 	Output("smooth_input", "value"),
-	Output("scale_input", "value"),
 	State("axis_y_max", "value"),
 	State("axis_y_min", "value"),
 	State("axis_x_max", "value"),

@@ -3,7 +3,7 @@
 [![codecov.io](https://codecov.io/gh/Heptazhou/SDSS-SpecViewer/branch/master/graph/badge.svg)](https://app.codecov.io/gh/Heptazhou/SDSS-SpecViewer)
 
 authors: Dr. Jennifer Li (UIUC) and Meg Davis (UConn, <megan.c.davis@uconn.edu>), 2021<br />
-authors: Pat Hall and Zezhou Zhu (YorkU, <phall@yorku.ca>, <zzz@my.yorku.ca>), 2023-2025
+authors: Pat Hall and Zezhou Zhu (YorkU, <phall@yorku.ca>, <zzz@my.yorku.ca>), 2023-2026
 
 This is a multi-epoch spectral viewer for SDSSV-BHM using [plotly/dash](https://dash.plotly.com/). The goal is to build a web application that allows quick spectral visualization for SDSSV BHM data. The current version will access the data via url and it takes a few seconds to load the spectra.
 
