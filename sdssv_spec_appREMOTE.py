@@ -20,7 +20,7 @@ from threading import RLock as ReentrantLock
 from time import sleep
 from traceback import print_exc
 from typing import Any, cast
-from warnings import catch_warnings, filterwarnings
+from warnings import catch_warnings, filterwarnings, simplefilter
 
 import numpy
 from astropy.convolution import Box1DKernel, convolve # type: ignore[import-untyped]
@@ -31,11 +31,13 @@ from plotly.graph_objects import Figure, Scatter # type: ignore[import-untyped]
 from pyzstd import open as ZSTD
 from requests import request
 from requests.exceptions import ChunkedEncodingError, ConnectionError, HTTPError
+import io as _io
+import contextlib
+
+### Import several important functions from util/sdss.py etc.
 
 import util
 from util import identity, isa, isfile, nextfloat, parse_json, sdss_iau, sdss_sas_fits, sdss_zwarn, write
-
-### Import several important functions from util/sdss.py etc.
 
 
 with catch_warnings():
@@ -1120,13 +1122,14 @@ def hide_file_upload(checklist: list[str]):
 	Input("file_ul", "last_modified"))
 def process_upload(sto: dict, contents: list[str], filename: list[str], timestamp: list[float]):
 	# read in spectrum from csv/tsv/wsv file for wavelength, flux, error (optional)
+	# uploading will silently fail if input has 4 columns - need to fix that for DESI
 	if not contents: return sto
 	if not sto: sto = {}
 	with mktempdir(prefix="py_", ignore_cleanup_errors=True) as tmpdir:
 		d = Path(tmpdir)
 		for s, f, t in zip(contents, filename, timestamp):
 			try:
-				# print((s[:100], f, t)) # for testing
+				#print((s[:100], f, t)) # for testing
 				path, type = d / f, None # default file type is tsv/wsv
 				mime, data = s.split(",", 1)
 				head, data = 0, base64decode(data).decode()
@@ -1139,11 +1142,31 @@ def process_upload(sto: dict, contents: list[str], filename: list[str], timestam
 					if fullmatch(r"\s*[+-]?\d+.*", line): break
 					# lines that fail the above criterion are added to the count of header lines:
 					head += 1
+				# create temporary file "path" containing data file
 				write(path, data)
-				a = numpy.genfromtxt(path, dtype=None, delimiter=type, skip_header=head).transpose()
+				# check for a fourth column. If it exists, we'll assume it's a DESI file with ivar in the 3rd column.
+				with contextlib.redirect_stderr(_io.StringIO()):
+					b = numpy.genfromtxt(path, dtype=None, delimiter=type, usecols=(3), invalid_raise=False, skip_header=head).transpose()
+					#print(b)
+				# check for a third column
+				with contextlib.redirect_stderr(_io.StringIO()):
+					c = numpy.genfromtxt(path, dtype=None, delimiter=type, usecols=(2), invalid_raise=False, skip_header=head).transpose()
+					#print(c)
+				if numpy.all(c == ''): # if no 3rd column, just use first two columns of the input file as wavelength, flux
+					a = numpy.genfromtxt(path, dtype=None, delimiter=type, usecols=(0,1), skip_header=head).transpose()
+					#print(a) # testing
+					print('Two-column input file: wavelength flux.')
+				else: # otherwise, use the first three columns of the input file as wavelength, flux, error
+					a = numpy.genfromtxt(path, dtype=None, delimiter=type, usecols=(0,1,2), skip_header=head).transpose()
+					if numpy.all(b == ''): print('Three-column input file: wavelength flux error.')
+					#print(a) # testing
 				sto[path.stem] = a
-				# print(a)
-			except: print_exc()
+				#print(a) # testing
+				if numpy.all(b == '')==False: # if a fourth column as present, change the third column from ivar to error [DESI files]
+					a[2,:]=1.0/numpy.sqrt(a[2,:]+1e-4) # add 1e-4 (error=100.) to cover cases of ivar=0
+					print('Four-column input file. 3rd column converted from ivar to error.')
+				#print(a) # testing
+			except: print("An exception occurred. Uncomment this line if needed for debugging.") #print_exc()
 	return sto
 
 ## hide/show pipeline redshift info
