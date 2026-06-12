@@ -21,7 +21,7 @@ from time import sleep
 from traceback import print_exc
 from typing import Any, cast
 from warnings import catch_warnings, filterwarnings, simplefilter
-from sparcl.client import SparclClient
+#from sparcl.client import SparclClient 
 from astropy.time import Time
 
 import numpy
