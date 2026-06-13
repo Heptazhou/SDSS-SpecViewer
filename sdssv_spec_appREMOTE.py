@@ -5,6 +5,8 @@ See https://github.com/Heptazhou/SDSS-SpecViewer
 Excelsior!
 """
 
+import contextlib
+import io as _io
 from base64 import b64decode as base64decode
 from collections import defaultdict
 from dataclasses import dataclass
@@ -21,25 +23,23 @@ from time import sleep
 from traceback import print_exc
 from typing import Any, cast
 from warnings import catch_warnings, filterwarnings, simplefilter
-#from sparcl.client import SparclClient 
-from astropy.time import Time
 
+# from sparcl.client import SparclClient
 import numpy
 from astropy.convolution import Box1DKernel, convolve # type: ignore[import-untyped]
 from astropy.io.fits import BinTableHDU, FITS_rec # type: ignore[import-untyped]
 from astropy.io.fits import open as FITS
+from astropy.time import Time
 from numpy import mean, median, ndarray, sqrt, std
 from plotly.graph_objects import Figure, Scatter # type: ignore[import-untyped]
 from pyzstd import open as ZSTD
 from requests import request
 from requests.exceptions import ChunkedEncodingError, ConnectionError, HTTPError
-import io as _io
-import contextlib
-
-### Import several important functions from util/sdss.py etc.
 
 import util
 from util import identity, isa, isfile, nextfloat, parse_json, sdss_iau, sdss_sas_fits, sdss_zwarn, write
+
+### Import several important functions from util/sdss.py etc.
 
 
 with catch_warnings():
@@ -208,9 +208,9 @@ def SDSSV_fetch(username: str, password: str, field: int | str, mjd: int, obj: i
 	wave = 10**wave                           # λ
 	errs = 1 / sqrt(errs)                     # σ
 	## PBH testing optional scaling for allepoch coadds only
-	#print(f"meta: {type(meta)} = {str(meta)[:100]}")
-	#print(f"wave: {type(wave)} = {str(wave)[:100]}")
-	#print(f"flux: {type(flux)} = {str(flux)[:100]}")
+	# print(f"meta: {type(meta)} = {str(meta)[:100]}")
+	# print(f"wave: {type(wave)} = {str(wave)[:100]}")
+	# print(f"flux: {type(flux)} = {str(flux)[:100]}")
 	if some(RUN2D := get(meta, "RUN2D")) and RUN2D != branch:
 		print(f"Error: unexpected {RUN2D=} with {branch=} in `{basename(url)}`")
 		meta["RUN2D"][0] = ""
@@ -249,21 +249,21 @@ def SDSSV_fetch_allepoch(username: str, password: str, mjd: int, obj: int | str)
 	field = "allepoch*"
 	raise HTTPError(f"[SDSSV_fetch] {(field, mjd, obj)}")
 
-	#if mjd >= 59187:
-	#	for x in ["allepoch_apo"] if mjd < 60000 else ["allepoch_apo", "allepoch_lco"]:
-	#		try: return SDSSV_fetch(username, password, x, mjd, obj, branch="v6_2_1")
-	#		except: pass
-	#		try: return SDSSV_fetch(username, password, x, mjd, obj, branch="v6_2_0")
-	#		except: pass
-	#	for x in ["allepoch"    ] if mjd < 60000 else ["allepoch", "allepoch_lco"    ]:
-	#		try: return SDSSV_fetch(username, password, x, mjd, obj, branch="v6_1_3")
-	#		except: pass
-	#if mjd >= 59164:
-	#	for x in ["allepoch"    ]:
-	#		try: return SDSSV_fetch(username, password, x, mjd, obj, branch="v6_1_1")
-	#		except: pass
-	#field = "allepoch*"
-	#raise HTTPError(f"[SDSSV_fetch] {(field, mjd, obj)}")
+	# if mjd >= 59187:
+	# 	for x in ["allepoch_apo"] if mjd < 60000 else ["allepoch_apo", "allepoch_lco"]:
+	# 		try: return SDSSV_fetch(username, password, x, mjd, obj, branch="v6_2_1")
+	# 		except: pass
+	# 		try: return SDSSV_fetch(username, password, x, mjd, obj, branch="v6_2_0")
+	# 		except: pass
+	# 	for x in ["allepoch"    ] if mjd < 60000 else ["allepoch", "allepoch_lco"    ]:
+	# 		try: return SDSSV_fetch(username, password, x, mjd, obj, branch="v6_1_3")
+	# 		except: pass
+	# if mjd >= 59164:
+	# 	for x in ["allepoch"    ]:
+	# 		try: return SDSSV_fetch(username, password, x, mjd, obj, branch="v6_1_1")
+	# 		except: pass
+	# field = "allepoch*"
+	# raise HTTPError(f"[SDSSV_fetch] {(field, mjd, obj)}")
 
 @dataclass
 class Meta:
@@ -314,7 +314,7 @@ class Data:
 	flux: ndarray
 	errs: ndarray
 
-def fetch_catID(field: int | str, catID: int | str, extra: str = "", sdss_id: str = "", match_sdss_id: bool = True, max_epochs: int=12 ) \
+def fetch_catID(field: int | str, catID: int | str, extra: str = "", sdss_id: str = "", match_sdss_id: bool = True, max_epochs: int = 12 ) \
 	-> tuple[Meta, list[str], list[ndarray], list[ndarray], list[ndarray]]:
 	"""
 	Fetch all the needed data for an object
@@ -343,10 +343,10 @@ def fetch_catID(field: int | str, catID: int | str, extra: str = "", sdss_id: st
 	else:
 		sid = 0
 		match_sdss_id = False
-	_key = (field, catID, extra, sid, match_sdss_id, max_epochs) #PBH
+	_key = (field, catID, extra, sid, match_sdss_id, max_epochs) # PBH
 	if _key in fetch_cache:
 		return fetch_cache[_key]
-	#print(f"[sdss_id] {catID} => {sid} => {cats} # {match_sdss_id}")
+	# print(f"[sdss_id] {catID} => {sid} => {cats} # {match_sdss_id}")
 
 	def legend(meta: Meta, base: str = "") -> str:
 		base = base or f"{meta.mjd}"
@@ -357,7 +357,7 @@ def fetch_catID(field: int | str, catID: int | str, extra: str = "", sdss_id: st
 		return base if len(base) <= 20 else base.replace("\n", "<br />")
 	for x in extra.split(","): # for each extra entry, separated by commas
 		x, ver = [*x.split("@", 1), ""][:2]
-		#print(x,ver)
+		# print(x,ver)
 		if not fullmatch(r"\d+p?-\d+-[^-](.*[^-])?", x): continue
 		fid, mjd_, obj = x.split("-", 2)
 		mjd = int(mjd_)
@@ -367,7 +367,7 @@ def fetch_catID(field: int | str, catID: int | str, extra: str = "", sdss_id: st
 			if str(e): print(e) if isa(e, HTTPError) else print_exc()
 			continue
 		meta = Meta(dat[0])
-		#print(meta)
+		# print(meta)
 		data.append(Data(meta, wave=dat[1], flux=dat[2], errs=dat[3], name=legend(meta, f"{meta.mjd}*")))
 	if fullmatch(r"\d+p?-\d+", field):
 		obj, ver = [*catID.split("@", 1), ""][:2]
@@ -378,7 +378,7 @@ def fetch_catID(field: int | str, catID: int | str, extra: str = "", sdss_id: st
 		except Exception as e:
 			if str(e): print(e) if isa(e, HTTPError) else print_exc()
 			raise # re-raise
-		#print(f"{dat[0].columns=}")
+		# print(f"{dat[0].columns=}")
 		meta = Meta(dat[0])
 		data.append(Data(meta, wave=dat[1], flux=dat[2], errs=dat[3], name=legend(meta)))
 		mjd_list = [mjd]
@@ -390,26 +390,26 @@ def fetch_catID(field: int | str, catID: int | str, extra: str = "", sdss_id: st
 				if field != "all" and int(field) != fid: continue
 				if mjd not in mjd_list: mjd_list.append(mjd)
 		mjd_list.sort(reverse=True)
-		#print(mjd_list) # PBH
-		#print(len(mjd_list)) # PBH
-		##print(numpy.size(mjd_list)) # PBH
-		#print(max_epochs) # PBH
-		    
+		# print(mjd_list) # PBH
+		# print(len(mjd_list)) # PBH
+		## print(numpy.size(mjd_list)) # PBH
+		# print(max_epochs) # PBH
+
 		### NEW: if more than max_epochs regular epochs, only fetch few earliest & latest
-		mjd_list_all = mjd_list.copy()   # before trimming
+		mjd_list_all = mjd_list.copy() # before trimming
 		if max_epochs and max_epochs >= 2 and numpy.size(mjd_list) > max_epochs:
 			print("More than ", max_epochs, "spectra found. Displaying only 3 earliest, 3 latest, & any all_epoch spectra from those MJDs (plus specified previous spectra).")
-			#mjd_list = [max(mjd_list), min(mjd_list)]   # latest, earliest (keep reverse order)
-			#mjd_list = [(mjd_list[0]), mjd_list[1], mjd_list[-2], mjd_list[-1]]   # latest, earliest (keep reverse order)
-			mjd_list = [(mjd_list[0]), mjd_list[1], mjd_list[2], mjd_list[-3], mjd_list[-2], mjd_list[-1]]   # latest, earliest (keep reverse order)
-			#print(mjd_list) # PBH
+			# mjd_list = [max(mjd_list), min(mjd_list)] # latest, earliest (keep reverse order)
+			# mjd_list = [(mjd_list[0]), mjd_list[1], mjd_list[-2], mjd_list[-1]] # latest, earliest (keep reverse order)
+			mjd_list = [(mjd_list[0]), mjd_list[1], mjd_list[2], mjd_list[-3], mjd_list[-2], mjd_list[-1]] # latest, earliest (keep reverse order)
+			# print(mjd_list) # PBH
 
 		for cat in cats:
 			for fieldmjd in catalogs.get(f"{cat}", [0])[1:]: # {13'FIELD,5'MJD}
 				fid, mjd = divmod(abs(fieldmjd), 10**5)
 				if field != "all" and int(field) != fid: continue
-				#print(mjd, " fieldmjd") # PBH
-				if mjd not in mjd_list: continue          # ← NEW: skip non-selected epochs
+				# print(mjd, " fieldmjd") # PBH
+				if mjd not in mjd_list: continue # ← NEW: skip non-selected epochs
 				try:
 					dat = SDSSV_fetch(username, password, fid, mjd, cat)
 				except Exception as e:
@@ -417,14 +417,14 @@ def fetch_catID(field: int | str, catID: int | str, extra: str = "", sdss_id: st
 					continue
 				meta = Meta(dat[0])
 				data.append(Data(meta, wave=dat[1], flux=dat[2], errs=dat[3], name=legend(meta)))
-	#print(mjd_list)
-	#data.sort(key=lambda x: x.meta.mjd)
+	# print(mjd_list)
+	# data.sort(key=lambda x: x.meta.mjd)
 
-	# 
+	#
 	for cat in cats:
-		#for mjd in (x for x in mjd_list_all if x <= 59392):
+		# for mjd in (x for x in mjd_list_all if x <= 59392):
 		for mjd in (x for x in mjd_list if x <= 59392): # greatly restrict allepoch search for >max_epochs
-			#print(mjd, " allplate") # PBH
+			# print(mjd, " allplate") # PBH
 			try:
 				dat = SDSSV_fetch_allepoch(username, password, mjd, cat)
 			except Exception: # as e: # PBH: stop after first
@@ -435,12 +435,12 @@ def fetch_catID(field: int | str, catID: int | str, extra: str = "", sdss_id: st
 			break
 	# allFPS
 	for cat in cats:
-		#for mjd in (x for x in mjd_list_all if x >= 59393):
+		# for mjd in (x for x in mjd_list_all if x >= 59393):
 		for mjd in (x for x in mjd_list if x >= 59393): # greatly restrict allepoch search for >max_epochs
-			#print(mjd, " allFPS") # PBH
+			# print(mjd, " allFPS") # PBH
 			try:
 				dat = SDSSV_fetch_allepoch(username, password, mjd, cat)
-			except Exception: #as e: PBH: stop after first 
+			except Exception: # as e: PBH: stop after first
 				# if str(e): print(e) if isa(e, HTTPError) else print_exc()
 				continue
 			meta = Meta(dat[0], True)
@@ -448,28 +448,28 @@ def fetch_catID(field: int | str, catID: int | str, extra: str = "", sdss_id: st
 			break
 	data.sort(key=lambda x: x.meta.mjd + (1e6 if x.name.startswith("all") else 0))
 
-	### PBH+Claude NEW: if more than max_epochs (12 by default, set by &e=# on command line), 
-	#display only earliest, latest, & allepoch spectra (plus specified previous spectra).
+	### PBH+Claude NEW: if more than max_epochs (12 by default, set by &e=# on command line),
+	# display only earliest, latest, & allepoch spectra (plus specified previous spectra).
 	# max_epochs = 12 # default; reset on command line
 
 	# split out the categories that are never subject to the cap
-	is_extra    = lambda d: d.name.endswith("*")                                   # "prev"/extra
-	is_allepoch = lambda d: d.name.startswith("allplate") or d.name.startswith("allFPS")
-	is_regular  = lambda d: not is_extra(d) and not is_allepoch(d)
+	def is_extra(d): return d.name.endswith("*") # "prev"/extra
+	def is_allepoch(d): return d.name.startswith("allplate") or d.name.startswith("allFPS")
+	def is_regular(d): return not is_extra(d) and not is_allepoch(d)
 
-	regular  = [d for d in data if is_regular(d)]
-	extra_   = [d for d in data if is_extra(d)]
+	regular = [d for d in data if is_regular(d)]
+	extra_ = [d for d in data if is_extra(d)]
 	allepoch = [d for d in data if is_allepoch(d)]
 
-	#if len(regular) > max_epochs:
-	#	print("More than ", max_epochs, "spectra found. Displaying only earliest, latest, & allepoch spectra (plus specified previous spectra).")
-	#	earliest = min(regular, key=lambda d: d.meta.mjd)
-	#	latest   = max(regular, key=lambda d: d.meta.mjd)
-	#	kept = {id(earliest), id(latest)}
-	#	regular = [d for d in regular if id(d) in kept]
-	#	regular.sort(key=lambda d: d.meta.mjd)
+	# if len(regular) > max_epochs:
+	# 	print("More than ", max_epochs, "spectra found. Displaying only earliest, latest, & allepoch spectra (plus specified previous spectra).")
+	# 	earliest = min(regular, key=lambda d: d.meta.mjd)
+	# 	latest = max(regular, key=lambda d: d.meta.mjd)
+	# 	kept = {id(earliest), id(latest)}
+	# 	regular = [d for d in regular if id(d) in kept]
+	# 	regular.sort(key=lambda d: d.meta.mjd)
 
-	#data = regular + allepoch
+	# data = regular + allepoch
 	data = regular + allepoch + extra_
 	data.sort(key=lambda x: x.meta.mjd + (1e6 if x.name.startswith("all") else 0))
 
@@ -511,7 +511,7 @@ try:
 	# fetch_test = SDSSV_fetch(username, password, 112359, 60086, 27021600949438682)
 	fetch_test = SDSSV_fetch(username, password, 101126, 60477, 63050394846126565)
 	# url = SDSSV_buildURL("102236", "60477", "63050394846126565", "")
-	#print(url)
+	# print(url)
 	print("Verification succeeded.  Quick syntax guide:")
 	print("Try loading http://127.0.0.1:8050/?<sdss_id>")
 	print("         or http://127.0.0.1:8050/?<field>-<mjd>-<catid>")
@@ -527,7 +527,7 @@ except:
 	print("Verification failed.")
 	print("Please make sure you have internet access and/or fix authentication.txt.")
 	print("You may either edit the file to fix it or simply delete it, and then rerun this program.")
-	#print("Contact Meg (megan.c.davis@uconn.edu) if the issue persists.")
+	# print("Contact Meg (megan.c.davis@uconn.edu) if the issue persists.")
 	# exit(1)
 
 
@@ -636,8 +636,8 @@ spec_line_abs = numpy.asarray([
 	[1, 1, "0911.7600                    ", "Ly ∞"      ],
 ])
 
-#print(spec_line_emi[numpy.bool_(numpy.int_(spec_line_emi[:, 0])), 3].tolist())
-#print(spec_line_abs[numpy.bool_(numpy.int_(spec_line_abs[:, 0])), 3].tolist())
+# print(spec_line_emi[numpy.bool_(numpy.int_(spec_line_emi[:, 0])), 3].tolist())
+# print(spec_line_abs[numpy.bool_(numpy.int_(spec_line_abs[:, 0])), 3].tolist())
 
 ### wavelength plotting range
 wave_max = 10500.
@@ -957,16 +957,16 @@ app.layout = html.Div(className="container-fluid", style={"width": "90%"}, child
 
 			]),
 
-                        ## spectral smoothing
-                        html.Div(className="col-lg-6 col-md-3 col-sm-4 col-xs-6", children=[
-                                html.Label(
-                                        html.H4("Smoothing"),
-                                ),
-                                dcc.Input(
-                                        id="smooth_input", type="number", step=2, min=1, value=smooth_default, placeholder="SmoothWidth",
-                                        style={"height": "36px", "width": "100%"}, max=smooth_max,
-                                ), # PBH: closes dcc.Input
-                        ]), # PBH: closes html.Div
+			## spectral smoothing
+			html.Div(className="col-lg-6 col-md-3 col-sm-4 col-xs-6", children=[
+				html.Label(
+					html.H4("Smoothing"),
+				),
+				dcc.Input(
+					id="smooth_input", type="number", step=2, min=1, value=smooth_default, placeholder="SmoothWidth",
+					style={"height": "36px", "width": "100%"}, max=smooth_max,
+				), # PBH: closes dcc.Input
+			]), # PBH: closes html.Div
 
 			## allepoch scaling
 			html.Div(className="col-lg-6 col-md-3 col-sm-4 col-xs-6", children=[
@@ -1155,7 +1155,7 @@ def set_redshift_stepping(z, step):
 # syntax example: http://127.0.0.1:8050/?100701-59719-27021597909876068&extra=1163-52669-0597
 @app.callback(
 	Output("extra_obj_input", "value"),
-	Output("max-epochs-store", "data"),        # PBH
+	Output("max-epochs-store", "data"), # PBH
 	Input("window_location", "search"))
 def set_extra_obj(search: str):
 	extra_obj = ""
@@ -1164,7 +1164,7 @@ def set_extra_obj(search: str):
 		if not fullmatch(r"[^=]+=[^=]+", x): continue
 		k, v = x.split("=", 1)
 		if k in ["ext", "extra", "prev", "previous"]: extra_obj = v
-		if k == "e" and fullmatch(r"\d+", v): max_epochs = int(v)   # PBH
+		if k == "e" and fullmatch(r"\d+", v): max_epochs = int(v) # PBH
 	return extra_obj, max_epochs
 
 # reset axes range, smooth width, and redshift when any of program/fieldid/catid changes
@@ -1223,7 +1223,7 @@ def process_upload(sto: dict, contents: list[str], filename: list[str], timestam
 		d = Path(tmpdir)
 		for s, f, t in zip(contents, filename, timestamp):
 			try:
-				#print((s[:100], f, t)) # for testing
+				# print((s[:100], f, t)) # for testing
 				path, type = d / f, None # default file type is tsv/wsv
 				mime, data = s.split(",", 1)
 				head, data = 0, base64decode(data).decode()
@@ -1241,26 +1241,26 @@ def process_upload(sto: dict, contents: list[str], filename: list[str], timestam
 				# check for a fourth column. If it exists, we'll assume it's a DESI file with ivar in the 3rd column.
 				with contextlib.redirect_stderr(_io.StringIO()):
 					b = numpy.genfromtxt(path, dtype=None, delimiter=type, usecols=(3), invalid_raise=False, skip_header=head).transpose()
-					#print(b)
+					# print(b)
 				# check for a third column
 				with contextlib.redirect_stderr(_io.StringIO()):
 					c = numpy.genfromtxt(path, dtype=None, delimiter=type, usecols=(2), invalid_raise=False, skip_header=head).transpose()
-					#print(c)
+					# print(c)
 				if numpy.all(c == ''): # if no 3rd column, just use first two columns of the input file as wavelength, flux
-					a = numpy.genfromtxt(path, dtype=None, delimiter=type, usecols=(0,1), skip_header=head).transpose()
-					#print(a) # testing
+					a = numpy.genfromtxt(path, dtype=None, delimiter=type, usecols=(0, 1), skip_header=head).transpose()
+					# print(a) # testing
 					print('Two-column input file: wavelength flux.')
 				else: # otherwise, use the first three columns of the input file as wavelength, flux, error
-					a = numpy.genfromtxt(path, dtype=None, delimiter=type, usecols=(0,1,2), skip_header=head).transpose()
+					a = numpy.genfromtxt(path, dtype=None, delimiter=type, usecols=(0, 1, 2), skip_header=head).transpose()
 					if numpy.all(b == ''): print('Three-column input file: wavelength flux error.')
-					#print(a) # testing
+					# print(a) # testing
 				sto[path.stem] = a
-				#print(a) # testing
-				if numpy.all(b == '')==False: # if a fourth column as present, change the third column from ivar to error [DESI files]
-					a[2,:]=1.0/numpy.sqrt(a[2,:]+1e-4) # add 1e-4 (error=100.) to cover cases of ivar=0
+				# print(a) # testing
+				if numpy.all(b == '') == False: # if a fourth column as present, change the third column from ivar to error [DESI files]
+					a[2, :] = 1.0 / numpy.sqrt(a[2, :] + 1e-4) # add 1e-4 (error=100.) to cover cases of ivar=0
 					print('Four-column input file. 3rd column converted from ivar to error.')
-				#print(a) # testing
-			except: print("An exception occurred. Uncomment this line if needed for debugging.") #print_exc()
+				# print(a) # testing
+			except: print("An exception occurred. Uncomment this line if needed for debugging.") # print_exc()
 	return sto
 
 ## hide/show pipeline redshift info
@@ -1288,7 +1288,7 @@ def hide_spec_info2(checklist: list[str]):
 	Input("catalogid_input", "value"),
 	Input("sdss_id_input", "value"),
 	Input("extra_func_list", "value"),
-        Input("max-epochs-store", "data"))
+	Input("max-epochs-store", "data"))
 def show_spec_info(field_d, cat_d, field_i, cat_i, sdss_id, checklist: list[str], max_epochs: int):
 	try:
 		meta = fetch_catID(field_d or field_i, cat_d or cat_i, "", sdss_id, match_sdss_id="s" in checklist, max_epochs=max_epochs or 12)[0]
@@ -1306,7 +1306,7 @@ def show_spec_info(field_d, cat_d, field_i, cat_i, sdss_id, checklist: list[str]
 	Input("catalogid_input", "value"),
 	Input("sdss_id_input", "value"),
 	Input("extra_func_list", "value"),
-        Input("max-epochs-store", "data"))
+	Input("max-epochs-store", "data"))
 def show_spec_info2(field_d, cat_d, field_i, cat_i, sdss_id, checklist: list[str], max_epochs: int):
 	try:
 		meta = fetch_catID(field_d or field_i, cat_d or cat_i, "", sdss_id, match_sdss_id="s" in checklist, max_epochs=max_epochs or 12)[0]
