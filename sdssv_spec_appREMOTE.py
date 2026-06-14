@@ -5,13 +5,13 @@ See https://github.com/Heptazhou/SDSS-SpecViewer
 Excelsior!
 """
 
-import contextlib
-import io as _io
 from base64 import b64decode as base64decode
 from collections import defaultdict
+from contextlib import redirect_stderr
 from dataclasses import dataclass
 from functools import lru_cache
 from io import BytesIO as IOBuffer
+from io import StringIO
 from math import log10
 from math import nan as NaN
 from pathlib import Path
@@ -22,14 +22,13 @@ from threading import RLock as ReentrantLock
 from time import sleep
 from traceback import print_exc
 from typing import Any, cast
-from warnings import catch_warnings, filterwarnings, simplefilter
+from warnings import catch_warnings, filterwarnings
 
-# from sparcl.client import SparclClient
 import numpy
+# from sparcl.client import SparclClient
 from astropy.convolution import Box1DKernel, convolve # type: ignore[import-untyped]
 from astropy.io.fits import BinTableHDU, FITS_rec # type: ignore[import-untyped]
 from astropy.io.fits import open as FITS
-from astropy.time import Time
 from numpy import mean, median, ndarray, sqrt, std
 from plotly.graph_objects import Figure, Scatter # type: ignore[import-untyped]
 from pyzstd import open as ZSTD
@@ -232,19 +231,16 @@ def SDSSV_fetch_allepoch(username: str, password: str, mjd: int, obj: int | str)
 		for x in ["allepoch_apo"] if mjd < 60000 else ["allepoch_apo", "allepoch_lco"]:
 			for branch in ("v6_2_1", "v6_2_0"):
 				url, _ = sdss_sas_fits(x, mjd, obj, branch)
-				if not url_exists(url):
-					continue
+				if not url_exists(url): continue
 				return SDSSV_fetch(username, password, x, mjd, obj, branch)
 		for x in ["allepoch"] if mjd < 60000 else ["allepoch", "allepoch_lco"]:
 			url, _ = sdss_sas_fits(x, mjd, obj, "v6_1_3")
-			if not url_exists(url):
-				continue
+			if not url_exists(url): continue
 			return SDSSV_fetch(username, password, x, mjd, obj, "v6_1_3")
 	if mjd >= 59164:
 		for x in ["allepoch"]:
 			url, _ = sdss_sas_fits(x, mjd, obj, "v6_1_1")
-			if not url_exists(url):
-				continue
+			if not url_exists(url): continue
 			return SDSSV_fetch(username, password, x, mjd, obj, "v6_1_1")
 	field = "allepoch*"
 	raise HTTPError(f"[SDSSV_fetch] {(field, mjd, obj)}")
@@ -357,7 +353,7 @@ def fetch_catID(field: int | str, catID: int | str, extra: str = "", sdss_id: st
 		return base if len(base) <= 20 else base.replace("\n", "<br />")
 	for x in extra.split(","): # for each extra entry, separated by commas
 		x, ver = [*x.split("@", 1), ""][:2]
-		# print(x,ver)
+		# print(x, ver)
 		if not fullmatch(r"\d+p?-\d+-[^-](.*[^-])?", x): continue
 		fid, mjd_, obj = x.split("-", 2)
 		mjd = int(mjd_)
@@ -392,24 +388,24 @@ def fetch_catID(field: int | str, catID: int | str, extra: str = "", sdss_id: st
 		mjd_list.sort(reverse=True)
 		# print(mjd_list) # PBH
 		# print(len(mjd_list)) # PBH
-		## print(numpy.size(mjd_list)) # PBH
+		# print(numpy.size(mjd_list)) # PBH
 		# print(max_epochs) # PBH
 
-		### NEW: if more than max_epochs regular epochs, only fetch few earliest & latest
-		mjd_list_all = mjd_list.copy() # before trimming
+		### if more than max_epochs regular epochs, only fetch few earliest & latest
+		# mjd_list_all = mjd_list.copy() # before trimming
 		if max_epochs and max_epochs >= 2 and numpy.size(mjd_list) > max_epochs:
-			print("More than ", max_epochs, "spectra found. Displaying only 3 earliest, 3 latest, & any all_epoch spectra from those MJDs (plus specified previous spectra).")
+			print(f"More than {max_epochs} spectra found. Displaying only 3 earliest, 3 latest, & any all_epoch spectra from those MJDs (plus specified previous spectra).")
 			# mjd_list = [max(mjd_list), min(mjd_list)] # latest, earliest (keep reverse order)
-			# mjd_list = [(mjd_list[0]), mjd_list[1], mjd_list[-2], mjd_list[-1]] # latest, earliest (keep reverse order)
-			mjd_list = [(mjd_list[0]), mjd_list[1], mjd_list[2], mjd_list[-3], mjd_list[-2], mjd_list[-1]] # latest, earliest (keep reverse order)
+			# mjd_list = [mjd_list[0], mjd_list[1], mjd_list[-2], mjd_list[-1]] # latest, earliest (keep reverse order)
+			mjd_list = [mjd_list[0], mjd_list[1], mjd_list[2], mjd_list[-3], mjd_list[-2], mjd_list[-1]] # latest, earliest (keep reverse order)
 			# print(mjd_list) # PBH
 
 		for cat in cats:
 			for fieldmjd in catalogs.get(f"{cat}", [0])[1:]: # {13'FIELD,5'MJD}
 				fid, mjd = divmod(abs(fieldmjd), 10**5)
 				if field != "all" and int(field) != fid: continue
-				# print(mjd, " fieldmjd") # PBH
-				if mjd not in mjd_list: continue # ← NEW: skip non-selected epochs
+				# print(f"{mjd} fieldmjd") # PBH
+				if mjd not in mjd_list: continue # skip non-selected epochs
 				try:
 					dat = SDSSV_fetch(username, password, fid, mjd, cat)
 				except Exception as e:
@@ -420,14 +416,14 @@ def fetch_catID(field: int | str, catID: int | str, extra: str = "", sdss_id: st
 	# print(mjd_list)
 	# data.sort(key=lambda x: x.meta.mjd)
 
-	#
+	# allplate
 	for cat in cats:
 		# for mjd in (x for x in mjd_list_all if x <= 59392):
 		for mjd in (x for x in mjd_list if x <= 59392): # greatly restrict allepoch search for >max_epochs
-			# print(mjd, " allplate") # PBH
+			# print(f"{mjd} allplate") # PBH
 			try:
 				dat = SDSSV_fetch_allepoch(username, password, mjd, cat)
-			except Exception: # as e: # PBH: stop after first
+			except Exception as e: # PBH: stop after first
 				# if str(e): print(e) if isa(e, HTTPError) else print_exc()
 				continue
 			meta = Meta(dat[0], True)
@@ -437,10 +433,10 @@ def fetch_catID(field: int | str, catID: int | str, extra: str = "", sdss_id: st
 	for cat in cats:
 		# for mjd in (x for x in mjd_list_all if x >= 59393):
 		for mjd in (x for x in mjd_list if x >= 59393): # greatly restrict allepoch search for >max_epochs
-			# print(mjd, " allFPS") # PBH
+			# print(f"{mjd} allFPS") # PBH
 			try:
 				dat = SDSSV_fetch_allepoch(username, password, mjd, cat)
-			except Exception: # as e: PBH: stop after first
+			except Exception as e: # PBH: stop after first
 				# if str(e): print(e) if isa(e, HTTPError) else print_exc()
 				continue
 			meta = Meta(dat[0], True)
@@ -448,21 +444,21 @@ def fetch_catID(field: int | str, catID: int | str, extra: str = "", sdss_id: st
 			break
 	data.sort(key=lambda x: x.meta.mjd + (1e6 if x.name.startswith("all") else 0))
 
-	### PBH+Claude NEW: if more than max_epochs (12 by default, set by &e=# on command line),
+	### PBH+Claude: if more than max_epochs (12 by default, set by &e=# on command line),
 	# display only earliest, latest, & allepoch spectra (plus specified previous spectra).
 	# max_epochs = 12 # default; reset on command line
 
 	# split out the categories that are never subject to the cap
-	def is_extra(d): return d.name.endswith("*") # "prev"/extra
-	def is_allepoch(d): return d.name.startswith("allplate") or d.name.startswith("allFPS")
-	def is_regular(d): return not is_extra(d) and not is_allepoch(d)
+	def is_extra(d: Data): return d.name.endswith("*") # "prev"/extra
+	def is_allepoch(d: Data): return d.name.startswith("allplate") or d.name.startswith("allFPS")
+	def is_regular(d: Data): return not is_extra(d) and not is_allepoch(d)
 
 	regular = [d for d in data if is_regular(d)]
 	extra_ = [d for d in data if is_extra(d)]
 	allepoch = [d for d in data if is_allepoch(d)]
 
 	# if len(regular) > max_epochs:
-	# 	print("More than ", max_epochs, "spectra found. Displaying only earliest, latest, & allepoch spectra (plus specified previous spectra).")
+	# 	print(f"More than {max_epochs} spectra found. Displaying only earliest, latest, & allepoch spectra (plus specified previous spectra).")
 	# 	earliest = min(regular, key=lambda d: d.meta.mjd)
 	# 	latest = max(regular, key=lambda d: d.meta.mjd)
 	# 	kept = {id(earliest), id(latest)}
@@ -1239,24 +1235,24 @@ def process_upload(sto: dict, contents: list[str], filename: list[str], timestam
 				# create temporary file "path" containing data file
 				write(path, data)
 				# check for a fourth column. If it exists, we'll assume it's a DESI file with ivar in the 3rd column.
-				with contextlib.redirect_stderr(_io.StringIO()):
-					b = numpy.genfromtxt(path, dtype=None, delimiter=type, usecols=(3), invalid_raise=False, skip_header=head).transpose()
+				with redirect_stderr(StringIO()):
+					b = numpy.genfromtxt(path, dtype=None, delimiter=type, usecols=(3,), invalid_raise=False, skip_header=head).transpose()
 					# print(b)
 				# check for a third column
-				with contextlib.redirect_stderr(_io.StringIO()):
-					c = numpy.genfromtxt(path, dtype=None, delimiter=type, usecols=(2), invalid_raise=False, skip_header=head).transpose()
+				with redirect_stderr(StringIO()):
+					c = numpy.genfromtxt(path, dtype=None, delimiter=type, usecols=(2,), invalid_raise=False, skip_header=head).transpose()
 					# print(c)
-				if numpy.all(c == ''): # if no 3rd column, just use first two columns of the input file as wavelength, flux
+				if numpy.all(c == ""): # if no 3rd column, just use first two columns of the input file as wavelength, flux
 					a = numpy.genfromtxt(path, dtype=None, delimiter=type, usecols=(0, 1), skip_header=head).transpose()
 					# print(a) # testing
 					print('Two-column input file: wavelength flux.')
 				else: # otherwise, use the first three columns of the input file as wavelength, flux, error
 					a = numpy.genfromtxt(path, dtype=None, delimiter=type, usecols=(0, 1, 2), skip_header=head).transpose()
-					if numpy.all(b == ''): print('Three-column input file: wavelength flux error.')
+					if numpy.all(b == ""): print('Three-column input file: wavelength flux error.')
 					# print(a) # testing
 				sto[path.stem] = a
 				# print(a) # testing
-				if numpy.all(b == '') == False: # if a fourth column as present, change the third column from ivar to error [DESI files]
+				if not numpy.all(b == ""): # if a fourth column as present, change the third column from ivar to error [DESI files]
 					a[2, :] = 1.0 / numpy.sqrt(a[2, :] + 1e-4) # add 1e-4 (error=100.) to cover cases of ivar=0
 					print('Four-column input file. 3rd column converted from ivar to error.')
 				# print(a) # testing

@@ -2,7 +2,7 @@
 [tool.pixi.dependencies]
 astropy-base = "<=4.3.1"
 coverage = "*"
-dash = "<=2.13.0"
+dash = "<=2.13.0,<4"
 numpy = "<=1.21.4"
 plotly = "<=5.0.0"
 pytest = "*"

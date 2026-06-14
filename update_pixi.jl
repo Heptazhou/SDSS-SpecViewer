@@ -15,9 +15,8 @@
 using Exts
 
 @time if abspath(PROGRAM_FILE) == @__FILE__
-	run(`pixi add "dash~=3.2.0"`, devnull)
-	run(`pixi add "setuptools~=80.8.0"`, devnull)
-	run(`pixi update`, devnull)
+	run(`pixi add "dash>=3.4.0,<4"`, devnull)
+	run(`pixi update $ARGS`, devnull)
 	f = "pixi.lock"
 	s = readstr(f)
 	s = replace(s, r"^( +)- [^: ]+\K:(?= )"m => "\0")
