@@ -365,29 +365,15 @@ def fetch_catID(field: int | str, catID: int | str, extra: str = "", desi: str =
 		if x=='': continue
 		targetid = int(x)
 		print('desi targetid = ', targetid)
-		inc = ['sparcl_id', 'specid', 'flux', 'wavelength', 'ivar', 'mask', 'dateobs_center', 'redshift', 'ra', 'dec']
+		inc = ['sparcl_id', 'specid', 'flux', 'wavelength', 'ivar', 'mask', 'dateobs_center', 'redshift', 'redshift_warning', 'ra', 'dec']
 		client = SparclClient(connect_timeout=11, read_timeout=60, announcement=False)
 		results=client.retrieve_by_specid([targetid], include=inc, dataset_list=['DESI-DR1'])
-		print(results)
-		print("results = ", results)
+		#print(results) # number of records will be printed
 		for y in results.records:
-			print("y = ", y)
-			### Will need to fix for multiple DESI spectra. Possible fix:
-			##	dateobs_raw = y.dateobs_center
-			##	if isinstance(dateobs_raw, (list, tuple)):
-  			##		dateobs_raw = dateobs_raw[0]
-			##	dateobs = str(dateobs_raw).lstrip(' ').replace(" ", "T")
-			##	mjd = Time(dateobs, format='isot').mjd
-			#dat = results.records[y]
-			#mjd = Time(str(results.records[y].dateobs_center[0:10])+'T'+str(results.records[y].dateobs_center[11:24])).mjd
-			#	~~~~~~~~~~~~~~~^^^
-			#	TypeError: list indices must be integers or slices, not dict
-			##sparcl_id = [result['sparcl_id'][0]]
-			##dateobs = (str(results.records[y]["dateobs_center"][0]).lstrip(' ')).replace(" ","T")
-			#dateobs = (str(y["dateobs_center"][0]).lstrip(' ')).replace(" ","T")
-			print('dateobs_center = ', y.dateobs_center)
+			#print("y = ", y)
+			#print('dateobs_center = ', y.dateobs_center)
 			dateobs = (str(y.dateobs_center).lstrip(' ')).split('+')[0].replace(" ","T")
-			print('dateobs = ', dateobs)
+			#print('dateobs = ', dateobs)
 			mjd = Time(dateobs, format='fits').mjd
 			wave = numpy.asarray(y.wavelength, dtype=float)
 			flux = numpy.asarray(y.flux, dtype=float)
@@ -398,6 +384,7 @@ def fetch_catID(field: int | str, catID: int | str, extra: str = "", desi: str =
 			meta.obs = "DESI"
 			meta.mjd = mjd
 			meta.z   = float(y.redshift) if y.redshift is not None else 0.0
+			meta.zwarn = int(y.redshift_warning) if y.redshift_warning is not None else 0
 			meta.lon = float(y.ra)       if y.ra       is not None else float('nan')
 			meta.lat = float(y.dec)      if y.dec      is not None else float('nan')
 			if some(meta.lon) and some(meta.lat):
@@ -416,14 +403,16 @@ def fetch_catID(field: int | str, catID: int | str, extra: str = "", desi: str =
 
 	# After the desi loop, if there's no SDSS input, return early
 	if desi and not (catID or sdss_id or extra):
+		#print ("entering desi and not() loop")
 		if not data:
 			raise Exception("DESI fetch returned no data")
-	# build return values from data and return
+		# build return values from data and return
 		names  = [d.name for d in data]
 		waves  = [d.wave for d in data]
 		fluxes = [d.flux for d in data]
 		errs   = [d.errs for d in data]
 		meta   = data[0].meta
+		#print(meta)
 		fetch_cache[_key] = meta, names, waves, fluxes, errs
 		return meta, names, waves, fluxes, errs
 
@@ -1366,15 +1355,28 @@ def hide_spec_info2(checklist: list[str]):
 	Input("catalogid_dropdown", "value"),
 	Input("fieldid_input", "value"),
 	Input("catalogid_input", "value"),
+	Input("extra_obj_input", "value"),
+	Input("desi_obj_input", "value"),
 	Input("sdss_id_input", "value"),
 	Input("extra_func_list", "value"),
-	Input("max-epochs-store", "data"))
-def show_spec_info(field_d, cat_d, field_i, cat_i, sdss_id, checklist: list[str], max_epochs: int):
+	Input("max-epochs-store", "data"),
+	prevent_initial_call=True) # Wait for an actual user-triggered or callback-triggered change before firing
+def show_spec_info(field_d, cat_d, field_i, cat_i, extra_obj, desi_obj, sdss_id, checklist: list[str], max_epochs: int):
 	try:
-		meta = fetch_catID(field_d or field_i, cat_d or cat_i, "", "", sdss_id, match_sdss_id="s" in checklist, max_epochs=max_epochs or 12)[0]
-		warn = f"{x} ({s})" if (s := ", ".join(sdss_zwarn(x := meta.zwarn))) else f"{x}"
+		field  = "" if desi_obj else (field_d or field_i)
+		catID  = "" if desi_obj else (cat_d or cat_i)
+		meta = fetch_catID(field, catID, extra_obj or "", desi=desi_obj or "", sdss_id=sdss_id, match_sdss_id="s" in checklist, max_epochs=max_epochs or 12)[0]
+		#meta = fetch_catID(field_d or field_i, cat_d or cat_i, desi=desi_obj or "", sdss_id=sdss_id, match_sdss_id="s" in checklist, max_epochs=max_epochs or 12)[0]
+		#print('')
+		#print(f"[show_spec_info] meta.iau={meta.iau} meta.lon={meta.lon} meta.lat={meta.lat} desi_obj={desi_obj}")
+		#print('')
+		try:
+			warn = f"{x} ({s})" if (s := ", ".join(sdss_zwarn(x := meta.zwarn))) else f"{x}"
+		except (AssertionError, Exception):
+			warn = str(meta.zwarn)
 		return warn, meta.z, meta.rc2, meta.sid, meta.iau, meta.lon, meta.lat
 	except Exception as e:
+		print(f"[show_spec_info] EXCEPTION: {repr(e)}")
 		if str(e): print(f"[show_spec_info]  fetch_catID{([field_d, field_i], [cat_d, cat_i])}")
 		if str(e): print(e) if isa(e, HTTPError) else print_exc()
 		return None, None, None, None, None, None, None
@@ -1384,12 +1386,18 @@ def show_spec_info(field_d, cat_d, field_i, cat_i, sdss_id, checklist: list[str]
 	Input("catalogid_dropdown", "value"),
 	Input("fieldid_input", "value"),
 	Input("catalogid_input", "value"),
+	Input("etra_obj_input", "value"),
+	Input("desi_obj_input", "value"),
 	Input("sdss_id_input", "value"),
 	Input("extra_func_list", "value"),
-	Input("max-epochs-store", "data"))
-def show_spec_info2(field_d, cat_d, field_i, cat_i, sdss_id, checklist: list[str], max_epochs: int):
+	Input("max-epochs-store", "data"),
+	prevent_initial_call=True) # Wait for an actual user-triggered or callback-triggered change before firing
+def show_spec_info2(field_d, cat_d, field_i, cat_i, desi_obj, sdss_id, checklist: list[str], max_epochs: int):
 	try:
-		meta = fetch_catID(field_d or field_i, cat_d or cat_i, "", "", sdss_id, match_sdss_id="s" in checklist, max_epochs=max_epochs or 12)[0]
+		field  = "" if desi_obj else (field_d or field_i)
+		catID  = "" if desi_obj else (cat_d or cat_i)
+		meta = fetch_catID(field, catID, extra_obj or "", desi=desi_obj or "", sdss_id=sdss_id, match_sdss_id="s" in checklist, max_epochs=max_epochs or 12)[0]
+		#meta = fetch_catID(field_d or field_i, cat_d or cat_i, desi=desi_obj or "", sdss_id=sdss_id, match_sdss_id="s" in checklist, max_epochs=max_epochs or 12)[0]
 		return f"{meta.cats}"
 	except Exception as e:
 		if str(e): print(f"[show_spec_info2] fetch_catID{([field_d, field_i], [cat_d, cat_i])}")
