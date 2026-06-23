@@ -1392,7 +1392,7 @@ def show_spec_info(field_d, cat_d, field_i, cat_i, extra_obj, desi_obj, sdss_id,
 	Input("extra_func_list", "value"),
 	Input("max-epochs-store", "data"),
 	prevent_initial_call=True) # Wait for an actual user-triggered or callback-triggered change before firing
-def show_spec_info2(field_d, cat_d, field_i, cat_i, desi_obj, sdss_id, checklist: list[str], max_epochs: int):
+def show_spec_info2(field_d, cat_d, field_i, cat_i, extra_obj, desi_obj, sdss_id, checklist: list[str], max_epochs: int):
 	try:
 		field  = "" if desi_obj else (field_d or field_i)
 		catID  = "" if desi_obj else (cat_d or cat_i)
